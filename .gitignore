@@ -1,0 +1,9 @@
+# Personal, machine-local instructions — see Claude Code memory docs
+CLAUDE.local.md
+
+# Local agent settings
+.claude/settings.local.json
+
+# Working documents kept out of the published repository
+docs/
+tests/
