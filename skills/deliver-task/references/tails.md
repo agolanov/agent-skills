@@ -1,6 +1,6 @@
 # Tails and follow-up brief
 
-After merge, gather the child's Out of scope plus deferred minor, outside-scope and disputed review findings. Append one line per finding to `<plan-path-without-extension>-tails.md` in the main checkout:
+After merge, gather the child's Out of scope plus deferred minor, outside-scope and disputed review findings. Append one line per finding to `<plan-path-without-extension>-tails.md` beside the plan:
 
 ```text
 - <branch> <merge-sha7>: <what> — <where> — <why>
@@ -8,7 +8,11 @@ After merge, gather the child's Out of scope plus deferred minor, outside-scope 
 
 Use the merge commit's seven-character SHA, a concrete `path:line` location, and the scope/deferral reason. For a dispute, preserve both positions and the unresolved question. Preserve prior entries; do not invent a finding for zero tails. Report the count.
 
-When the plans directory contains tracked files, commit only this tails file on main immediately after merge, as `tails: <branch>`. When ignored, append locally without force-adding. Do not put tails on the reviewed child branch. With no findings there is no tails commit. Stop for unexpected main dirt rather than include unrelated files.
+The docs repository is the nearest Git root at or above the plan's directory: `git -C <plan-dir> rev-parse --show-toplevel`. It is the project repository when the project tracks the plans, or a nested repository inside a directory the project ignores. Record tails immediately after merge:
+
+1. If the toplevel is the project and `git -C <main-checkout> check-ignore -q <plan-dir>` exits 0, the plans directory is ignored without its own repository: append locally, no commit, no force-add.
+2. Otherwise, before staging, the docs repository's `git status --short` may show only this tails file; any other dirt stops rather than joining the commit. Stage only the tails file and commit it in the docs repository, on its current branch, as `tails: <branch>` with the task branch name.
+3. With no findings there is no tails commit. Do not put tails on the reviewed child branch. Afterwards require empty `git status --short` in the main checkout and, after a commit, in the docs repository.
 
 Write `${XDG_RUNTIME_DIR:-/tmp}/child-sessions/<branch>-tails-brief.md` outside Git even when there are no tails. Fill this ready follow-up template with absolute paths and actual findings:
 
