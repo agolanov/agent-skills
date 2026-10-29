@@ -9,11 +9,11 @@ A **unit** is one plan with its spec; the queue lists units. A **window** maps t
 | Free-text idea | needs spec, plan, review |
 | Spec without plan | needs plan, review |
 | Spec with N plans | N units; each needs whatever its plan lacks |
-| Plan without spec | one unit; needs spec (Phase 1, written from the plan with the user), then review of both |
+| Plan without spec | one unit; needs spec (Phase 1, written from the plan with the user), then review of both; the plan is reviewed in Phase 2 even with a fresh mark |
 | Spec and plan, either without a fresh mark | needs review of each document lacking one |
 | Spec and plan, both fresh | ready |
 
-A document "lacks review" whenever it is not fresh (below); a missing, stale, displaced or duplicated mark all count. Review scope is per document: a spec without a plan that was never marked is reviewed in Phase 2 together with its new plan.
+A document "lacks review" whenever it is not fresh (below); a missing, stale, displaced or duplicated mark all count. Review scope is per document: a spec without a plan that was never marked is reviewed in Phase 2 together with its new plan. The one exception to reviewing only non-fresh documents: the plan of a plan-without-spec unit is always reviewed in Phase 2, because any older mark predates its spec, so it was never reviewed against it.
 
 A directory input expands to every `.md` file inside it, except `*-tails.md` (delivery leftovers, not plans), anything under `.worktrees/` or `queues/`, and any path inside a linked worktree of the docs repository (every `git -C <docs-main> worktree list` entry except `<docs-main>` itself). A path under `specs/` or named `*-design.md` is a spec; under `plans/` a plan; anything else, ask. For every included spec, also include its plans found in `plans/` by the matching rules.
 

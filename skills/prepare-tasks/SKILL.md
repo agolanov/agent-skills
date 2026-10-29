@@ -19,7 +19,7 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 ## Units
 
 1. Read [units.md](references/units.md). With no inputs, scan the docs dir's `specs/` and `plans/`, show the units found and ask which to include. Map inputs to units, match specs to plans, derive slugs and paths, and classify every existing spec and plan fresh or stale by its freshness rule (a mark's presence proves nothing).
-2. Before opening anything, show the unit table: unit, spec, plan, lacks (`spec, plan, review`, `spec, review of <plan>`, `plan, review`, `review of <documents>`, or `nothing: ready`), naming each stale mark and why, plus the windows it implies. Ready units get no window.
+2. Before opening anything, show the unit table: unit, spec, plan, lacks (`spec, plan, review`, `spec, review of <plan>` for every plan without spec, `plan, review`, `review of <documents>`, or `nothing: ready`), naming each stale mark and why, plus the windows it implies. Ready units get no window.
 3. Check the selected child's actual installed catalogs (Claude: `~/.claude/skills`, enabled `~/.claude/plugins`; Codex: `~/.codex/skills`, `~/.agents/skills`, enabled `~/.codex/plugins`; plus the project's `.claude/skills` and `.agents/skills`). Resolve readable absolute SKILL.md paths for superpowers `brainstorming` (when a unit needs a spec) and `writing-plans` (when a plan is to be written), `auto-cross-refine`, the opposite launcher (`refine-with-codex` for a Claude child, `refine-with-claude` for Codex) and `review-fix-loop`. Missing ones stop before any window; report them for the user to install, without substitution.
 
 ## Windows (both phases)
@@ -45,7 +45,7 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 
 ## Phase 2: plans and reviews
 
-1. For every spec with unready units, skipping units whose Phase 1 window failed (they keep `not ready`; that window receives no further brief), fill [plan-brief.md](references/plan-brief.md) at `<runtime>/prep-<slug>-plan-brief.md`, status `<runtime>/prep-<slug>-plan-status.md`: `Spec:`; plans to write on `Plan paths:` in confirmed order; every existing document of the spec's units lacking a fresh mark (by its freshness on the window's branch for Phase 1 specs) on `Documents to review:`, never a fresh one; predecessors and plan headers from the order.
+1. For every spec with unready units, skipping units whose Phase 1 window failed (they keep `not ready`; that window receives no further brief), fill [plan-brief.md](references/plan-brief.md) at `<runtime>/prep-<slug>-plan-brief.md`, status `<runtime>/prep-<slug>-plan-status.md`: `Spec:`; plans to write on `Plan paths:` in confirmed order; every existing document of the spec's units lacking a fresh mark (by its freshness on the window's branch for Phase 1 specs) on `Documents to review:`, never a fresh one except the plan of a plan-without-spec unit, which is always listed; predecessors and plan headers from the order.
 2. A spec with an alive Phase 1 window (`alive prep-<slug>`): `send prep-<slug> "Read the brief at <abs plan-brief> completely and carry it out."`. A Phase 1 window whose agent is gone: `close`, then `open` in the same worktree with the plan brief. Any other spec: new worktree and window. Send or open all before the first `wait`, then wait round-robin.
 
 ## Verify and merge
