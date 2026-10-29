@@ -15,6 +15,7 @@ child-session open [--agent claude|codex] [--model M] [--effort E] [--split righ
 child-session send <name> <text>
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
+child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
 child-session close <name>
 child-session list
 
@@ -174,6 +175,38 @@ cmd_alive() {
   current=$(tmux display-message -p -t "$(window_target "$1")" '#{pane_current_command}')
   [[ $current != bash && $current != sh && $current != zsh ]]
 }
+cmd_wait() {
+  local name=$1 status_file=$2 seconds=$3
+  [[ $seconds =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
+  seconds=$((10#$seconds))
+  [[ $seconds -ge 0 ]] || die 'wait seconds must be a nonnegative integer'
+  local started=$SECONDS elapsed remaining delay first_line seen_alive=0
+  while true; do
+    first_line=''
+    if [[ -f $status_file ]]; then first_line=$(head -n 1 -- "$status_file" 2>/dev/null) || first_line=''; fi
+    if [[ $first_line =~ ^STATUS:\ (done|blocked|failed)$ ]]; then
+      printf '%s\n' "$first_line"
+      return 0
+    fi
+    elapsed=$((SECONDS - started))
+    if (( elapsed >= seconds )); then
+      printf 'TIMEOUT: %s s without status\n' "$seconds"
+      return 124
+    fi
+    if cmd_alive "$name"; then
+      seen_alive=1
+    elif (( seen_alive || elapsed >= 120 )); then
+      printf 'EXITED: agent in window %s is gone, no status\n' "$name"
+      return 3
+    fi
+    elapsed=$((SECONDS - started))
+    remaining=$((seconds - elapsed))
+    (( remaining > 0 )) || continue
+    if (( elapsed < 120 )); then delay=5; else delay=30; fi
+    (( delay <= remaining )) || delay=$remaining
+    sleep "$delay"
+  done
+}
 cmd_close() {
   local prefix
   if has_window "$1"; then
@@ -222,6 +255,7 @@ case ${1:-} in
   send) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_send "$2" "$3" ;;
   peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
   alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
+  wait) [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}" ;;
   close) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_close "$2" ;;
   list) [[ $# == 1 ]] || { usage; exit 2; }; cmd_list ;;
   *) usage; exit 2 ;;
