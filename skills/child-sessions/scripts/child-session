@@ -206,7 +206,13 @@ cmd_open() {
     for variable in CLAUDE_CONFIG_DIR CODEX_HOME; do
       if [[ ${!variable+x} ]]; then printf 'export %s=%q\n' "$variable" "${!variable}"; fi
     done
-    printf 'printf "running\\n" > %q\n' "$state"
+    if [[ $BACKEND == herdr ]]; then
+      declare -f process_identity
+      # shellcheck disable=SC2016 # Capture the actual launcher PID at runtime.
+      printf 'printf "running %%s %%s\\n" "$$" "$(process_identity "$$")" > %q\n' "$state"
+    else
+      printf 'printf "running\\n" > %q\n' "$state"
+    fi
     printf '%q ' "$AGENT" "${args[@]}"; printf '\n'
     printf 'printf "exited\\n" > %q\n' "$state"
     if [[ $BACKEND == tmux ]]; then printf 'exec bash -i\n'; fi
@@ -240,16 +246,36 @@ cmd_open() {
   if [[ $BACKEND == tmux ]]; then cmd_tab "$name"; fi
 }
 
+# Linux/WSL process identity, including start time to reject reused PIDs.
+# Zombies still have /proc entries and answer kill -0, but are no longer alive.
+process_identity() {
+  local stat
+  local -a fields
+  [[ $1 =~ ^[0-9]+$ && -r /proc/$1/stat ]] || return 1
+  { IFS= read -r stat < "/proc/$1/stat"; } 2>/dev/null || return 1
+  stat=${stat##*) }
+  read -r -a fields <<< "$stat"
+  (( ${#fields[@]} >= 20 )) || return 1
+  [[ ${fields[0]} != Z && ${fields[0]} != X ]] || return 1
+  printf '%s\n' "${fields[19]}"
+}
+
 cmd_alive() {
   resolve "$1" || return 1
   local state current
   state=$(runtime_prefix "$1").state
-  if [[ -f $state && $(cat -- "$state") == running ]]; then return 0; fi
   if [[ $W == herdr ]]; then
+    local phase='' pid='' started='' identity
+    if [[ -f $state ]]; then read -r phase pid started < "$state" || true; fi
+    if [[ $phase == running && -n $pid && -n $started ]] &&
+       identity=$(process_identity "$pid") && [[ $identity == "$started" ]]; then
+      return 0
+    fi
     herdr pane process-info --pane "$H_PANE" 2>/dev/null | jq -e \
       '[.result.process_info.foreground_processes[].name] | any(. != "bash" and . != "sh" and . != "zsh")' >/dev/null
     return
   fi
+  if [[ -f $state && $(cat -- "$state") == running ]]; then return 0; fi
   current=$(tmux display-message -p -t "$(window_target "$1")" '#{pane_current_command}')
   [[ $current != bash && $current != sh && $current != zsh ]]
 }
