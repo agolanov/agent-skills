@@ -48,9 +48,9 @@ The child owns implementation and refinement. The root checks Git/status facts, 
 ## Tails
 
 1. Read [tails.md](references/tails.md). Immediately after the verified merge append every out-of-scope, deferred minor and disputed finding beside the plan in `<plan-stem>-tails.md`, with branch and merge-SHA provenance. Keep the reviewed task branch unchanged.
-2. If the plans directory is tracked, stage only that tails file and commit on main as `tails: <branch>`; an ignored directory stays local. No empty commit for zero findings. Require main clean, then write the ready `<runtime>/<branch>-tails-brief.md` and print its absolute path. Opening a follow-up is the user's call; do not auto-open it.
+2. Find the docs repository with `git -C <plan-dir> rev-parse --show-toplevel`: the project repository or a nested one inside an ignored directory. Stage only the tails file and commit it there, on that repository's current branch, as `tails: <branch>`. When that toplevel is the project and `git -C <main-checkout> check-ignore -q <plan-dir>` exits 0, append locally: no commit, no force-add. No empty commit for zero findings. Require the docs repository and the main checkout clean, then write the ready `<runtime>/<branch>-tails-brief.md` and print its absolute path. Opening a follow-up is the user's call; do not auto-open it.
 
 ## Cleanup
 
 1. After tree equality, required post-merge checks and tails recording succeed, run non-forced `git worktree remove <path>`, `git branch -d <branch>`, then `child-session close <name>` using the resolved executable and recorded window name. A failure is reported, not forced away.
-2. Report merge SHA, child commits, tails count/commit if any, follow-up brief path and required post-merge check results. Root writes only runtime artifacts and main's tails record; one task yields one merge.
+2. Report merge SHA, child commits, tails count/commit if any, follow-up brief path and required post-merge check results. Root writes only runtime artifacts and the docs repository's tails record; one task yields one merge.
