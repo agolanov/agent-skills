@@ -1,8 +1,6 @@
 ---
 name: deliver-queue
 description: "Delivers every ready task of a prepare-tasks queue file (or a list of plans) through deliver-task, running independent tasks in parallel in visible child sessions up to a limit, merging in order of readiness and recording each task's state in the queue file. Use when several reviewed plans are ready and the user wants them all delivered to the main branch without running deliver-task by hand."
-metadata:
-  internal: true
 ---
 
 # Deliver Queue
