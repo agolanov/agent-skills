@@ -32,11 +32,16 @@ HEAD: <full SHA>
 ## Out of scope
 <one line per finding: what — where (path:line) — why it is out of scope>
 
+## Artifacts
+<one absolute path per line of files the child created or changed for the calling task>
+
 ## Questions
 <for blocked: the question, options, and the child's recommendation>
 ```
 
-Keep every field and section. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
+Optional: present only when the calling task asks for it; lists files the child created or changed, one absolute path per line.
+
+Keep every field and section except the optional `## Artifacts`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
 
 Write the report completely before exposing a terminal first line (for example, write a temporary file beside it, then rename it to the status path). The root may read as soon as that first line appears.
 
