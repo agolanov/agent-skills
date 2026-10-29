@@ -31,7 +31,7 @@ Runs at the start, after each merge, and whenever a slot frees.
 
 1. Startable: a candidate not yet started whose dependencies are all `delivered`.
 2. Read [overlap.md](references/overlap.md). Hold back a startable unit that overlaps a unit with a live window or an earlier unit chosen in the same pass; it waits until that window is gone, normally after its merge.
-3. Live windows: `running`, `blocked`, `rebasing` and `done awaiting merge` (its agent stays alive for a possible main-moved return until Cleanup), plus a `failed` window until `close` and `alive` returning 1, and a delivered unit's window whose Cleanup `close` failed, while `alive` (rechecked at each Scheduling) returns 0. Choose startable units in queue order until live windows reach `--parallel`.
+3. Live windows: `running`, `blocked`, `rebasing` and `done awaiting merge` (its agent stays alive for a possible main-moved return until Cleanup), plus a `failed` window until `close` and `alive` returning 1, and a delivered unit's window whose Cleanup `close` failed, while `alive` (rechecked at each Scheduling) returns 0. Choose startable units in queue order until live windows reach `--parallel`. If such delivered windows keep a startable unit waiting while no unit is working or awaiting merge, report them and ask the user: they close the window (recheck `alive`, then Scheduling again), or the run goes to End with the waiting units `ready`.
 4. Mark the chosen units `running` in the state file. At the start and after a merge, the batch point comes next; after a freed slot, go straight to the start half.
 
 ## Start half
