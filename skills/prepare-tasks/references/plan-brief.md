@@ -48,7 +48,7 @@ Work:
    c. Make sure the file ends with a newline, then git add it and commit it as "docs: <basename>" when anything changed; <sha> is the full git rev-parse HEAD.
    d. Append exactly one last line: Review: <clean|clean except disputed>, <today YYYY-MM-DD>, reviewer <the opposite system that reviewed: claude|codex>, commit <sha>
    e. Commit it as "mark: <basename>".
-   f. Check freshness: the last line is the only line matching that expression and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. A document changed after marking is reviewed and marked again.
+   f. Check freshness: the last line is the only line matching that expression, git cat-file -e <sha>:<path relative to this worktree> succeeds, and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. A document changed after marking is reviewed and marked again.
 5. Write the status file (below) with STATUS: done, then stay in this window; the root closes it.
 
 Boundaries: commit only on this branch in this worktree. Do not merge, push, rebase, delete the branch or worktree, or touch the docs main checkout or the project checkout. Edit only this spec and its plans; predecessor specs and every document owned by another window are read only. A defect in one of them goes into Out of scope; if a plan cannot be written without fixing it, end STATUS: blocked with the question. Ask the user your own questions in this window; use STATUS: blocked only for what the root must resolve (a missing predecessor, a Git problem).
