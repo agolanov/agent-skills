@@ -15,7 +15,7 @@ A **unit** is one plan with its spec; the queue lists units. A **window** maps t
 
 A document "lacks review" whenever it is not fresh (below); a missing, stale, displaced or duplicated mark all count. Review scope is per document: a spec without a plan that was never marked is reviewed in Phase 2 together with its new plan.
 
-A directory input expands to every `.md` file inside it, except `*-tails.md` (delivery leftovers, not plans). A path under `specs/` or named `*-design.md` is a spec; under `plans/` a plan; anything else, ask. For every included spec, also include its plans found in `plans/` by the matching rules.
+A directory input expands to every `.md` file inside it, except `*-tails.md` (delivery leftovers, not plans), anything under `.worktrees/` or `queues/`, and any path inside a registered worktree of the docs repository (`git -C <docs-main> worktree list`). A path under `specs/` or named `*-design.md` is a spec; under `plans/` a plan; anything else, ask. For every included spec, also include its plans found in `plans/` by the matching rules.
 
 ## Matching
 
@@ -34,7 +34,7 @@ All document paths below are relative to the docs dir (`specs/...`, `plans/...`)
 - Unit name: plan stem without its date (`gamma-2`), or the slug when no plan exists yet.
 - Two units or windows colliding on a slug, or a slug colliding with an existing branch, worktree or window: ask the user for a distinct one.
 
-In a brief every path becomes absolute inside the window's worktree: `<worktree>/<path relative to the docs repository>`. Tracked layout: `<worktree>/docs/superpowers/specs/x-design.md`; nested layout (`docs/superpowers` is the repository): `<worktree>/specs/x-design.md`. Plan headers always use the project-relative form `docs/superpowers/specs/<basename>`.
+In a brief every path becomes absolute inside the window's worktree: `<worktree>/<path relative to the docs repository>`. Tracked layout: `<worktree>/docs/superpowers/specs/x-design.md`; nested layout (`docs/superpowers` is the repository): `<worktree>/specs/x-design.md`. Plan headers always use the path relative to the project checkout (`docs/superpowers/specs/<basename>` in the usual layout).
 
 ## Review mark
 
@@ -72,6 +72,6 @@ Performed by the child for every document it reviewed or changed, after the revi
 
 1. Delete every line matching `^Review: (clean|clean except disputed), ` anywhere in the document (a stale mark may have been displaced by later edits).
 2. For `clean except disputed`, keep the disputed findings and both positions in the document.
-3. Commit the content (`git add <file>`, commit `docs: <basename>` when anything changed); `<sha>` = full `git rev-parse HEAD`.
+3. Make sure the file ends with a newline (else the mark joins its last line), then commit the content (`git add <file>`, commit `docs: <basename>` when anything changed); `<sha>` = full `git rev-parse HEAD`.
 4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <opposite system>, commit <sha>` as the last line; commit it as `mark: <basename>`.
 5. Run the freshness check; it must pass. A document changed after marking is reviewed and marked again.

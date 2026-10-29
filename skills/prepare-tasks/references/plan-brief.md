@@ -45,7 +45,7 @@ Work:
 4. Mark each of those documents, and any other document of this spec you changed:
    a. Delete every line matching the regular expression '^Review: (clean|clean except disputed), ' anywhere in the document.
    b. For clean except disputed, keep the disputed findings and both positions in the document.
-   c. git add the file and commit it as "docs: <basename>" when anything changed; <sha> is the full git rev-parse HEAD.
+   c. Make sure the file ends with a newline, then git add it and commit it as "docs: <basename>" when anything changed; <sha> is the full git rev-parse HEAD.
    d. Append exactly one last line: Review: <clean|clean except disputed>, <today YYYY-MM-DD>, reviewer <the opposite system that reviewed: claude|codex>, commit <sha>
    e. Commit it as "mark: <basename>".
    f. Check freshness: the last line is the only line matching that expression and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. A document changed after marking is reviewed and marked again.
