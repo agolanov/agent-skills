@@ -2,12 +2,14 @@
 
 Settings configure the reviewer, not the implementing session. Accept `--model MODEL`, `--effort LEVEL`, and equivalent prose independently. Current explicit values win; reuse recorded values when continuing the same loop; fill remaining fields with these defaults:
 
-| Reviewer system | Automatic model family | Effort |
-| --- | --- | --- |
-| Codex | Latest available Sol | high |
-| Claude | Latest available Opus | high |
+Automatic policy, consolidated 2026-10-29 (family policy, not a pinned version list):
 
-Automatic selection excludes premium Astra/Fable. Explicit assignments may select them. CLI configured defaults and the parent's model are not substitutes for this policy. A model must belong to the assigned system. When changing system or launch method, re-resolve incompatible saved defaults; preserve current explicit overrides.
+| Reviewer system | Automatic family | Excluded from automatic choice; explicit allowed | Default effort |
+| --- | --- | --- | --- |
+| Codex | Latest available Sol | Astra | high |
+| Claude | Latest available Opus | Fable | high |
+
+Explicit supported premium assignments are allowed. CLI configured defaults and the parent's model are not substitutes for this policy. A model must belong to the assigned system. When changing system or launch method, re-resolve incompatible saved defaults; preserve current explicit overrides.
 
 Resolve the exact account/provider-available version using evidence relevant to the launch method:
 

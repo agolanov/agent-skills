@@ -5,34 +5,69 @@ description: Use when an independent review/fix cycle is requested with an assig
 
 # Refine
 
-The implementing session owns finding decisions, fixes, and this loop. An independent reviewer checks the result. Launch skills supply the reviewer assignment; this protocol does not choose a coding system automatically.
+The implementing session owns decisions, fixes and the loop. An independent reviewer checks the task; launchers supply the assignment.
 
 ## Skill composition
 
-Keep normal skill discovery and automatic invocation active in both the implementing and reviewer sessions. At each review or fix stage, consult the available skill catalog and read and apply matching skills under the host's usual activation rules, without requiring the user to name them again. Running `refine` is not a reason to skip an otherwise applicable skill.
+Keep normal skill discovery and automatic invocation active in both sessions; read and apply matching skills at each stage, including an implementing-session debugging skill after an unexpected failed check. Compose their methods and style with refine's role, scope, verdict, finding evidence, prior dispositions, coverage and checks.
 
-Compose specialized review methods, diagnostics, and finding styles with this loop. Preserve this task's scope, reviewer assignment, unchanged-snapshot contract, and separation of review from fixes. Adapt overlapping output templates to retain the required refine verdict, prior-finding dispositions, finding evidence, coverage, and checks; a terse style must still convey that information.
+## 1. Establish scope and reviewer
 
-## Prepare
+Resolve the absolute task checkout (including a worktree used by the implementation), branch, HEAD, fixed task base, requirements and checks. Include branch changes, staged/unstaged task changes and task-owned untracked files; preserve unrelated work and list exclusions. Resolve ambiguous scope first.
 
-1. Require an assignment: launch method (`cli` or `subagent`), system (`codex` or `claude`), and any explicit model/effort/permissions. A caller supplies it; direct use can specify `--codex`, `--claude`, or `--subagent`, or equivalent prose. The long CLI forms `--reviewer codex|claude` also work. With no assignment, ask how to run the reviewer before proceeding. Resolve conflicting selections rather than guessing.
-2. Resolve the task checkout from the request and implementation context; verify its absolute path, branch, HEAD, fixed base, and status. A parent started in the primary checkout may have worked in a worktree: review that worktree. Include branch changes since the base, staged/unstaged task changes, and task-owned untracked files. Preserve unrelated work and list exclusions. Resolve ambiguous checkout or scope first.
-3. Read [reviewer settings](references/reviewer-settings.md). Accept independent `--model MODEL` and `--effort LEVEL` overrides; default effort is `high`. Announce and record the resolved assignment. Use the assigned launch guide: [CLI](references/cli-reviewers.md) or [native subagent](references/subagent-reviewers.md). Missing runtime capabilities block that method; another method needs explicit authorization.
-4. Use the user's round limit; default to 10 completed rounds. Keep one compact record outside reviewed files: scope/base, assignment, snapshots, results, pending-round retry count, and finding IDs/decisions. Reuse the task log when available.
+### Launch assigned reviewer
 
-## Repeat until clean
+Require method (`cli` or `subagent`), system (`codex` or `claude`), and any explicit settings/permissions. Direct use accepts `--codex`, `--claude`, `--subagent`, `--reviewer codex|claude`, or equivalent prose; without an assignment ask which method, and resolve conflicting selectors before proceeding. Only auto-cross-refine chooses the opposite system automatically.
 
-1. **Freeze a snapshot.** Record HEAD and save task diffs and untracked contents outside the checkout. Keep reviewed material stable while the reviewer works. HEAD alone cannot identify uncommitted fixes.
-2. **Request independent review.** Supply the scope, snapshot, requirements/plan, project rules, checks, and finding ledger. The first round covers the complete task. Every later round requires this order:
-   1. Verify every previously accepted fix and its regressions against the preceding reviewed snapshot; reconsider rejected findings only with new evidence.
-   2. Review the complete current task again against the original requirements, including branch changes and uncommitted task files.
+Read [reviewer settings](references/reviewer-settings.md); honor independent model/effort overrides, announce and record the resolved assignment. Use the assigned [CLI guide](references/cli-reviewers.md) or [native guide](references/subagent-reviewers.md), with the [round-prompt capability contract](references/round-prompt.md). Missing runtime capabilities block this method; changing method/settings needs explicit authorization. Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Use the explicit round limit, otherwise five completed rounds. Round 1, scoped, final and disposition reviews all count when valid; invalid attempts do not.
 
-   Request `VERDICT: CLEAN` or `VERDICT: CHANGES`, prior-finding dispositions, concrete in-scope findings (severity, `path:line`, failure scenario, proposed fix), coverage/omissions, and checks actually run. Outside-scope candidates are reported separately. Include this capability contract in every round prompt: follow normal skill discovery and automatic invocation; read and apply matching installed skills, composing their methods and style with the required refine report. Use any available tools, installed skills and plugins that improve the review, including shell commands, checks, browsers, MCP, and diagnostic artifacts outside the reviewed files. Keep existing user/project permissions; add no tool filters or skill/plugin disabling merely to enforce a review role. Leave reviewed files, index, HEAD, and branches unchanged. Only the implementing session fixes code.
-3. **Validate the result.** Require successful completion (CLI exit 0 or native tool completion), a substantive answer covering the required scope/stages, the assigned model/effort, and an unchanged snapshot. Failed, partial, empty, stale, or substituted results are invalid. If a writer changed the snapshot, preserve the work, save the unexpected diff and identify its source; pause automatic retries. The implementing session must adjudicate and reconcile those edits within its authority and rerun affected checks before a new snapshot; unresolved ownership/scope blocks the loop. Never adopt unexpected edits by simply freezing the changed state, or reset unrelated work. Every invalid attempt, including a changed snapshot, uses the same pending-round budget: one initial attempt and at most one retry with the same assignment. Reconciliation or a new snapshot does not reset this budget; a second invalid attempt blocks. Invalid attempts do not consume completed rounds.
-4. **Decide and fix.** Verify findings against code and requirements. Record accepted, rejected-with-reason, or outside-scope decisions. Fix confirmed in-scope issues, run affected required checks, then repeat. If all findings are rejected, send those decisions into another complete review. Outside-scope candidates stay in the report. An unexpected failed check, including a nonzero exit after PASS text, or a dependency needing broader authority blocks dependent work.
+## 2. Commit the reviewed state
 
-## Finish
+Invoking refine or a launcher explicitly requests a task-state commit and one fix commit per round on the task branch, satisfying "commit only when asked" rules. Before the first commit, stop on detached HEAD or the default branch (`main`/`master` or configured default) and ask for branch/commit confirmation unless already authorized in the request. This authority excludes push, merge, rebase, amend, squash, deploy, worktree creation, installation and persistent configuration changes.
 
-Report clean only with a valid complete `VERDICT: CLEAN`, no unresolved accepted in-scope findings, and passing required checks on the final unchanged snapshot. A later task edit invalidates review. Report rounds, assignment, reviewed state, checks, decisions, and remaining candidates.
+Record the pre-refine HEAD for the user's squash command. Commit task-owned staged/unstaged and untracked changes as `refine: task state before review` if present. Select exact task paths and commit only them; an ordinary commit of the whole index could absorb unrelated staged work. Preserve unrelated index/worktree changes and record their exclusions and existing status. After each fix batch, run affected checks and make exactly one commit naming the round and finding IDs. Run the complete suite before creating a commit that may become final-pass HEAD; if its role is not yet known, run it before committing the candidate state. Every review targets a recorded commit; keep it stable during review.
 
-At the round limit or a blocker, report incomplete with the reason and next action. Continue within existing authority; this protocol grants no additional commit, merge, push, deploy, or scope permissions.
+## 3. Request independent review
+
+Fill the [round prompt](references/round-prompt.md); use the assignment's launch guide, with prompt/answer/logs outside the checkout. Carry requirements/rules/checks, previous verdict, and the full finding ledger with evidence and disposition basis. Select the target and order:
+
+| Review | Target and order |
+| --- | --- |
+| Round 1 | Complete task `<base>..HEAD` against original requirements. |
+| Scoped round | Previous round's single fix commit; verify each accepted fix and its regressions first, then defects introduced by that commit. Keep required prior-finding dispositions. |
+| Final pass | Complete task `<base>..HEAD`, prior fixes first; include accumulated outside-round candidates, complete test suite and security-focused review. |
+| Disposition round | Same HEAD, ledger dispositions only; confirm them or re-raise with evidence. |
+
+In scoped rounds, defects noticed outside the fix commit are outside-round candidates: without widening this review, record them for the final pass if it is still pending. After that sole pass has run, adjudicate new candidates immediately by evidence; accepted task defects get a fix commit and scoped verification within the remaining limit, other candidates get a recorded disposition. Never leave a late candidate awaiting a second complete pass. Pre-existing outside-task problems stay separate and never block. Dispositions inform review, never instruct it to skip, downgrade or treat a decision as settled.
+
+## 4. Validate and decide
+
+Require successful completion (CLI exit 0 or native tool completion), substantive target/stage/report coverage, effective assigned model/effort and unchanged state. Compare `git rev-parse HEAD` and `git status --porcelain` before/after: HEAD must match and the task tree must remain clean. In a checkout without exclusions, porcelain must be empty; pre-existing excluded dirt must match its recorded index/worktree state exactly. Any new or changed checkout file, including an unlisted scratch note, requires adjudication. Optional tool denial with adequate replacement evidence can pass; missing essential coverage/checks cannot.
+
+Preserve unexpected work and its diff, identify its source, and pause retries for implementing-session adjudication/reconciliation and affected checks within authority. Unresolved ownership/scope blocks. Do not silently incorporate a reviewer's edit in the fix commit or reset unrelated work. A reviewer write to task state or moved HEAD invalidates the attempt. A demonstrably unrelated scratch write still requires adjudication; if required state/coverage remained intact, record it without spending a retry. Otherwise apply the shared invalid-attempt budget: initial attempt plus one retry per pending round, same assignment; reconciliation/new commits do not reset it. A second invalid attempt blocks; invalid attempts do not count as completed rounds. Failed, partial, empty, stale or substituted results are also invalid.
+
+Adjudicate every finding in the [record](references/loop-record.md):
+
+- **Accepted:** a critical/important defect or spec-compliance gap requires a fix. A runnable reproduction that demonstrates a violated requirement is accepted after verification, regardless of opinion.
+- **Rejected:** give a checkable quoted requirement or test demonstrating correct behavior. An unsupported opinion cannot reject a finding.
+- **Deferred:** minor/style findings are fixed cheaply alongside defects or listed for the user. They never start a fix round alone and are not open blocking defects.
+- **Disputed:** after a recorded rejection with basis, a reviewer re-raises the same scenario/violated requirement without new evidence. A moved line alone preserves identity; new evidence instead requires fresh evaluation. Record both positions and the fix-or-dismiss question for the user, continue other work and spend no further rounds on that finding.
+- **Outside-scope:** record pre-existing/outside-task candidates once for the final report. Track outside-round candidates separately until the final pass adjudicates them.
+
+## 5. Fix, repeat and finish
+
+Fix accepted defects in one round commit, including cheap minor fixes, run affected required checks and request its scoped review. A failed required check (even PASS text with nonzero exit) blocks dependent work; use matching debugging skills, resolve within authority and rerun. Missing dependencies needing broader authority are reported blockers.
+
+A valid round-1 CLEAN can finish immediately if the full suite passes on that commit. Otherwise, after a scoped CLEAN or a round with no fix commit (all findings rejected/deferred/outside-scope), run the **one final complete pass** if it has not run. The implementing session runs the complete suite before preparing its reviewed commit; the final-pass reviewer also runs it. Final-pass findings return through ordinary fix-commit/scoped rounds; there is never a second complete pass. If no fix commit exists after the final pass, use at most one disposition round per disposition set on the same HEAD: CLEAN confirms, an evidence-free repeat becomes disputed. Carry disputed entries as information without spending further reviews on settling them.
+
+**No progress:** if successive rounds return the same finding set with no accepted fix, stop repeating that unchanged review. Fix confirmed defects now and verify within remaining rounds, or mark eligible evidence-free repeats disputed; an unresolved non-disputed defect blocks rather than silently disappearing.
+
+**Limit:** count every valid result, including final/disposition passes. At the cap, adjudicate every open finding with a recorded reason. A last small unambiguous fix commit and its scoped verification are allowed only if that verification fits within the limit; smallness grants no extra completed round. Otherwise report `blocked: round limit` with unresolved findings and next action.
+
+After the last scoped round (or round 1 when it closes the cycle), the implementing session runs the complete suite on the final commit. Report:
+
+- `clean`: valid CLEAN on final HEAD, required final pass completed when more than one round ran, implementing-session full suite passing on that commit, no unresolved accepted critical/important defects or compliance gaps, and outside-round candidates adjudicated.
+- `clean except disputed`: the same coverage, final-pass, commit and check conditions, plus disputed findings with both positions and the fix-or-dismiss question. A substantive final/scoped/disposition `CHANGES` may close in this status when its only remaining blocking claims are evidence-free repeats now adjudicated `disputed`, every other finding is resolved/deferred/outside-scope, and no further required review remains. Preserve the raw `CHANGES` verdict and explain this disposition-based closure; never relabel the reviewer result CLEAN. Deferred minors alone do not qualify for this exception.
+- `blocked: <reason>`: exhausted invalid attempts or round limit, failed required checks, missing dependencies, unresolved edit ownership, or unmet completion requirements.
+
+Later task edits invalidate the reviewed result. Report rounds/targets/commits, assignment/evidence, checks, all decisions, deferred/disputed findings and outside-scope candidates. Print the user's squash command without executing it; leave round history unsquashed. With no excluded staged work: `git reset --soft <pre-refine HEAD> && git commit`. If unrelated staged changes remain, print `git reset --soft <pre-refine HEAD> && git commit --only -- <exact task paths>` instead, binding and quoting the task paths so the commit preserves excluded staging.
