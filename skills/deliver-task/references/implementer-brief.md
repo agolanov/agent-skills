@@ -15,6 +15,11 @@ Window name: <name>
 Launch options: <explicit model/effort, or CLI defaults>
 Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and recording tails.
 
+Layout facts (gitignored material is not in this worktree):
+Docs repository: <abs docs main checkout> (spec and plan live here; read-only: do not edit or commit there)
+Ignored test material: <abs path or None>
+Edit ignored material by absolute path in the main checkout; commit only files inside this worktree.
+
 Read the spec and plan completely. Read and honor all applicable project rules: <project-rules>.
 
 Required installed skills (read these absolute SKILL.md paths):
@@ -27,7 +32,7 @@ Execute the entire plan with the selected execution skill in this existing isola
 
 After the plan is complete and all checks pass, invoke `auto-cross-refine` and run it until it ends `clean` or `clean except disputed`. Do not squash.
 
-Work only inside this checkout. Do not merge, push, rebase, touch the main checkout, delete the branch/worktree, or fix out-of-scope findings. A later explicit main-moved message may authorize one rebase onto its named SHA, checks and one fix-review round; until then the rebase prohibition holds. That message also changes the reporting/review base for the fresh result.
+Work only inside this checkout, except the ignored-material paths named under Layout facts, which you may edit in the main checkout; never write anything else there and never commit there. Do not merge, push, rebase, touch the main checkout beyond those Layout-facts paths, delete the branch/worktree, or fix out-of-scope findings. A later explicit main-moved message may authorize one rebase onto its named SHA, checks and one fix-review round; until then the rebase prohibition holds. That message also changes the reporting/review base for the fresh result.
 
 Record each out-of-scope finding as: what — where (path:line) — why it is out of scope. Continue unless completing the plan requires a user decision. Retain deferred minor/outside-scope/disputed review findings. In Review, report final refine mode separately from the raw reviewer verdict; a permitted clean except disputed closure may keep raw CHANGES. Never rename that raw verdict CLEAN. Include disputed findings, both positions and the fix-or-dismiss question.
 
