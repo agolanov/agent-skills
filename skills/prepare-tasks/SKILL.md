@@ -1,8 +1,6 @@
 ---
 name: prepare-tasks
 description: "Turns any mix of ideas, specs and plans into tasks ready for deliver-task: opens a visible child session for each spec that still needs a spec, plan or clean cross review, proposes the task order, verifies review marks and writes a queue file. Use when the user wants several tasks prepared for delivery without writing the documents in the current session."
-metadata:
-  internal: true
 ---
 
 # Prepare Tasks
