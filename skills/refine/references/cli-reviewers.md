@@ -4,7 +4,7 @@ Use a separate CLI session for the assigned system. Start a fresh reviewer each 
 
 Check installed `codex exec --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the loop finishes or blocks.
 
-Preserve the CLI's normal tools, installed skills, plugins, and MCP configuration. Unless the user explicitly requests capability limits, add no `--tools` whitelist, `--disallowedTools` denylist, skill/plugin disabling, or empty/restricted MCP configuration. Review-only is a task contract, not a reduced tool set; skills may use editing tools for authorized scratch artifacts outside the reviewed files. Existing user/project permissions still apply. Configure session permissions for already authorized checks when needed, without changing persistent settings or silently broadening authority.
+Preserve the CLI's normal tools, installed skills, skill discovery and automatic invocation, plugins, and MCP configuration. Unless the user explicitly requests capability limits, add no `--tools` whitelist, `--disallowedTools` denylist, skill/plugin disabling, or empty/restricted MCP configuration. Review-only is a task contract, not a reduced tool set; skills may use editing tools for authorized scratch artifacts outside the reviewed files. Existing user/project permissions still apply. Configure session permissions for already authorized checks when needed, without changing persistent settings or silently broadening authority.
 
 ## Codex reviewer
 
