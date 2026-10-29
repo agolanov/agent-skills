@@ -16,7 +16,7 @@ Launch options: <explicit model/effort, or CLI defaults>
 Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and recording tails.
 
 Layout facts (gitignored material is not in this worktree):
-Docs repository: <abs docs main checkout> (spec and plan live here; do not commit there)
+Docs repository: <abs docs main checkout> (spec and plan live here; read-only: do not edit or commit there)
 Ignored test material: <abs path or None>
 Edit ignored material by absolute path in the main checkout; commit only files inside this worktree.
 
