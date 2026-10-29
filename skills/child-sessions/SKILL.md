@@ -1,8 +1,6 @@
 ---
 name: child-sessions
 description: Runs Claude Code or Codex in a visible terminal window (herdr tab or tmux) from a brief file and waits for its status file. Use when a task must run in a separate agent session the user can watch, or when another skill needs to open, answer, or close such a session.
-metadata:
-  internal: true
 ---
 
 # Child Sessions

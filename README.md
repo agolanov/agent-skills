@@ -7,8 +7,8 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | Skill | Description |
 |-------|-------------|
 | `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
-| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux window from a brief and wait for its status. *(in development)* |
-| `deliver-task` | Execute one reviewed plan in a child session with cross review, then merge and record leftovers. *(in development)* |
+| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux window from a brief and wait for its status. |
+| `deliver-task` | Execute one reviewed plan in a child session with cross review, then merge and record leftovers. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
 | `refine-with-codex` | Run the cycle with a separate Codex reviewer process. |
 | `refine-with-claude` | Run the cycle with a separate Claude reviewer process. |

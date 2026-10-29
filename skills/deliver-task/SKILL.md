@@ -1,8 +1,6 @@
 ---
 name: deliver-task
 description: Takes one reviewed spec and plan from a fresh worktree through a visible child agent session and cross review to a merge into the main branch, then records leftovers. Use when a plan is ready to implement and the user wants it executed, reviewed and merged without writing code in the current session.
-metadata:
-  internal: true
 ---
 
 # Deliver Task
