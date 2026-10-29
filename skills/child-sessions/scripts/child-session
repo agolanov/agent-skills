@@ -118,7 +118,13 @@ cmd_open() {
 
   # Non-interactive startup preserves the caller's PATH (including custom CLIs).
   # An ordinary interactive shell stays in the window after the child exits.
-  tmux has-session -t "=$S" 2>/dev/null || tmux new-session -d -s "$S" -n home -c "$HOME"
+  local initial_window=''
+  if ! tmux has-session -t "=$S" 2>/dev/null; then
+    # Reserve the requested child as the first window, without a public-name
+    # bootstrap window. Hold it until its session-scoped launcher is ready.
+    initial_window=$(tmux new-session -d -P -F '#{window_id}' -s "$S" -n "$name" -c "$cwd" 'exec sleep 3600')
+    tmux set-window-option -t "$initial_window" automatic-rename off
+  fi
   clean_server_env
   local prefix launcher state variable attempt
   umask 077
@@ -141,8 +147,13 @@ cmd_open() {
     [[ $variable == TMUX || $variable == TMUX_PANE ]] && continue
     environment+=(-e "$variable=${!variable}")
   done
-  tmux new-window -d -t "=$S:" -n "$name" -c "$cwd" "${environment[@]}" \
-    "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+  if [[ -n $initial_window ]]; then
+    tmux respawn-window -k -t "$initial_window" -c "$cwd" "${environment[@]}" \
+      "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+  else
+    tmux new-window -d -t "=$S:" -n "$name" -c "$cwd" "${environment[@]}" \
+      "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+  fi
   tmux set-window-option -t "$(window_target "$name")" automatic-rename off
   # A fast agent may already have exited; do not wait for a missed process.
   for ((attempt=0; attempt<100; attempt++)); do
