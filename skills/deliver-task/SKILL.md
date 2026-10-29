@@ -18,7 +18,7 @@ The child owns implementation and refinement. The root checks Git/status facts, 
 
 ## Worktree
 
-1. Use the project worktree convention, otherwise `<main-checkout>/.worktrees/<branch>`. Check the path is ignored with `git check-ignore`; if not, tell the user and stop without changing ignore rules. Refuse any existing branch or worktree, naming both, unless `--resume`.
+1. Use the project worktree convention, otherwise `<main-checkout>/.worktrees/<branch>`. Resolve the main checkout and selected path, including existing symlinks. For a path inside the main checkout, run `git check-ignore`; if it is not ignored, tell the user and stop without changing ignore rules. For an external path, apply the same ownership/existence checks without an ignore prerequisite. Refuse any existing branch or worktree, naming both, unless `--resume`.
 2. For a new task record full main HEAD as `<base-sha>` and run `git worktree add -b <branch> <path> <base-sha>`. Verify its branch and HEAD match. Keep runtime files under `${XDG_RUNTIME_DIR:-/tmp}/child-sessions/` outside Git, creating parent directories for nested branch names.
 3. For `--resume`, require the prior runtime brief with base, absolute plan/spec task identity, branch, checkout, window name and launch options. Match it to the requested task and registered Git worktree/branch; validate the recorded base exists and belongs to the task history. Reuse the recorded base/window identity, never today's main as a guessed replacement. Missing, conflicting or ambiguous provenance stops. Preserve current work for the child, archive any prior status to an unused suffix, and append the continuation instruction from child-sessions. An old terminal report cannot complete a resumed run.
 
@@ -43,7 +43,7 @@ The child owns implementation and refinement. The root checks Git/status facts, 
 ## Merge
 
 1. Immediately before merging, require main still on its branch and clean, and compare full main HEAD to recorded base. If changed, archive status, retain the prior brief and append the new target plus this one-time authorization: “main moved to <sha>: rebase onto it, rerun the checks and one fix-review round, write a new status”. Tell the child to use `<sha>` as its reporting/review base. Send to the same child (reopen with continuation only if necessary), wait, verify a fresh report against that target, then update the recorded Base SHA in the runtime brief. Repeat Verify and this latest-main check; no stale status or merge before refresh.
-2. In the main checkout run `git merge --no-ff <branch>`. On conflict run `git merge --abort`, report and preserve the child/worktree. Capture the merge SHA, then explicitly compare `git rev-parse HEAD^{tree}` with `git rev-parse <branch>^{tree}`. Inequality stops cleanup. Run only project-mandated post-merge checks; failures stop with evidence preserved.
+2. In the main checkout run `git merge --no-ff <branch>`. On conflict run `git merge --abort`, report and preserve the child/worktree. Capture the merge SHA, then explicitly compare `git rev-parse HEAD^{tree}` with `git rev-parse <branch>^{tree}`. Inequality stops cleanup. Run checks again only when project rules explicitly require them after merge; ordinary “after changing code” requirements are satisfied by the child's verified results. Post-merge check failures stop with evidence preserved.
 
 ## Tails
 
