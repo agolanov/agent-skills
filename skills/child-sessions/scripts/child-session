@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# Launch and control child coding agents in named terminal windows.
+set -euo pipefail
+
+S=${CHILD_SESSION_TMUX_SESSION:-child-sessions}
+BACKEND=${CHILD_SESSION_BACKEND:-}
+[[ -n "$BACKEND" ]] || { [[ ${HERDR_ENV:-} == 1 ]] && BACKEND=herdr || BACKEND=tmux; }
+AGENT=${CHILD_SESSION_AGENT:-claude}
+RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp}/child-sessions
+export LANG=${LANG:-C.UTF-8}
+
+usage() {
+  cat <<'USAGE'
+child-session open [--agent claude|codex] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
+child-session send <name> <text>
+child-session peek <name> [lines]
+child-session alive <name>             Exit 0 while the agent is running, else 1.
+child-session close <name>
+child-session list
+
+CHILD_SESSION_BACKEND: tmux (herdr support is not installed yet).
+CHILD_SESSION_AGENT: claude (default) or codex.
+CHILD_SESSION_TMUX_SESSION: child-sessions (default).
+CHILD_SESSION_TAB=0 disables the best-effort Windows Terminal tab.
+CHILD_SESSION_CLAUDE_ARGS / CHILD_SESSION_CODEX_ARGS replace default CLI flags.
+Argument overrides are whitespace-separated words, without shell evaluation.
+USAGE
+}
+
+die() { printf 'child-session: %s\n' "$*" >&2; exit 2; }
+valid_name() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]] || die 'window names must match [A-Za-z0-9_-]+'; }
+[[ $BACKEND == tmux || $BACKEND == herdr ]] || die 'CHILD_SESSION_BACKEND must be tmux or herdr'
+
+# Keep user configuration, but never inherit parent-agent session metadata.
+strip_variable() {
+  [[ $1 =~ ^(CLAUDE|CODEX_COMPANION_|CODEX_) && $1 != CLAUDE_CONFIG_DIR && $1 != CODEX_HOME ]]
+}
+for variable in $(compgen -e); do
+  if strip_variable "$variable"; then unset "$variable"; fi
+done
+clean_server_env() {
+  local entry variable level
+  local -a scope
+  for level in global session; do
+    if [[ $level == global ]]; then scope=(-g); else scope=(-t "=$S"); fi
+    while IFS= read -r entry; do
+      variable=${entry%%=*}
+      variable=${variable#-}
+      if strip_variable "$variable"; then tmux set-environment "${scope[@]}" -u "$variable"; fi
+    done < <(tmux show-environment "${scope[@]}" 2>/dev/null)
+  done
+}
+
+has_window() { tmux list-windows -t "=$S" -F '#W' 2>/dev/null | grep -qxF -- "$1"; }
+require_window() { has_window "$1" || die "no window $1"; }
+window_target() { printf '=%s:=%s' "$S" "$1"; }
+runtime_prefix() {
+  # A separate socket/server must not reuse another server's launch state.
+  local socket_key session_id
+  socket_key=$(tmux display-message -p -t "=$S" '#{socket_path}' | cksum)
+  socket_key=${socket_key%% *}
+  session_id=$(tmux display-message -p -t "=$S" '#{session_id}')
+  printf '%s/tmux-%s-%s-%s' "$RUNTIME_DIR" "$socket_key" "${session_id#\$}" "$1"
+}
+
+fix_interop() {
+  local socket='' candidate
+  if [[ -z ${WSL_INTEROP:-} || ! -S $WSL_INTEROP ]]; then
+    for candidate in /run/WSL/*_interop; do
+      [[ -S $candidate ]] || continue
+      if [[ -z $socket || $candidate -nt $socket ]]; then socket=$candidate; fi
+    done
+    [[ -z "$socket" ]] || export WSL_INTEROP="$socket"
+  fi
+  return 0
+}
+cmd_tab() {
+  [[ ${CHILD_SESSION_TAB:-1} != 0 ]] || return 0
+  command -v wt.exe >/dev/null || return 0
+  local name=$1 view="v-$1"
+  if ! { tmux has-session -t "=$view" 2>/dev/null || tmux new-session -d -s "$view" -t "=$S"; } ||
+     ! tmux select-window -t "=$view:=$name"; then
+    printf 'child-session: could not prepare a Windows Terminal view for %s\n' "$name" >&2
+    return 0
+  fi
+  fix_interop
+  wt.exe -w 0 new-tab --title "$name" wsl.exe -d "${WSL_DISTRO_NAME:-ubuntu-dev}" -e tmux attach -t "=$view" >/dev/null 2>&1 ||
+    printf 'child-session: could not open Windows Terminal; attach manually: tmux attach -t %s\n' "$view" >&2
+  return 0
+}
+
+cmd_open() {
+  local split=$1 name=$2 cwd=$3 brief=$4 model=$5 effort=$6
+  valid_name "$name"
+  [[ $AGENT == claude || $AGENT == codex ]] || die '--agent must be claude or codex'
+  [[ -d $cwd ]] || die "no directory $cwd"
+  [[ -f $brief ]] || die "no brief $brief"
+  brief=$(realpath -- "$brief")
+  [[ -z "$split" ]] || die '--split is supported only by the herdr backend'
+  [[ $BACKEND == tmux ]] || die 'herdr backend is not installed yet'
+  command -v tmux >/dev/null || die 'tmux is required'
+  command -v "$AGENT" >/dev/null || die "$AGENT is not on PATH"
+  if has_window "$name"; then die "window $name already exists"; fi
+
+  local -a args environment
+  if [[ $AGENT == claude ]]; then
+    args=(--permission-mode bypassPermissions)
+    if [[ ${CHILD_SESSION_CLAUDE_ARGS+x} ]]; then read -r -a args <<< "$CHILD_SESSION_CLAUDE_ARGS" || true; fi
+    [[ -z "$model" ]] || args+=(--model "$model")
+    [[ -z "$effort" ]] || args+=(--effort "$effort")
+  else
+    args=(--dangerously-bypass-approvals-and-sandbox)
+    if [[ ${CHILD_SESSION_CODEX_ARGS+x} ]]; then read -r -a args <<< "$CHILD_SESSION_CODEX_ARGS" || true; fi
+    [[ -z "$model" ]] || args+=(-m "$model")
+    [[ -z "$effort" ]] || args+=(-c "model_reasoning_effort=$effort")
+  fi
+  args+=("Read the brief at $brief completely and carry it out.")
+
+  # Non-interactive startup preserves the caller's PATH (including custom CLIs).
+  # An ordinary interactive shell stays in the window after the child exits.
+  tmux has-session -t "=$S" 2>/dev/null || tmux new-session -d -s "$S" -n home -c "$HOME"
+  clean_server_env
+  local prefix launcher state variable attempt
+  umask 077
+  mkdir -p -- "$RUNTIME_DIR"
+  prefix=$(runtime_prefix "$name")
+  launcher=$prefix.sh
+  state=$prefix.state
+  printf 'starting\n' > "$state"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'export PATH=%q\n' "$PATH"
+    printf 'printf "running\\n" > %q\n' "$state"
+    printf '%q ' "$AGENT" "${args[@]}"; printf '\n'
+    printf 'printf "exited\\n" > %q\n' "$state"
+    printf 'exec bash -i\n'
+  } > "$launcher"
+  # New windows must see current caller configuration even in an older server.
+  environment=()
+  for variable in $(compgen -e); do
+    [[ $variable == TMUX || $variable == TMUX_PANE ]] && continue
+    environment+=(-e "$variable=${!variable}")
+  done
+  tmux new-window -d -t "=$S:" -n "$name" -c "$cwd" "${environment[@]}" \
+    "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+  tmux set-window-option -t "$(window_target "$name")" automatic-rename off
+  # A fast agent may already have exited; do not wait for a missed process.
+  for ((attempt=0; attempt<100; attempt++)); do
+    [[ $(cat -- "$state") == starting ]] || break
+    sleep 0.1
+  done
+  if [[ $(cat -- "$state") == starting ]]; then
+    printf 'child-session: agent did not start; inspect with child-session peek %s\n' "$name" >&2
+  fi
+  cmd_tab "$name"
+}
+
+cmd_alive() {
+  has_window "$1" || return 1
+  local state current
+  state=$(runtime_prefix "$1").state
+  if [[ -f $state && $(cat -- "$state") == running ]]; then return 0; fi
+  current=$(tmux display-message -p -t "$(window_target "$1")" '#{pane_current_command}')
+  [[ $current != bash && $current != sh && $current != zsh ]]
+}
+cmd_close() {
+  local prefix
+  if has_window "$1"; then
+    prefix=$(runtime_prefix "$1")
+    tmux kill-session -t "=v-$1" 2>/dev/null || true
+    tmux kill-window -t "$(window_target "$1")"
+    rm -f -- "$prefix.sh" "$prefix.state"
+  fi
+}
+cmd_peek() {
+  require_window "$1"
+  [[ $2 =~ ^[0-9]+$ ]] || die 'peek lines must be a nonnegative integer'
+  tmux capture-pane -p -t "$(window_target "$1")" -S "-$2" |
+    sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+}
+cmd_send() {
+  require_window "$1"
+  tmux send-keys -t "$(window_target "$1")" -l -- "$2"
+  sleep 0.3
+  tmux send-keys -t "$(window_target "$1")" Enter
+}
+cmd_list() {
+  if tmux has-session -t "=$S" 2>/dev/null; then
+    tmux list-windows -t "=$S" -F '#I #W #{pane_current_command} #{pane_current_path}'
+  else
+    printf 'no session %s\n' "$S"
+  fi
+}
+
+case ${1:-} in
+  open)
+    shift; split=; model=; effort=
+    while [[ ${1:-} == --* ]]; do
+      [[ $# -ge 2 && -n $2 ]] || die "${1}: a value is required"
+      case $1 in
+        --agent) AGENT=$2 ;;
+        --model) model=$2 ;;
+        --effort) effort=$2 ;;
+        --split) [[ $2 == right || $2 == down ]] || die '--split must be right or down'; split=$2 ;;
+        *) die "unknown option $1" ;;
+      esac
+      shift 2
+    done
+    [[ $# == 3 ]] || { usage; exit 2; }
+    cmd_open "$split" "$1" "$2" "$3" "$model" "$effort" ;;
+  send) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_send "$2" "$3" ;;
+  peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
+  alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
+  close) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_close "$2" ;;
+  list) [[ $# == 1 ]] || { usage; exit 2; }; cmd_list ;;
+  *) usage; exit 2 ;;
+esac
