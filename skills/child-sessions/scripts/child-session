@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+# Launch and control child coding agents in named terminal windows.
+set -euo pipefail
+
+S=${CHILD_SESSION_TMUX_SESSION:-child-sessions}
+BACKEND=${CHILD_SESSION_BACKEND:-}
+[[ -n "$BACKEND" ]] || { [[ ${HERDR_ENV:-} == 1 ]] && BACKEND=herdr || BACKEND=tmux; }
+AGENT=${CHILD_SESSION_AGENT:-claude}
+WS=${HERDR_WORKSPACE_ID:-}
+RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp}/child-sessions
+export LANG=${LANG:-C.UTF-8}
+
+usage() {
+  cat <<'USAGE'
+child-session open [--agent claude|codex] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
+child-session send <name> <text>
+child-session peek <name> [lines]
+child-session alive <name>             Exit 0 while the agent is running, else 1.
+child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
+child-session close <name>
+child-session list
+
+CHILD_SESSION_BACKEND: herdr or tmux (default: herdr when HERDR_ENV=1, else tmux).
+CHILD_SESSION_AGENT: claude (default) or codex.
+CHILD_SESSION_TMUX_SESSION: child-sessions (default).
+CHILD_SESSION_TAB=0 disables the best-effort Windows Terminal tab.
+CHILD_SESSION_CLAUDE_ARGS / CHILD_SESSION_CODEX_ARGS replace default CLI flags.
+Argument overrides are whitespace-separated words, without shell evaluation.
+USAGE
+}
+
+die() { printf 'child-session: %s\n' "$*" >&2; exit 2; }
+valid_name() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]] || die 'window names must match [A-Za-z0-9_-]+'; }
+[[ $BACKEND == tmux || $BACKEND == herdr ]] || die 'CHILD_SESSION_BACKEND must be tmux or herdr'
+
+# Keep user configuration, but never inherit parent-agent session metadata.
+strip_variable() {
+  [[ $1 =~ ^(CLAUDE|CODEX_COMPANION_|CODEX_) && $1 != CLAUDE_CONFIG_DIR && $1 != CODEX_HOME ]]
+}
+for variable in $(compgen -e); do
+  if strip_variable "$variable"; then unset "$variable"; fi
+done
+clean_server_env() {
+  local entry variable level
+  local -a scope
+  for level in global session; do
+    if [[ $level == global ]]; then scope=(-g); else scope=(-t "=$S"); fi
+    while IFS= read -r entry; do
+      variable=${entry%%=*}
+      variable=${variable#-}
+      if strip_variable "$variable"; then tmux set-environment "${scope[@]}" -u "$variable"; fi
+    done < <(tmux show-environment "${scope[@]}" 2>/dev/null)
+  done
+}
+
+has_window() { tmux list-windows -t "=$S" -F '#W' 2>/dev/null | grep -qxF -- "$1"; }
+# Herdr lookup is optional when controlling a tmux child outside herdr.
+h_find() {
+  H_TAB='' H_PANE='' H_SPLIT=0
+  [[ -n $WS ]] && command -v herdr >/dev/null && command -v jq >/dev/null || return 1
+  local panes tabs
+  panes=$(herdr pane list --workspace "$WS" 2>/dev/null) || return 1
+  tabs=$(herdr tab list --workspace "$WS" 2>/dev/null) || return 1
+  H_TAB=$(jq -r --arg n "$1" '[.result.tabs[] | select(.label == $n)][0].tab_id // empty' <<< "$tabs") || return 1
+  if [[ -n $H_TAB ]]; then
+    H_PANE=$(jq -r --arg t "$H_TAB" '[.result.panes[] | select(.tab_id == $t)][0].pane_id // empty' <<< "$panes") || return 1
+  else
+    H_SPLIT=1
+    read -r H_PANE H_TAB < <(jq -r --arg n "$1" \
+      '[.result.panes[] | select(.label == $n)][0] // empty | "\(.pane_id) \(.tab_id)"' <<< "$panes") || true
+  fi
+  [[ -n $H_PANE ]]
+}
+resolve() {
+  if has_window "$1"; then W=tmux
+  elif h_find "$1"; then W=herdr
+  else return 1
+  fi
+}
+require_window() { resolve "$1" || die "no window $1"; }
+window_target() { printf '=%s:=%s' "$S" "$1"; }
+runtime_prefix() {
+  # A separate socket/server must not reuse another server's launch state.
+  if [[ ${W:-$BACKEND} == herdr ]]; then
+    local workspace_key
+    workspace_key=$(printf '%s' "$WS" | cksum)
+    printf '%s/herdr-%s-%s' "$RUNTIME_DIR" "${workspace_key%% *}" "$1"
+    return
+  fi
+  local socket_key session_id
+  socket_key=$(tmux display-message -p -t "=$S" '#{socket_path}' | cksum)
+  socket_key=${socket_key%% *}
+  session_id=$(tmux display-message -p -t "=$S" '#{session_id}')
+  printf '%s/tmux-%s-%s-%s' "$RUNTIME_DIR" "$socket_key" "${session_id#\$}" "$1"
+}
+
+fix_interop() {
+  local socket='' candidate
+  if [[ -z ${WSL_INTEROP:-} || ! -S $WSL_INTEROP ]]; then
+    for candidate in /run/WSL/*_interop; do
+      [[ -S $candidate ]] || continue
+      if [[ -z $socket || $candidate -nt $socket ]]; then socket=$candidate; fi
+    done
+    [[ -z "$socket" ]] || export WSL_INTEROP="$socket"
+  fi
+  return 0
+}
+cmd_tab() {
+  [[ ${CHILD_SESSION_TAB:-1} != 0 ]] || return 0
+  command -v wt.exe >/dev/null || return 0
+  local name=$1 view="v-$1"
+  if ! { tmux has-session -t "=$view" 2>/dev/null || tmux new-session -d -s "$view" -t "=$S"; } ||
+     ! tmux select-window -t "=$view:=$name"; then
+    printf 'child-session: could not prepare a Windows Terminal view for %s\n' "$name" >&2
+    return 0
+  fi
+  fix_interop
+  wt.exe -w 0 new-tab --title "$name" wsl.exe -d "${WSL_DISTRO_NAME:-ubuntu-dev}" -e tmux attach -t "=$view" >/dev/null 2>&1 ||
+    printf 'child-session: could not open Windows Terminal; attach manually: tmux attach -t %s\n' "$view" >&2
+  return 0
+}
+
+h_open() {
+  local name=$1 cwd=$2 launcher=$3 split=$4 result attempt ready=0
+  if [[ -n $split ]]; then
+    result=$(herdr pane split "$HERDR_PANE_ID" --direction "$split" --cwd "$cwd" --no-focus)
+    H_PANE=$(jq -er '.result.pane.pane_id' <<< "$result")
+    herdr pane rename "$H_PANE" "$name" >/dev/null
+  else
+    result=$(herdr tab create --workspace "$WS" --cwd "$cwd" --label "$name" --no-focus)
+    H_TAB=$(jq -er '.result.tab.tab_id' <<< "$result")
+    H_PANE=$(jq -er '.result.root_pane.pane_id' <<< "$result")
+  fi
+  # The echoed command does not contain the evaluated marker. Wait for actual
+  # output: interactive shell startup can otherwise discard the first input.
+  for ((attempt=0; attempt<30; attempt++)); do
+    # shellcheck disable=SC2016 # Arithmetic must expand in the pane shell.
+    herdr pane run "$H_PANE" 'echo child-session-ready-$((6*7))' >/dev/null
+    if herdr pane wait-output "$H_PANE" --match child-session-ready-42 --timeout 2000 >/dev/null 2>&1; then
+      ready=1; break
+    fi
+  done
+  (( ready )) || die "shell in window $name did not accept input within 60 s; inspect with child-session peek $name"
+  herdr pane run "$H_PANE" "clear; bash --noprofile --norc $(printf '%q' "$launcher")" >/dev/null
+}
+
+cmd_open() {
+  local split=$1 name=$2 cwd=$3 brief=$4 model=$5 effort=$6
+  valid_name "$name"
+  [[ $AGENT == claude || $AGENT == codex ]] || die '--agent must be claude or codex'
+  [[ -d $cwd ]] || die "no directory $cwd"
+  [[ -f $brief ]] || die "no brief $brief"
+  brief=$(realpath -- "$brief")
+  [[ -z $split || $BACKEND == herdr ]] || die '--split requires the herdr backend'
+  if [[ $BACKEND == herdr ]]; then
+    command -v herdr >/dev/null || die 'herdr is required for the herdr backend'
+    command -v jq >/dev/null || die 'jq is required for the herdr backend'
+    [[ -n $WS ]] || die 'herdr requires HERDR_WORKSPACE_ID'
+    [[ -z $split || -n ${HERDR_PANE_ID:-} ]] || die '--split requires HERDR_PANE_ID'
+  fi
+  command -v tmux >/dev/null || die 'tmux is required'
+  command -v "$AGENT" >/dev/null || die "$AGENT is not on PATH"
+  if resolve "$name"; then die "window $name already exists"; fi
+  W=$BACKEND
+
+  local -a args environment
+  if [[ $AGENT == claude ]]; then
+    args=(--permission-mode bypassPermissions)
+    if [[ ${CHILD_SESSION_CLAUDE_ARGS+x} ]]; then read -r -a args <<< "$CHILD_SESSION_CLAUDE_ARGS" || true; fi
+    [[ -z "$model" ]] || args+=(--model "$model")
+    [[ -z "$effort" ]] || args+=(--effort "$effort")
+  else
+    args=(--dangerously-bypass-approvals-and-sandbox)
+    if [[ ${CHILD_SESSION_CODEX_ARGS+x} ]]; then read -r -a args <<< "$CHILD_SESSION_CODEX_ARGS" || true; fi
+    [[ -z "$model" ]] || args+=(-m "$model")
+    [[ -z "$effort" ]] || args+=(-c "model_reasoning_effort=$effort")
+  fi
+  args+=("Read the brief at $brief completely and carry it out.")
+
+  # Non-interactive startup preserves the caller's PATH (including custom CLIs).
+  # An ordinary interactive shell stays in the window after the child exits.
+  local initial_window=''
+  if [[ $BACKEND == tmux ]] && ! tmux has-session -t "=$S" 2>/dev/null; then
+    # Reserve the requested child as the first window, without a public-name
+    # bootstrap window. Hold it until its session-scoped launcher is ready.
+    initial_window=$(tmux new-session -d -P -F '#{window_id}' -s "$S" -n "$name" -c "$cwd" 'exec sleep 3600')
+    tmux set-window-option -t "$initial_window" automatic-rename off
+  fi
+  if [[ $BACKEND == tmux ]]; then clean_server_env; fi
+  local prefix launcher state variable attempt
+  umask 077
+  mkdir -p -- "$RUNTIME_DIR"
+  prefix=$(runtime_prefix "$name")
+  launcher=$prefix.sh
+  state=$prefix.state
+  printf 'starting\n' > "$state"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'export PATH=%q\n' "$PATH"
+    # Herdr starts this script from a shell whose inherited environment can
+    # still contain parent metadata. Scrub again at the actual launch boundary.
+    declare -f strip_variable
+    # shellcheck disable=SC2016 # Generate code for the child launcher.
+    printf '%s\n' 'for variable in $(compgen -e); do' \
+      '  if strip_variable "$variable"; then unset "$variable"; fi' 'done'
+    for variable in CLAUDE_CONFIG_DIR CODEX_HOME; do
+      if [[ ${!variable+x} ]]; then printf 'export %s=%q\n' "$variable" "${!variable}"; fi
+    done
+    declare -f process_identity
+    # shellcheck disable=SC2016 # Capture the actual launcher PID at runtime.
+    printf 'printf "running %%s %%s\\n" "$$" "$(process_identity "$$")" > %q\n' "$state"
+    printf '%q ' "$AGENT" "${args[@]}"; printf '\n'
+    printf 'printf "exited\\n" > %q\n' "$state"
+    if [[ $BACKEND == tmux ]]; then printf 'exec bash -i\n'; fi
+  } > "$launcher"
+  if [[ $BACKEND == herdr ]]; then
+    h_open "$name" "$cwd" "$launcher" "$split"
+  else
+    # New windows must see current caller configuration even in an older server.
+    environment=()
+    for variable in $(compgen -e); do
+      [[ $variable == TMUX || $variable == TMUX_PANE ]] && continue
+      environment+=(-e "$variable=${!variable}")
+    done
+    if [[ -n $initial_window ]]; then
+      tmux respawn-window -k -t "$initial_window" -c "$cwd" "${environment[@]}" \
+        "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+    else
+      tmux new-window -d -t "=$S:" -n "$name" -c "$cwd" "${environment[@]}" \
+        "exec bash --noprofile --norc $(printf '%q' "$launcher")"
+    fi
+    tmux set-window-option -t "$(window_target "$name")" automatic-rename off
+  fi
+  # A fast agent may already have exited; do not wait for a missed process.
+  for ((attempt=0; attempt<100; attempt++)); do
+    [[ $(cat -- "$state") == starting ]] || break
+    sleep 0.1
+  done
+  if [[ $(cat -- "$state") == starting ]]; then
+    printf 'child-session: agent did not start; inspect with child-session peek %s\n' "$name" >&2
+  fi
+  if [[ $BACKEND == tmux ]]; then cmd_tab "$name"; fi
+}
+
+# Linux/WSL process identity, including start time to reject reused PIDs.
+# Zombies still have /proc entries and answer kill -0, but are no longer alive.
+process_identity() {
+  local stat
+  local -a fields
+  [[ $1 =~ ^[0-9]+$ && -r /proc/$1/stat ]] || return 1
+  { IFS= read -r stat < "/proc/$1/stat"; } 2>/dev/null || return 1
+  stat=${stat##*) }
+  read -r -a fields <<< "$stat"
+  (( ${#fields[@]} >= 20 )) || return 1
+  [[ ${fields[0]} != Z && ${fields[0]} != X ]] || return 1
+  printf '%s\n' "${fields[19]}"
+}
+
+cmd_alive() {
+  resolve "$1" || return 1
+  local state current phase='' pid='' started='' identity
+  state=$(runtime_prefix "$1").state
+  if [[ $W == tmux ]]; then
+    # remain-on-exit retains the pane and its stale command/launch marker.
+    current=$(tmux display-message -p -t "$(window_target "$1")" '#{pane_dead}') || return 1
+    [[ $current == 0 ]] || return 1
+  fi
+  if [[ -f $state ]]; then read -r phase pid started < "$state" || true; fi
+  if [[ $phase == running && -n $pid && -n $started ]] &&
+     identity=$(process_identity "$pid") && [[ $identity == "$started" ]]; then
+    return 0
+  fi
+  if [[ $W == herdr ]]; then
+    herdr pane process-info --pane "$H_PANE" 2>/dev/null | jq -e \
+      '[.result.process_info.foreground_processes[].name] | any(. != "bash" and . != "sh" and . != "zsh")' >/dev/null
+    return
+  fi
+  # A live replacement shell/process is not the recorded dead launcher.
+  [[ $phase != running ]] || return 1
+  current=$(tmux display-message -p -t "$(window_target "$1")" '#{pane_current_command}')
+  [[ $current != bash && $current != sh && $current != zsh ]]
+}
+cmd_wait() {
+  local name=$1 status_file=$2 seconds=$3
+  [[ $seconds =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
+  seconds=$((10#$seconds))
+  [[ $seconds -ge 0 ]] || die 'wait seconds must be a nonnegative integer'
+  local started=$SECONDS elapsed remaining delay first_line seen_alive=0
+  while true; do
+    first_line=''
+    if [[ -f $status_file ]]; then first_line=$(head -n 1 -- "$status_file" 2>/dev/null) || first_line=''; fi
+    if [[ $first_line =~ ^STATUS:\ (done|blocked|failed)$ ]]; then
+      printf '%s\n' "$first_line"
+      return 0
+    fi
+    elapsed=$((SECONDS - started))
+    if (( elapsed >= seconds )); then
+      printf 'TIMEOUT: %s s without status\n' "$seconds"
+      return 124
+    fi
+    if cmd_alive "$name"; then
+      seen_alive=1
+    elif (( seen_alive || elapsed >= 120 )); then
+      printf 'EXITED: agent in window %s is gone, no status\n' "$name"
+      return 3
+    fi
+    elapsed=$((SECONDS - started))
+    remaining=$((seconds - elapsed))
+    (( remaining > 0 )) || continue
+    if (( elapsed < 120 )); then delay=5; else delay=30; fi
+    (( delay <= remaining )) || delay=$remaining
+    sleep "$delay"
+  done
+}
+cmd_close() {
+  local prefix
+  if resolve "$1"; then
+    prefix=$(runtime_prefix "$1")
+    if [[ $W == herdr ]]; then
+      if (( H_SPLIT )); then herdr pane close "$H_PANE" >/dev/null; else herdr tab close "$H_TAB" >/dev/null; fi
+    else
+      tmux kill-session -t "=v-$1" 2>/dev/null || true
+      tmux kill-window -t "$(window_target "$1")"
+    fi
+    rm -f -- "$prefix.sh" "$prefix.state"
+  fi
+}
+cmd_peek() {
+  require_window "$1"
+  [[ $2 =~ ^[0-9]+$ ]] || die 'peek lines must be a nonnegative integer'
+  if [[ $W == herdr ]]; then
+    local rows
+    rows=$(herdr pane get "$H_PANE" | jq -r '.result.pane.scroll.viewport_rows // 60')
+    herdr pane read "$H_PANE" --source recent-unwrapped --lines "$(( $2 + rows ))" | cat -s
+  else
+    tmux capture-pane -p -t "$(window_target "$1")" -S "-$2"
+  fi |
+    sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+}
+cmd_send() {
+  require_window "$1"
+  if [[ $W == herdr ]]; then
+    herdr pane send-text "$H_PANE" "$2" >/dev/null
+    sleep 0.3
+    herdr pane send-keys "$H_PANE" enter >/dev/null
+  else
+    tmux send-keys -t "$(window_target "$1")" -l -- "$2"
+    sleep 0.3
+    tmux send-keys -t "$(window_target "$1")" Enter
+  fi
+}
+cmd_list() {
+  if tmux has-session -t "=$S" 2>/dev/null; then
+    tmux list-windows -t "=$S" -F '#I #W #{pane_current_command} #{pane_current_path}'
+  elif [[ $BACKEND == tmux ]]; then
+    printf 'no session %s\n' "$S"
+  fi
+  if [[ -n $WS ]] && command -v herdr >/dev/null && command -v jq >/dev/null; then
+    local tabs panes
+    tabs=$(herdr tab list --workspace "$WS")
+    panes=$(herdr pane list --workspace "$WS")
+    printf 'herdr workspace %s (number, label, agent status, cwd):\n' "$WS"
+    jq -rn --argjson t "$tabs" --argjson p "$panes" '
+      $t.result.tabs[] as $x
+      | ([$p.result.panes[] | select(.tab_id == $x.tab_id)][0]) as $y
+      | "\($x.number) \($x.label) \($x.agent_status) \($y.foreground_cwd // $y.cwd)"'
+    jq -rn --argjson t "$tabs" --argjson p "$panes" '
+      [$p.result.panes[] | select(.label != null)] as $s
+      | if ($s | length) > 0 then "split panes (tab, label, agent status, cwd):" else empty end,
+        ($s[] as $y | ([$t.result.tabs[] | select(.tab_id == $y.tab_id)][0].number // $y.tab_id) as $n
+        | "\($n) \($y.label) \($y.agent_status) \($y.foreground_cwd // $y.cwd)")'
+  fi
+}
+
+case ${1:-} in
+  open)
+    shift; split=; model=; effort=
+    while [[ ${1:-} == --* ]]; do
+      [[ $# -ge 2 && -n $2 ]] || die "${1}: a value is required"
+      case $1 in
+        --agent) AGENT=$2 ;;
+        --model) model=$2 ;;
+        --effort) effort=$2 ;;
+        --split) [[ $2 == right || $2 == down ]] || die '--split must be right or down'; split=$2 ;;
+        *) die "unknown option $1" ;;
+      esac
+      shift 2
+    done
+    [[ $# == 3 ]] || { usage; exit 2; }
+    cmd_open "$split" "$1" "$2" "$3" "$model" "$effort" ;;
+  send) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_send "$2" "$3" ;;
+  peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
+  alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
+  wait) [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}" ;;
+  close) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_close "$2" ;;
+  list) [[ $# == 1 ]] || { usage; exit 2; }; cmd_list ;;
+  *) usage; exit 2 ;;
+esac
