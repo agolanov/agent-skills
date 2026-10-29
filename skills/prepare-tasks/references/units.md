@@ -64,7 +64,7 @@ re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer
 diff <(git -C "$docs_repo" show "$sha:$rel") <(sed '$d' -- "$file") >/dev/null
 ```
 
-`rel` is the path relative to the repository that holds `file` (the docs main checkout, or the window's worktree, whose relative paths are the same).
+`rel` is the path relative to the repository that holds `file` (the docs main checkout, or the window's worktree, whose relative paths are the same). Checking a branch, use `git -C <docs-main> show prep-<slug>:<rel>` as the content; once the worktree's `git status --short` is empty, its working file is equivalent.
 
 ## Marking procedure
 

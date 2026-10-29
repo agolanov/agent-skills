@@ -4,7 +4,7 @@ Path: `<docs-dir>/queues/<YYYY-MM-DD>-<slug>.md` in the docs main checkout (`doc
 
 It is written twice, each time staging only this file and committing it in the docs repository as `queue: <slug>`, with the docs main checkout clean afterwards:
 
-1. **After the order is confirmed, before Phase 2:** the table in confirmed order. State is `ready` for units that were already ready, `not ready: <reason>` for units already lost (Phase 1 `failed`), and `pending` for units entering Phase 2. No commands yet.
+1. **After the order is confirmed, before Phase 2:** the table in confirmed order. State is `ready` for units that were already ready, `not ready: <reason>` for units already lost (Phase 1 `failed`), and `pending` for units entering Phase 2. A unit whose Phase 1 failed sits after its known dependencies, else at the end. No commands yet.
 2. **After verify and merge:** every `pending` replaced by its final state, and the commands below the table.
 
 ## Format
