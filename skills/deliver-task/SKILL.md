@@ -48,7 +48,7 @@ The child owns implementation and refinement. The root checks Git/status facts, 
 ## Tails
 
 1. Read [tails.md](references/tails.md). Immediately after the verified merge append every out-of-scope, deferred minor and disputed finding beside the plan in `<plan-stem>-tails.md`, with branch and merge-SHA provenance. Keep the reviewed task branch unchanged.
-2. Find the docs repository with `git -C <plan-dir> rev-parse --show-toplevel`: the project repository or a nested one inside an ignored directory. Stage only the tails file and commit it there, on that repository's current branch, as `tails: <branch>`. When that toplevel is the project and `git -C <main-checkout> check-ignore -q <plan-dir>` exits 0, append locally: no commit, no force-add. No empty commit for zero findings. Require the docs repository and the main checkout clean, then write the ready `<runtime>/<branch>-tails-brief.md` and print its absolute path. Opening a follow-up is the user's call; do not auto-open it.
+2. Find the docs repository with `git -C <plan-dir> rev-parse --show-toplevel`: the project repository or a nested one inside an ignored directory. If the toplevel is the project and `git -C <main-checkout> check-ignore -q <plan-dir>` exits 0, append locally: no commit, no force-add. Otherwise stage only the tails file and commit it in the docs repository, on its current branch, as `tails: <branch>`. No empty commit for zero findings. Require the main checkout clean and, after a commit, the docs repository too, then write the ready `<runtime>/<branch>-tails-brief.md` and print its absolute path. Opening a follow-up is the user's call; do not auto-open it.
 
 ## Cleanup
 

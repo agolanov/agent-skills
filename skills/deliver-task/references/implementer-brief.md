@@ -13,7 +13,7 @@ Spec: <spec>
 Agent: <agent>
 Window name: <name>
 Launch options: <explicit model/effort, or CLI defaults>
-Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and recording tails on main.
+Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and recording tails.
 
 Read the spec and plan completely. Read and honor all applicable project rules: <project-rules>.
 
