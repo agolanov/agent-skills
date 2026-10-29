@@ -8,9 +8,9 @@
 
 ## State file
 
-Path: `<runtime>/<queue-slug>-state.md`. An existing file from an earlier run is read first (a plain list takes its states from it), then renamed to an unused `<file>-old-<n>` suffix; the new file starts fresh.
+Path: `<runtime>/<queue-slug>-state.md`. An existing file from an earlier run is read first (a plain list takes its states from it only when its header names the same absolute plans in the same order; a different header means another input, and every unit starts `ready`), then renamed to an unused `<file>-old-<n>` suffix; the new file starts fresh.
 
-First line `# <absolute queue file, or "plain list">`, then one line per unit in queue order:
+Header: `# <absolute queue file>`, or for a plain list `# plain list` followed by one `# plan: <absolute plan path>` line per plan in order. Then one line per unit in queue order:
 
 ```text
 <unit> | <state> | <branch> | <window> | <status-file> | <base-sha>
