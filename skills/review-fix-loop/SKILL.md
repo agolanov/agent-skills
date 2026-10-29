@@ -1,15 +1,15 @@
 ---
-name: refine
+name: review-fix-loop
 description: Use when an independent review/fix cycle is requested with an assigned reviewer, or another refine skill supplies that assignment. Not for a read-only review alone.
 ---
 
-# Refine
+# Review Fix Loop
 
 The implementing session owns decisions, fixes and the loop. An independent reviewer checks the task; launchers supply the assignment.
 
 ## Skill composition
 
-Keep normal skill discovery and automatic invocation active in both sessions; read and apply matching skills at each stage, including an implementing-session debugging skill after an unexpected failed check. Compose their methods and style with refine's role, scope, verdict, finding evidence, prior dispositions, coverage and checks.
+Keep normal skill discovery and automatic invocation active in both sessions; read and apply matching skills at each stage, including an implementing-session debugging skill after an unexpected failed check. Compose their methods and style with review-fix-loop's role, scope, verdict, finding evidence, prior dispositions, coverage and checks.
 
 ## 1. Establish scope and reviewer
 
@@ -23,9 +23,9 @@ Read [reviewer settings](references/reviewer-settings.md); honor independent mod
 
 ## 2. Commit the reviewed state
 
-Invoking refine or a launcher explicitly requests a task-state commit and one fix commit per round on the task branch, satisfying "commit only when asked" rules. Before the first commit, stop on detached HEAD or the default branch (`main`/`master` or configured default) and ask for branch/commit confirmation unless already authorized in the request. This authority excludes push, merge, rebase, amend, squash, deploy, worktree creation, installation and persistent configuration changes.
+Invoking review-fix-loop or a launcher explicitly requests a task-state commit and one fix commit per round on the task branch, satisfying "commit only when asked" rules. Before the first commit, stop on detached HEAD or the default branch (`main`/`master` or configured default) and ask for branch/commit confirmation unless already authorized in the request. This authority excludes push, merge, rebase, amend, squash, deploy, worktree creation, installation and persistent configuration changes.
 
-Record the pre-refine HEAD for the user's squash command. Commit task-owned staged/unstaged and untracked changes as `refine: task state before review` if present. Select exact task paths and commit only them; an ordinary commit of the whole index could absorb unrelated staged work. Preserve unrelated index/worktree changes and record their exclusions and existing status. After each fix batch, run affected checks and make exactly one commit naming the round and finding IDs. Run the complete suite before creating a commit that may become final-pass HEAD; if its role is not yet known, run it before committing the candidate state. Every review targets a recorded commit; keep it stable during review.
+Record the pre-loop HEAD for the user's squash command. Commit task-owned staged/unstaged and untracked changes as `review-fix-loop: task state before review` if present. Select exact task paths and commit only them; an ordinary commit of the whole index could absorb unrelated staged work. Preserve unrelated index/worktree changes and record their exclusions and existing status. After each fix batch, run affected checks and make exactly one commit naming the round and finding IDs. Run the complete suite before creating a commit that may become final-pass HEAD; if its role is not yet known, run it before committing the candidate state. Every review targets a recorded commit; keep it stable during review.
 
 ## 3. Request independent review
 
@@ -70,4 +70,4 @@ After the last scoped round (or round 1 when it closes the cycle), the implement
 - `clean except disputed`: the same coverage, final-pass, commit and check conditions, plus disputed findings with both positions and the fix-or-dismiss question. A substantive final/scoped/disposition `CHANGES` may close in this status when its only remaining blocking claims are evidence-free repeats now adjudicated `disputed`, every other finding is resolved/deferred/outside-scope, and no further required review remains. Preserve the raw `CHANGES` verdict and explain this disposition-based closure; never relabel the reviewer result CLEAN. Deferred minors alone do not qualify for this exception.
 - `blocked: <reason>`: exhausted invalid attempts or round limit, failed required checks, missing dependencies, unresolved edit ownership, or unmet completion requirements.
 
-Later task edits invalidate the reviewed result. Report rounds/targets/commits, assignment/evidence, checks, all decisions, deferred/disputed findings and outside-scope candidates. Print the user's squash command without executing it; leave round history unsquashed. With no excluded staged work: `git reset --soft <pre-refine HEAD> && git commit`. If unrelated staged changes remain, print `git reset --soft <pre-refine HEAD> && git commit --only -- <exact task paths>` instead, binding and quoting the task paths so the commit preserves excluded staging.
+Later task edits invalidate the reviewed result. Report rounds/targets/commits, assignment/evidence, checks, all decisions, deferred/disputed findings and outside-scope candidates. Print the user's squash command without executing it; leave round history unsquashed. With no excluded staged work: `git reset --soft <pre-loop HEAD> && git commit`. If unrelated staged changes remain, print `git reset --soft <pre-loop HEAD> && git commit --only -- <exact task paths>` instead, binding and quoting the task paths so the commit preserves excluded staging.

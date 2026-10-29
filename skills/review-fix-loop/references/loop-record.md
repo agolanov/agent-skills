@@ -3,12 +3,12 @@
 Reuse an existing task log outside the checkout when possible. This is a short Markdown example, not a parser format. Fill it with inspected facts; do not copy illustrative status/evidence as a result.
 
 ```markdown
-# Refine record
+# Review Fix Loop record
 Status: running
 Checkout: /absolute/task
 Branch: feature/task
 Base: <fixed base>
-Pre-refine HEAD (squash anchor): <last task commit before refine>
+Pre-loop HEAD (squash anchor): <last task commit before the loop>
 Requirements/rules/checks: <links or concise text>
 Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <cli|subagent>/<codex|claude>, model <exact>, effort <exact>
@@ -38,7 +38,7 @@ Raw last verdict: <CLEAN|CHANGES; if dispute-only CHANGES closes, preserve it an
 Implementing-session complete suite: <command/exit/evidence on final commit>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; deferred minors; outside-scope; unresolved findings>
 Squash command for the user (not executed; select only exact task paths when unrelated staged work remains):
-git reset --soft <pre-refine HEAD> && git commit
+git reset --soft <pre-loop HEAD> && git commit
 With excluded staged work, print instead:
-git reset --soft <pre-refine HEAD> && git commit --only -- <exact quoted task paths>
+git reset --soft <pre-loop HEAD> && git commit --only -- <exact quoted task paths>
 ```

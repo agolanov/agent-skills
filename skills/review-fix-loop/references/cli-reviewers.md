@@ -1,6 +1,6 @@
 # CLI Reviewers
 
-Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [round prompt](round-prompt.md) and finding ledger supplied by `refine`. Keep prompts, answers, and logs outside the task checkout. The implementing session stays responsible for fixes.
+Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [round prompt](round-prompt.md) and finding ledger supplied by `review-fix-loop`. Keep prompts, answers, and logs outside the task checkout. The implementing session stays responsible for fixes.
 
 Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the loop finishes or blocks.
 
