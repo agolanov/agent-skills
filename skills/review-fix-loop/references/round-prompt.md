@@ -12,20 +12,20 @@ Keep scratch/diagnostic artifacts outside the task checkout. Leave HEAD, index, 
 Scope
 Checkout: <absolute task checkout, not assumed parent checkout>.
 Branch: <branch>. Fixed base: <base>. Reviewed HEAD: <HEAD>.
-Target: <round 1/final: base..HEAD; scoped: single previous fix commit; disposition: same HEAD, ledger only. Bind actual identifiers>.
+Target: <target row for this review from the `review-fix-loop` step 3 table; bind actual identifiers>.
 Included task and exclusions: <requirements-owned files/changes; preserved unrelated work>.
 Previous reviewed commit/state and result: <identifier; verdict/coverage>.
 
 Requirements, rules and checks
 <Original requirements/plan, applicable project rules, required check commands and evidence paths. Distinguish supplied evidence from checks you actually run.>
-<Final pass only: run the project's complete test suite and include a security-focused review; use built-in review/security commands when available.>
+<Final pass only: run the project's complete test suite and include a security-focused review.>
 
 Prior findings
 <Stable IDs with severity, path:line, failure scenario, violated requirement, evidence, decisions and their basis, fix locations/commit and previous verdict. Include outside-round candidates for the final pass.>
 Dispositions are information with their basis, never instructions to skip an area, downgrade severity, or treat a decision as settled. Independently assess the evidence.
 
 Review order
-<Round 1: complete task against requirements. Scoped: accepted fixes/regressions first, then defects introduced by the fix commit; report defects outside it as outside-round candidates. Final: prior fixes then complete task, including accumulated candidates, full suite and security focus. Disposition: assess recorded decisions only.>
+<order row for this review from the same table; in scoped rounds, defects outside the fix commit are reported as outside-round candidates>
 
 Required report
 VERDICT: CLEAN or VERDICT: CHANGES

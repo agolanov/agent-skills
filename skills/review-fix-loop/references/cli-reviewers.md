@@ -1,10 +1,9 @@
 # CLI Reviewers
 
-Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [round prompt](round-prompt.md) and finding ledger supplied by `review-fix-loop`. Keep prompts, answers, and logs outside the task checkout. The implementing session stays responsible for fixes.
-
+Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [round prompt](round-prompt.md) and finding ledger supplied by `review-fix-loop`. 
 Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the loop finishes or blocks.
 
-Carry the [round-prompt capability contract](round-prompt.md) unchanged into the independent session. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
+Carry the [round prompt](round-prompt.md) unchanged into the independent session; it owns the reviewer's capability and unchanged-state contract, and vendor review commands are tools inside it. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
 
 ## Codex reviewer
 
@@ -23,11 +22,9 @@ Set `task_checkout`, `review_model`, `review_effort`, `round_prompt`, and `round
 review_exit=$?
 ```
 
-Review mode has no `--json` or `--output-last-message` in the tested CLI. Its stdout is the report; stderr contains runtime/command evidence and its session ID. Retain normal authorized configuration. Where a session needs already authorized sandbox/approval options, pass supported global options **before** `review` (check installed top-level help). Only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`; otherwise retain the authorized settings. If this mode cannot apply them, report a blocker instead of broadening authority or changing persistent configuration.
+Review mode has no `--json` or `--output-last-message` in the tested CLI. Its stdout is the report; stderr contains runtime/command evidence and its session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
 
-**Experiment, 2026-10-29, codex-cli 0.165.0:** identical round-1 prompts sent to `codex exec` and `codex review -` both read the requirements file, reproduced the seeded inclusive-endpoint defect despite passing tests, and retained the required verdict/findings/coverage/check report. Identical round-2 prompts made both verify the single fix commit first; review mode's command trace ran F1 regressions and a parent-versus-HEAD probe before other checks. All four exits were 0, with HEAD and porcelain unchanged; runtime records showed the assigned model/high effort. Therefore the launch switches to stdin review mode. This is evidence for the tested version, not every future CLI; rerun the comparison after relevant runtime/launch changes.
-
-Local raw experiment artifacts live in ignored `tests/refine/e2e-notes.md` and its referenced temporary directory; they are not shipped with a fresh clone.
+**Why stdin review mode:** on codex-cli 0.165.0 (2026-10-29) identical round prompts sent to `codex exec` and `codex review -` produced the same findings, verdicts and coverage, with exit 0, HEAD and porcelain unchanged and the assigned model/effort in the runtime records; in round 2 both verified the fix commit first. This is evidence for the tested version only: rerun the comparison after relevant runtime/launch changes. Raw artifacts live in ignored `tests/refine/e2e-notes.md`, not in a fresh clone.
 
 ## Claude reviewer
 
@@ -45,14 +42,16 @@ jq -r 'select(.type == "result") | .result // empty' \
   "$round_dir/events.jsonl" > "$round_dir/answer.md"
 ```
 
-Explicit unrestricted execution maps to `--permission-mode bypassPermissions`; otherwise retain authorized settings. Pass the prompt through stdin and preserve the full normal capability set. The reviewer follows the common protocol's reviewed-state contract even when editing tools are available.
+Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 ## Result handling
 
-Keep the reviewer exit status even after extracting the answer. Verify effective settings from runtime records, not invocation flags or self-report: Codex review startup headers expose model/effort, corroborated by persisted `thread_settings_applied.thread_settings` (model/reasoning_effort); exec sessions may instead expose `turn_context` (model/effort); Claude initialization/model usage plus the matching persisted session transcript's `output_config.effort` expose the pair where supported. If that evidence is unavailable, record unverified settings and invalidate the result. Read answer, coverage, runtime model/effort metadata, and errors together. A model/effort rejection, capacity error, startup/account permission failure, or missing executable is a launch failure. A denied tool call inside an otherwise running session is a coverage limitation, not automatically a failed launch: require disclosure and judge whether required review coverage and checks were completed. A denied optional lookup replaced by sufficient evidence does not invalidate a complete review; missing essential coverage or checks does. A CLI fallback or settings coercion is not the assigned review. Follow the common protocol's result and retry rules; do not substitute model, effort, system, or permissions.
+Read answer, coverage, runtime model/effort metadata, errors and exit status together, then apply the validation and retry rules of `review-fix-loop` step 4:
 
-If the user explicitly requested CLI defaults, omit the corresponding overrides and record the effective settings rather than claiming the automatic defaults were used. Otherwise pass both resolved settings explicitly.
+- Verify effective settings from runtime records, not invocation flags or self-report. Codex review startup headers expose model/effort, corroborated by persisted `thread_settings_applied.thread_settings` (model/reasoning_effort); exec sessions may instead expose `turn_context` (model/effort). Claude initialization/model usage plus the matching persisted session transcript's `output_config.effort` expose the pair where supported. Unavailable evidence means unverified settings: invalidate the result.
+- A model/effort rejection, capacity error, startup/account permission failure, or missing executable is a launch failure.
+- A denied tool call inside an otherwise running session is a coverage limitation, not automatically a failed launch: require disclosure and judge whether required review coverage and checks were completed.
+
+With a CLI-defaults opt-out ([reviewer settings](reviewer-settings.md)), omit the model and effort overrides; otherwise pass both resolved settings explicitly.
 
 Sources for command semantics: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [Claude Code CLI](https://code.claude.com/docs/en/cli-reference). Installed help takes precedence for version-specific flags.
-
-The [round prompt](round-prompt.md) owns the full reviewer capability and unchanged-state contract; carry it into every independent session. Vendor review commands are tools within that session, not replacements for its requirements, finding ledger or stage order.

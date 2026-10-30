@@ -15,7 +15,7 @@ Assignment: <cli|subagent>/<codex|claude>, model <exact>, effort <exact>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence>
 Round limit: 5 <or explicit user limit>
 Completed rounds: 0
-Final pass: not run <or round/commit; at most once>
+Final pass: not run <or round/commit>
 Pending round: 1; invalid attempts: 0 of 2
 
 ## Round 1
@@ -37,8 +37,5 @@ Final reviewed commit: <HEAD>
 Raw last verdict: <CLEAN|CHANGES; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold>
 Implementing-session complete suite: <command/exit/evidence on final commit>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; deferred minors; outside-scope; unresolved findings>
-Squash command for the user (not executed; select only exact task paths when unrelated staged work remains):
-git reset --soft <pre-loop HEAD> && git commit
-With excluded staged work, print instead:
-git reset --soft <pre-loop HEAD> && git commit --only -- <exact quoted task paths>
+Squash command for the user (not executed): <command per `review-fix-loop` step 5>
 ```
