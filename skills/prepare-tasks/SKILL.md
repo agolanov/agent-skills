@@ -45,7 +45,7 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 
 ## Phase 2: plans and reviews
 
-1. For every spec with unready units, skipping units whose Phase 1 window failed (they keep `not ready`; that window receives no further brief), fill [plan-brief.md](references/plan-brief.md) at `<runtime>/prep-<slug>-plan-brief.md`, status `<runtime>/prep-<slug>-plan-status.md`: `Spec:`; plans to write on `Plan paths:` in confirmed order; every existing document of the spec's units lacking a fresh mark (by its freshness on the window's branch for Phase 1 specs) on `Documents to review:`, never a fresh one except the plan of a plan-without-spec unit, which is always listed; predecessors and plan headers from the order.
+1. For every spec with unready units, skipping units whose Phase 1 window failed (they keep `not ready`; that window receives no further brief), fill [plan-brief.md](references/plan-brief.md) at `<runtime>/prep-<slug>-plan-brief.md`, status `<runtime>/prep-<slug>-plan-status.md`: `Spec:`; `Delivery mode:` from the spec's header per plan-brief.md's filling rules; plans to write on `Plan paths:` in confirmed order; every existing document of the spec's units lacking a fresh mark (by its freshness on the window's branch for Phase 1 specs) on `Documents to review:`, never a fresh one except the plan of a plan-without-spec unit, which is always listed; predecessors and plan headers from the order.
 2. A spec with an alive Phase 1 window (`alive prep-<slug>`): `send prep-<slug> "Read the brief at <abs plan-brief> completely and carry it out."`. A Phase 1 window whose agent is gone: `close`, then `open` in the same worktree with the plan brief. Any other spec: new worktree and window. Send or open all before the first `wait`, then wait round-robin.
 
 ## Verify and merge
@@ -58,4 +58,4 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 ## Queue file
 
 1. Update the queue file per queue-file.md with final states and the ordered `deliver-task` lines; stage only it, commit `queue: <slug>` in the docs repository, and require docs main clean.
-2. Report the queue path, the `deliver-task` lines, not-ready units with reasons and their kept windows/worktrees, merge SHAs, and every child's Out of scope lines.
+2. Report the queue path, the `deliver-task` lines, not-ready units with reasons and their kept windows/worktrees, merge SHAs, every child's Out of scope lines, and every spec whose `**Delivery mode:**` value was unknown and carried as `full`, with the raw value.

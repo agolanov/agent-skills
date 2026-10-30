@@ -6,6 +6,7 @@ Rules for filling:
 
 - Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Spec:`, `Plan paths:`, `Documents to review:` and `Base SHA:` literally. Use `Spec:` for the unit's existing spec; `Spec path:` belongs only to the Phase 1 brief and means "write a spec here".
 - `Plan paths:` lists the plans to write, in confirmed order, separated by `, `. `Documents to review:` lists every existing document of this spec's units lacking a fresh mark (the spec too when it is not fresh), never a fresh one, except the plan of a plan-without-spec unit, which is always listed (an older mark predates its spec). Omit a line that would be empty; never write `None` on it. At least one of the two is present. Without `Plan paths:` (review only), drop the Planning skill line and the Plan headers section.
+- `Delivery mode:` carries the spec's mode: the first line of the spec matching `**Delivery mode:** <value>`; `light` and `full` as written, `full` when the spec has no such line. Any other value is carried as `full` and named, with the spec path and the raw value, in the final report. The root copies the value and never judges it.
 - Every document path is absolute inside this window's worktree. `Base SHA:` is the window's branch base, unchanged for a reused window.
 - Plan headers, per plan to write: `**Spec:** <spec path relative to the project checkout>`, then one `**Depends on:** <predecessor plan path relative to the project checkout> (merged first)` per predecessor from the confirmed order; from the second plan of this window on, the previous plan of this window is one of them. Write `None` under Predecessors when there are none.
 
@@ -20,6 +21,7 @@ Project checkout: <absolute project checkout> (read code there; never write ther
 Agent: <claude|codex>
 Window name: prep-<slug>
 Spec: <absolute spec path inside this worktree>
+Delivery mode: <light|full>
 Plan paths: <absolute plan path inside this worktree>[, <absolute plan path>...]
 Documents to review: <absolute document path inside this worktree>[, <absolute document path>...]
 Ownership: you are the only writer in this worktree. The root owns merging, cleanup and the queue file.
@@ -40,8 +42,8 @@ Required installed skills (read these absolute SKILL.md paths):
 
 Work:
 1. Read the Spec, every predecessor spec and every document to review completely, and read the project code they concern.
-2. For each path on the Plan paths line, in that order: write the plan with writing-plans against the Spec and its predecessors, at that path (it replaces writing-plans' default location), with its header lines; commit it on this branch. Planning ends at the committed plan; execution belongs to deliver-task later.
-3. Invoke auto-cross-refine over every plan written and every document to review, plans checked against the Spec, and run it until it ends clean or clean except disputed. Do not squash.
+2. For each path on the Plan paths line, in that order: write the plan with writing-plans against the Spec and its predecessors, at that path (it replaces writing-plans' default location), with its header lines; commit it on this branch. Planning ends at the committed plan; execution belongs to deliver-task later. With `Delivery mode: light`, write a short plan: the files and rules that change, the wording, and the existing checks to run and how to run them, as the project rules' light mode says; no tasks for fixtures, fakes, replays, RED or GREEN runs or notes. If the change does not meet the project rules' criteria for light, do not change the header or widen the change: end STATUS: blocked with the question (widen to full, or narrow the change).
+3. Invoke auto-cross-refine over every plan written and every document to review, plans checked against the Spec, and run it until it ends clean or clean except disputed. Do not squash. When the project rules define delivery modes, the mode of every spec on Documents to review is a requirement of its review, as in the spec brief; a light plan is checked against its spec like any plan.
 4. Mark each of those documents, and any other document of this spec you changed:
    a. Delete every line matching the regular expression '^Review: (clean|clean except disputed), ' anywhere in the document.
    b. For clean except disputed, keep the disputed findings and both positions in the document.
