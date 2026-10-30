@@ -64,3 +64,5 @@ Write the queue file's `State` column from the state file and commit `queue: <sl
 ## End
 
 When no window is working or awaiting merge and nothing is startable: batch point (c), then report a table `unit | state | merge SHA | tails count | follow-up brief path`, then every unit never started with its reason, and the kept worktree, branch and status file of each failed unit, and the leftovers listed for each unit recorded by Input 3.
+
+Then, when any unit's tails count in the table is above zero, print one last line `prepare-tasks <tails path> ...`: the absolute `-tails.md` path of each such unit, in queue order, space-separated (a unit delivered in an earlier run has no count and is left out). With no such unit print no line.
