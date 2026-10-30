@@ -18,7 +18,7 @@ Previous reviewed commit/state and result: <identifier; verdict/coverage>.
 
 Requirements, rules and checks
 <Original requirements/plan, applicable project rules, required check commands and evidence paths. Distinguish supplied evidence from checks you actually run.>
-<Final pass only: run the project's complete test suite and include a security-focused review.>
+<Final pass only: run the project's complete test suite and include a security-focused review. When you run in Codex and the Codex Security plugin's `security-diff-scan` skill is available, run it on the fixed base..reviewed HEAD range from Scope as part of that review: its scan artifacts stay in the plugin's state directory outside the checkout, and its configuration remediation stays a reported proposal, unapplied. A scan that cannot start or complete is a disclosed coverage limitation; your own security review covers the task either way.>
 
 Prior findings
 <Stable IDs with severity, path:line, failure scenario, violated requirement, evidence, decisions and their basis, fix locations/commit and previous verdict. Include outside-round candidates for the final pass.>
