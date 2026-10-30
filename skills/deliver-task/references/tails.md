@@ -24,6 +24,7 @@ Source plan: <absolute-plan>
 Source spec: <absolute-spec>
 Project rules: <absolute-rules-paths>
 Recorded tails: <absolute-tails-path, or None: no findings>
+To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>
 
 Findings:
 <one line per finding, including provenance, location, scope reason and both positions for disputes; or None>
@@ -33,4 +34,6 @@ Read the source inputs, project rules and findings. Establish current code locat
 Original review: <final refine mode and unchanged raw reviewer verdict>
 ```
 
-Print the absolute follow-up brief path. The user chooses whether to open it with child-sessions; deliver-task never launches it automatically.
+The `To prepare through prepare-tasks:` line is present only when there are findings; with none, omit it.
+
+Print the absolute follow-up brief path. The user chooses whether to open it with child-sessions; deliver-task never launches it automatically. With findings, also print the line `To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>`; nothing runs it automatically.
