@@ -15,4 +15,4 @@ A plan with no `**Files:**` block has an empty set and overlaps nothing.
 
 Units A and B overlap when some path of A equals some path of B, or one of them is a directory containing the other (`src/` contains `src/a.sh`; `src/a` does not contain `src/ab.sh`). Overlap is symmetric and not transitive.
 
-When scheduling, a startable unit is held back if it overlaps a unit with a live window or an earlier unit chosen in the same pass; the earlier unit in queue order goes first and the other waits for its merge. Name the shared path when reporting why a unit waited.
+When scheduling, a startable unit is held back if it overlaps a unit with a live window or an earlier unit chosen in the same pass; the earlier unit in queue order goes first and the other waits for its merge. A window left alive by a unit that `deliver-queue` Input 3 recorded as already merged holds nothing back: its changes are already on main. Name the shared path when reporting why a unit waited.
