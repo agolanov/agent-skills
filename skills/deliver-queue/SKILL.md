@@ -49,7 +49,7 @@ Write the queue file's `State` column from the state file and commit `queue: <sl
 2. Exit 0: read the first status line of every working window. Each `done` of a `running` unit becomes `done awaiting merge`; a `rebasing` unit keeps its state until its finish half ends. Then go to Finish half, or back to the loop when the hold allows none.
 3. `blocked`: state `blocked: <question>`; answer it per `deliver-task` Open and wait 3; back to its previous state (`running` or `rebasing`). A hold set on the unit persists throughout. Other windows keep going.
 4. `failed`, unlike `deliver-task`'s stop, because an interactive agent stays alive after writing `failed` and would hold a slot: state `failed: <reason>` in the state file only, `peek <name> 40` for the report, `close <name>`, free the slot only once `alive <name>` returns 1 (a failed `close` is Scheduling 3's retained window). Keep worktree, branch and status file. Its dependents, transitively, become `not started: depends on failed <unit>`; other units continue. Run Scheduling unless batch point (b) is pending (the drain's end runs it), then drain (Finish half 2). A unit the user stops is `stopped by the user`, handled the same way, except that its dependents, transitively, become `not started: depends on stopped <unit>`.
-5. Exit 124: next window; `peek` now and then for a dialog, answer within authority or ask the user. Exit 3: `deliver-task` Open and wait 4's single reopen; a second silent exit or any other error counts as `failed`.
+5. Exit 124: `peek <name> 40` and handle what it shows per child-sessions Dialogs, then the next window. Exit 3: `deliver-task` Open and wait 4's single reopen; a second silent exit or any other error counts as `failed`.
 
 ## Finish half
 
