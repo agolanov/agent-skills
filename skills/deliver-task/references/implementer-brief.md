@@ -31,7 +31,7 @@ Required installed skills (read these absolute SKILL.md paths):
 
 Execute the entire plan with the selected execution skill in this existing isolated worktree. Run all required checks and commit task changes on this branch. Keep only task implementation and review-fix commits here; delivery notes/tails belong to the root after merge.
 
-When Delivery mode is light, the whole task is: the edit the plan describes, the checks the plan and the project rules name, and the one `auto-cross-refine` below. Create no fixtures, fake scenarios, replay cases, RED or GREEN runs or notes entries, edit no test material, and do not escalate to the project's full process. If the change does not meet the project rules' criteria for light, do not change the header or widen the change: end STATUS: blocked with the question (widen to full, or narrow the change). When Delivery mode is full, this paragraph does not apply.
+When Delivery mode is light, the whole task is: the edit the plan describes, the checks the plan and the project rules name, and the one `auto-cross-refine` below. Create no fixtures, fake scenarios, replay cases, RED or GREEN runs or notes entries, edit no test material, and do not escalate to the project's full process on your own. If the change does not meet the project rules' criteria for light, do not change the header or widen the change: end STATUS: blocked with the question (widen to full, or narrow the change). When Delivery mode is full, this paragraph does not apply.
 
 After the plan is complete and all checks pass, invoke `auto-cross-refine` and run it until it ends `clean` or `clean except disputed`. Do not squash.
 
