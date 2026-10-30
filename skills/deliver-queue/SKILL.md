@@ -28,12 +28,12 @@ The root writes no code. Per-unit work is `deliver-task`'s sections, read from i
 
 ## Scheduling
 
-Runs at the start, after each merge, and whenever a slot frees.
+Runs at the start, at the end of each drain (Finish half 2), and whenever a slot frees while no batch point (b) is pending.
 
 1. Startable: a candidate not yet started whose dependencies are all `delivered`.
 2. Read [overlap.md](references/overlap.md). Hold back a startable unit that overlaps a unit with a live window or an earlier unit chosen in the same pass; it waits until that window is gone, normally after its merge.
 3. Live windows: `running`, `blocked`, `rebasing` and `done awaiting merge` (its agent stays alive for a possible main-moved return until Cleanup), plus a `failed` window until `close` and `alive` returning 1, and a delivered unit's window whose Cleanup `close` failed or a unit recorded by Input 3 whose window was left alive, while `alive` (rechecked at each Scheduling) returns 0. Choose startable units in queue order until live windows reach `--parallel`. If such retained windows (failed, stopped or delivered, their `close` failed and `alive` still 0, or recorded by Input 3 and left alive) keep a startable unit waiting while no unit is working or awaiting merge, report them and ask the user: they close the window (recheck `alive`, then Scheduling again; a failed or stopped unit keeps its worktree, branch and status file), or the run goes to End with the waiting units `ready`.
-4. Mark the chosen units `running` in the state file. At the start and after a merge, the batch point comes next; after a freed slot, go straight to the start half.
+4. Mark the chosen units `running` in the state file. At the start and at the end of a drain, the batch point comes next; after a freed slot, go straight to the start half.
 
 ## Start half
 
@@ -41,24 +41,24 @@ For each chosen unit in queue order, perform `deliver-task` Preflight 1–2, Wor
 
 ## Batch point
 
-Write the queue file's `State` column from the state file and commit `queue: <slug> progress` per state-file.md, only: (a) after the first scheduling, before any worktree is created; (b) after a merge's Tails and Cleanup and the next scheduling, before any new worktree; (c) at End. A failure, a block, a Verify return or a failed rebase is never a batch point. Because (a) and every (b) precede the next Worktree step, each new child starts from a main that already holds the queue commit: with documents tracked by the project, no child is ever moved past by a documentation-only commit.
+Write the queue file's `State` column from the state file and commit `queue: <slug> progress` per state-file.md, only: (a) after the first scheduling, before any worktree is created; (b) at the end of a drain (Finish half 2), after its last merge's Tails and Cleanup and the next scheduling, before any new worktree; one commit records every merge of the drain; (c) at End. A failure, a block, a Verify return or a failed rebase is never a batch point. Because (a) and every (b) precede the next Worktree step, each new child starts from a main that already holds the queue commit: with documents tracked by the project, no child is ever moved past by a documentation-only commit.
 
 ## Wait loop
 
 1. Round-robin over windows whose agent is working (`running`, `rebasing`, a `blocked` window after its answer): one foreground `wait <name> <status-file> 150` per window per turn, then the next window, with the host's command timeout set above the wait (180 s or more) so the host can never move it to the background; a wait still running beside other commands is not the loop. Never 120 or less, never several waits in one shell call or in the background, never one long wait on a single window. A Codex tool yield is not a timeout: poll the same command as child-sessions says. `done awaiting merge` windows are not waited on again.
 2. Exit 0: read the first status line of every working window. Each `done` of a `running` unit becomes `done awaiting merge`; a `rebasing` unit keeps its state until its finish half ends. Then go to Finish half, or back to the loop when the hold allows none.
 3. `blocked`: state `blocked: <question>`; answer it per `deliver-task` Open and wait 3; back to its previous state (`running` or `rebasing`). A hold set on the unit persists throughout. Other windows keep going.
-4. `failed`, unlike `deliver-task`'s stop, because an interactive agent stays alive after writing `failed` and would hold a slot: state `failed: <reason>` in the state file only, `peek <name> 40` for the report, `close <name>`, free the slot only once `alive <name>` returns 1 (a failed `close` is Scheduling 3's retained window). Keep worktree, branch and status file. Its dependents, transitively, become `not started: depends on failed <unit>`; other units continue; run Scheduling, then drain (Finish half 2). A unit the user stops is `stopped by the user`, handled the same way, except that its dependents, transitively, become `not started: depends on stopped <unit>`.
+4. `failed`, unlike `deliver-task`'s stop, because an interactive agent stays alive after writing `failed` and would hold a slot: state `failed: <reason>` in the state file only, `peek <name> 40` for the report, `close <name>`, free the slot only once `alive <name>` returns 1 (a failed `close` is Scheduling 3's retained window). Keep worktree, branch and status file. Its dependents, transitively, become `not started: depends on failed <unit>`; other units continue. Run Scheduling unless batch point (b) is pending (the drain's end runs it), then drain (Finish half 2). A unit the user stops is `stopped by the user`, handled the same way, except that its dependents, transitively, become `not started: depends on stopped <unit>`.
 5. Exit 124: next window; `peek` now and then for a dialog, answer within authority or ask the user. Exit 3: `deliver-task` Open and wait 4's single reopen; a second silent exit or any other error counts as `failed`.
 
 ## Finish half
 
 1. One finish half at a time. Pick, among `done awaiting merge` units, the one whose status file has the earliest modification time, not the window whose wait returned. The hold: from a main-moved return (step 4) until that unit is `delivered`, `failed` or `stopped by the user`, through any block or Verify return, the only finish half allowed is that unit's, once its fresh status says `done`.
-2. Drain: whenever a finish half is allowed (after a Wait loop exit 0, a delivery, a failure or stop, a Verify return), run it at once; the Wait loop runs only while none is allowed.
+2. Drain: whenever a finish half is allowed (after a Wait loop exit 0, a delivery, a failure or stop, a Verify return), run it at once; the Wait loop runs only while none is allowed. A merge leaves batch point (b) pending (step 6). While it is pending, a held unit's rebase belongs to the drain: the drain ends when no finish half is allowed and the hold is not set. Then run Scheduling, batch point (b) and the start halves.
 3. Perform `deliver-task` Verify, Merge, Tails and Cleanup exactly as written.
 4. Merge returns the child for main-moved: state `rebasing`, base SHA updated as `deliver-task` records it, back to the Wait loop with the hold set. Fresh `done`: this unit resumes at Verify. `failed`: Wait loop 4, which releases the hold with no batch point; drain.
 5. Verify or a disputed-findings decision returns the unit to its child: a `rebasing` unit stays `rebasing` and keeps the hold, any other becomes `running` (nothing merged, no hold); drain.
-6. Merged and cleaned up: `delivered <sha7>` with tails count and follow-up brief path (a Cleanup failure is reported; the unit is still delivered, and a window left alive keeps its slot per Scheduling 3); Scheduling; batch point (b); start halves; drain.
+6. Merged and cleaned up: `delivered <sha7>` with tails count and follow-up brief path (a Cleanup failure is reported; the unit is still delivered, and a window left alive keeps its slot per Scheduling 3); batch point (b) is now pending. Read the first status line of every working window as Wait loop 2 does, then drain (step 2).
 7. A stop before the merge commit is `failed: <reason>` (conflict) or `stopped by the user`, both per Wait loop 4. A stop after it (tree inequality, failed required post-merge check) leaves main suspect: record `failed: <reason>`, start and merge nothing more, go to End leaving other windows as they are.
 
 ## End
