@@ -53,4 +53,4 @@ The child owns implementation and refinement. The root checks Git/status facts, 
 ## Cleanup
 
 1. After tree equality, required post-merge checks and tails recording succeed, run non-forced `git worktree remove <path>`, `git branch -d <branch>`, then `child-session close <name>` using the resolved executable and recorded window name. A failure is reported, not forced away.
-2. Report merge SHA, child commits, tails count/commit if any, follow-up brief path and required post-merge check results. Root writes only runtime artifacts and the docs repository's tails record; one task yields one merge.
+2. Report merge SHA, child commits, tails count/commit if any, follow-up brief path and required post-merge check results. Root writes only runtime artifacts and the docs repository's tails record; one task yields one merge. When the tails count is above zero, also print `To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>`.

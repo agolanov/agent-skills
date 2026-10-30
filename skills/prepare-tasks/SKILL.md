@@ -1,6 +1,6 @@
 ---
 name: prepare-tasks
-description: "Turns any mix of ideas, specs and plans into tasks ready for deliver-task: opens a visible child session for each spec that still needs a spec, plan or clean cross review, proposes the task order, verifies review marks and writes a queue file. Use when the user wants several tasks prepared for delivery without writing the documents in the current session."
+description: "Turns any mix of ideas, specs, plans and delivery leftovers (deliver-task tails files or follow-up briefs) into tasks ready for deliver-task: opens a visible child session for each spec that still needs a spec, plan or clean cross review, proposes the task order, verifies review marks and writes a queue file. Use when the user wants several tasks prepared for delivery without writing the documents in the current session."
 ---
 
 # Prepare Tasks
@@ -11,15 +11,15 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 
 ## Preflight
 
-1. Resolve the project checkout (top level of the current repository), applicable project rules, and the docs dir: the one `docs/superpowers` holding every explicit path, else `<project>/docs/superpowers`; paths spread over several docs dirs need the user's decision.
+1. Resolve the project checkout (top level of the current repository), applicable project rules, and the docs dir: the one `docs/superpowers` holding every explicit path, else `<project>/docs/superpowers`; paths spread over several docs dirs need the user's decision. A follow-up brief stands for the path on its `Recorded tails:` line, not its own location; that path does not choose the docs dir: outside the one the other inputs give (else `<project>/docs/superpowers`) it is shown and asked about like paths spread over several docs dirs.
 2. Docs repository = `git -C <docs-dir> rev-parse --show-toplevel` (resolve from the project when the docs dir does not exist yet); its toplevel is the docs main checkout. If `git -C <project> check-ignore -q <docs-dir>` exits 0 and that toplevel is the project, stop before any window: the docs dir needs its own repository, `cd docs/superpowers && git init`; tell the user to commit the existing documents there and ignore `.worktrees/` in it before rerunning. Require the docs main checkout on its main branch with empty `git status --short`. Every document Git operation (branch, worktree, commit, merge, mark SHA) happens in the docs repository.
 3. Select `--agent`, otherwise identify the root's own system from session identity as `auto-cross-refine` does; unknown identity requires clarification. Never infer the agent from executable availability, environment, directory names or model.
 4. Locate the installed `child-sessions/SKILL.md`; read it, its `references/brief-writing.md` and `references/status-file.md`. Call `scripts/child-session` beside it by absolute path, never through PATH; its command/status contract governs every call. `<runtime>` is `${XDG_RUNTIME_DIR:-/tmp}/child-sessions`.
 
 ## Units
 
-1. Read [units.md](references/units.md). With no inputs, scan the docs dir's `specs/` and `plans/`, show the units found and ask which to include. Map inputs to units, match specs to plans, derive slugs and paths, and classify every existing spec and plan fresh or stale by its freshness rule (a mark's presence proves nothing).
-2. Before opening anything, show the unit table: unit, spec, plan, lacks (`spec, plan, review`, `spec, review of <plan>` for every plan without spec, `plan, review`, `review of <documents>`, or `nothing: ready`), naming each stale mark and why, plus the windows it implies. Ready units get no window.
+1. Read [units.md](references/units.md). With no inputs, scan the docs dir's `specs/` and `plans/`, show the units found and ask which to include. In that no-input scan only, also list separately, unselected by default, every `*-tails.md` in `plans/` that no spec in `specs/` references, with its finding count (lines starting with `- `); a directory input never lists, counts or asks about `*-tails.md` files (units.md excludes them). Map inputs to units, match specs to plans, derive slugs and paths, and classify every existing spec and plan fresh or stale by its freshness rule (a mark's presence proves nothing).
+2. Before opening anything, show the unit table: unit, spec, plan, lacks (`spec, plan, review`, `spec, review of <plan>` for every plan without spec, `plan, review`, `review of <documents>`, or `nothing: ready`), naming each stale mark and why, plus the windows it implies. The row of a tails unit (explicit tails file or follow-up brief) names its tails file, its finding count and the spec that already references that tails file, if any; no other row names a tails file. Ready units get no window.
 3. Check the selected child's actual installed catalogs (Claude: `~/.claude/skills`, enabled `~/.claude/plugins`; Codex: `~/.codex/skills`, `~/.agents/skills`, enabled `~/.codex/plugins`; plus the project's `.claude/skills` and `.agents/skills`). Resolve readable absolute SKILL.md paths for superpowers `brainstorming` (when a unit needs a spec) and `writing-plans` (when a plan is to be written), `auto-cross-refine`, the opposite launcher (`refine-with-codex` for a Claude child, `refine-with-claude` for Codex) and `review-fix-loop`. Missing ones stop before any window; report them for the user to install, without substitution.
 
 ## Windows (both phases)
@@ -34,7 +34,7 @@ Children own specs, plans, reviews and review marks, and talk to the user in the
 
 ## Phase 1: specs
 
-1. For each unit without a spec (idea, plan without spec): open a window with [spec-brief.md](references/spec-brief.md) at `<runtime>/prep-<slug>-spec-brief.md`, status `<runtime>/prep-<slug>-spec-status.md`.
+1. For each unit without a spec (idea, plan without spec, tails file): open a window with [spec-brief.md](references/spec-brief.md) at `<runtime>/prep-<slug>-spec-brief.md`, status `<runtime>/prep-<slug>-spec-status.md`. A tails unit's brief carries `Tails file:`, `Source plan:` and `Source spec:` instead of `Idea:`.
 2. On `done`, verify the Phase 1 status before Phase 2: full status format, Review `CLEAN` or `CLEAN EXCEPT DISPUTED`, the spec at `Spec path:` exists, is listed under Artifacts and is fresh on `prep-<slug>` per units.md; else reject (Windows 7). The window and its worktree stay open for Phase 2: never merge, remove or close after a Phase 1 `done`.
 
 ## Order

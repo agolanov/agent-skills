@@ -24,13 +24,16 @@ Source plan: <absolute-plan>
 Source spec: <absolute-spec>
 Project rules: <absolute-rules-paths>
 Recorded tails: <absolute-tails-path, or None: no findings>
+To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>
 
 Findings:
 <one line per finding, including provenance, location, scope reason and both positions for disputes; or None>
 
-Read the source inputs, project rules and findings. Establish current code locations and ask the user to select scope/resolve disputes before implementation. The original delivery did not authorize fixing these leftovers. Prepare a reviewed follow-up spec/plan for selected work; use a fresh branch for separately authorized implementation. Do not alter the completed task branch or assume merge/push/deploy authority.
+Read the source inputs, project rules and findings. Establish current code locations and ask the user to select scope/resolve disputes before implementation. The original delivery did not authorize fixing these leftovers. Prepare a reviewed follow-up spec/plan for selected work; use a fresh branch for separately authorized implementation. Do not alter the completed task branch or assume merge/push/deploy authority. The `To prepare through prepare-tasks:` line is for the user; do not run prepare-tasks in this session.
 
 Original review: <final refine mode and unchanged raw reviewer verdict>
 ```
 
-Print the absolute follow-up brief path. The user chooses whether to open it with child-sessions; deliver-task never launches it automatically.
+The `To prepare through prepare-tasks:` line is present only when there are findings; with none, omit it.
+
+Print the absolute follow-up brief path. The user chooses whether to open it with child-sessions; deliver-task never launches it automatically. With findings, also print the line `To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>`; nothing runs it automatically.
