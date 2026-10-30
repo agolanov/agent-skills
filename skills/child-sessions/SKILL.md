@@ -42,7 +42,7 @@ Codex's `exec_command.yield_time_ms` (up to 30000 ms) controls when the tool yie
 | Exit | Required action |
 |---|---|
 | `0` | Read only the first status line first (`head -n 1 -- "$status_file"`). Dispatch by the exact status below, then read the relevant named sections. Exit 0 alone does not mean success. |
-| `124` | `peek "$name" 40`. Work in progress: call bounded `wait` again. A question/dialog: answer via `send` within existing authority, or obtain the user's decision; then wait again. |
+| `124` | `peek "$name" 40`. A pending choice on screen: follow [Dialogs](#dialogs). Work in progress: call bounded `wait` again. |
 | `3` | `peek "$name" 40` and show the captured diagnostics. Reopen **once** using the recovery procedure below. |
 | Other | Report the command error and preserve the session and checkout for diagnosis. |
 
@@ -56,6 +56,18 @@ Keep waiting in the foreground. Do not replace this loop with background jobs, h
 
 The root never rewrites a child status. Read the first line before selecting sections; avoid repeatedly loading the whole report.
 
+## Dialogs
+
+A dialog is pending when the bottom of the peeked screen shows a choice the agent is waiting on: a numbered option list with a selection marker and a prompt such as "Do you want to proceed?", an approval request naming a command, or the agent's own question to the user. A working spinner without a choice is work in progress. When the top of the dialog (its title or border) or any line of its command is cut off, peek once more with `peek "$name" 120`; still cut, the dialog goes to the user unanswered.
+
+The root approves a permission dialog on its own only after reading the whole command on screen, and only when all of these hold: every path the command reads or writes lies inside the child's own checkout named in its brief, a temporary directory under `$TMPDIR` or `/tmp` that the child's task created for disposable fixtures, or the ignored-material paths the brief grants in the main checkout (a sibling directory that merely shares a prefix with one of these names lies outside); the command does not push, touches the main checkout and docs main checkout nowhere else, changes no Git state of any other repository, and deletes nothing outside those paths; and the child's brief allows the operation itself, since its prohibitions (for example rebase, merge or push) still apply inside those paths and an approval never grants authority the child lacks. Everything else is out of scope: decline it first, so the child is not left blocked, then show it to the user with the whole command and the reason it lies outside the child's authority. A dialog the root cannot classify goes to the user unanswered. The child's content questions follow the calling task's rule: answer within its authority or ask the user.
+
+Answer one dialog per action, using only bare Enter, `Up`, `Down` and `Escape`. Approve only when the highlighted option is the approving one (plain "Yes"), with `send "$name" ""`. When the highlight is elsewhere, move it with `key "$name" Up` or `key "$name" Down`, peek to verify the new highlight, then send the bare Enter. Decline with the agent's cancel key, `key "$name" Escape` in Claude Code, or by highlighting its explicit No option and sending the bare Enter. Option digits are never typed, least of all through `send`: in Claude Code a digit selects at once and `send`'s trailing Enter lands on the next, unread dialog. Each approval covers one command; an "always allow" / "don't ask again" option is never chosen.
+
+After each answer (Enter, cancel or No), peek until the screen no longer shows the answered dialog: its counter or command changed, or no dialog remains. A capture still showing it is stale, never the next dialog: pause with `wait "$name" "$status_file" 5` (safe while the child is visibly alive; exit 0 goes to the status dispatch above) and peek again, at most three times. A screen still showing the same command with no counter or the same counter may be a new identical request: leave it unanswered and run `alive "$name"`. Exit 1 means the child is gone: follow [Recover a silent exit](#recover-a-silent-exit). Exit 0: show it to the user as a possibly new identical request and wait for the decision before any key. In a stack ("2 of 3"), read and classify each dialog on its own before its key: a decline does not stop the next in-scope approval, and an approval does not carry over. When no dialog remains, return to the bounded `wait`.
+
+Tell the user about each answered dialog as it happens, in one line: window, command summary, answer. Declined or escalated dialogs are shown in full: window, whole command, reason. The calling task's final report counts the dialogs answered, declined and escalated.
+
 ## Recover a silent exit
 
 After exit 3, retain the original task instructions in the runtime brief and append this exact continuation instruction before reopening:
@@ -66,7 +78,7 @@ Close the stale named window with `close "$name"` if it still exists, then `open
 
 ## Other operations and environment
 
-`send <name> <text>` types one line and Enter; multiline content belongs in a file. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 for a running agent, 1 otherwise; a surviving shell window does not prove liveness. `list` lists sessions. After the calling task has completed its checks, `close <name>` closes the window; it does not remove the checkout or branch.
+`send <name> <text>` types one line and Enter; multiline content belongs in a file. `send <name> ""` sends a bare Enter. `key <name> <key>` sends one key without Enter: `Escape`, `Up`, `Down` or one digit `0`–`9`. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 for a running agent, 1 otherwise; a surviving shell window does not prove liveness. `list` lists sessions. After the calling task has completed its checks, `close <name>` closes the window; it does not remove the checkout or branch.
 
 | Variable | Meaning |
 |---|---|
