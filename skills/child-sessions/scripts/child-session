@@ -319,6 +319,13 @@ cmd_close() {
     prefix=$(runtime_prefix "$1")
     if [[ $W == herdr ]]; then
       if (( H_SPLIT )); then herdr pane close "$H_PANE" >/dev/null; else herdr tab close "$H_TAB" >/dev/null; fi
+      # herdr closes asynchronously: return only once the window is gone, so
+      # alive right after close cannot see the closing agent.
+      local tries=0
+      while h_find "$1"; do
+        (( ++tries <= 50 )) || die "window $1 still listed 10 s after close"
+        sleep 0.2
+      done
     else
       tmux kill-session -t "=v-$1" 2>/dev/null || true
       tmux kill-window -t "$(window_target "$1")"
