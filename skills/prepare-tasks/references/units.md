@@ -33,7 +33,7 @@ All document paths below are relative to the docs dir (`specs/...`, `plans/...`)
 
 - Spec slug: `<slug>` of `YYYY-MM-DD-<slug>-design.md`. Window and branch are `prep-<slug>`; replace characters outside `[A-Za-z0-9_-]` with `-`.
 - Plan without spec: slug = plan stem without its date; spec path `specs/<plan-date>-<slug>-design.md`.
-- Idea: slug of `[a-z0-9-]` from the idea's key words (`add a --version flag` → `version-flag`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`.
+- Idea: slug of `[a-z0-9-]` from the idea's key words (`add a --version flag` → `version-flag`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`. A derived slug ending in `-tails` counts as a collision: ask the user for a distinct one, as below.
 - Spec without plan: plan `plans/<spec-date>-<slug>.md`.
 - Tails file: source plan = the tails path without `-tails` (`plans/2026-10-29-omega-tails.md` → `plans/2026-10-29-omega.md`), `None` when that file does not exist; source spec = Matching rules 1 and 2 applied to the source plan, else `None` without a question (it is context for the child, not a pairing). Slug = source plan stem without its date plus `-tail-fixes` (`omega-tail-fixes`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`; unit name = slug.
 - Unit name: plan stem without its date (`gamma-2`), or the slug when no plan exists yet.
