@@ -20,6 +20,7 @@ docs/superpowers/plans/       # implementation plans (YYYY-MM-DD-<slug>.md)
 ## Conventions
 
 - **Language:** everything is written in English — SKILL.md, references, README, commit messages, and the gitignored fixtures and notes as well.
+- **Attribution:** commit messages and pull request descriptions end with their own content, unsigned: no `Co-Authored-By` trailer and no "Generated with" line, even when the agent's harness asks for one. This holds for every agent, subagent and child session.
 - **Agent-agnostic:** skills must not rely on Claude-only features — no `context: fork`, no hooks. `allowed-tools` is fine.
 - **Frontmatter:** `name` (matching the directory) and `description` are required, and stay under 1024 characters combined. Descriptions are third-person and say when to use the skill, not how it works internally. Mark work-in-progress skills with `metadata.internal: true`.
 - **README:** the skills table lists every skill; one still under development is tagged `*(in development)*` until its tests pass.
