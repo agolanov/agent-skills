@@ -14,7 +14,7 @@ usage() {
   cat <<'USAGE'
 child-session open [--agent claude|codex] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
 child-session send <name> <text>       Empty text sends only Enter.
-child-session key <name> <key>      Send one key without Enter: Escape, Up, Down or one digit 0-9.
+child-session key <name> <key>         Send one key without Enter: Escape, Up, Down or one digit 0-9.
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
