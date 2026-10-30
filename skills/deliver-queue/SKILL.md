@@ -63,6 +63,8 @@ Write the queue file's `State` column from the state file and commit `queue: <sl
 
 ## End
 
-When no window is working or awaiting merge and nothing is startable: batch point (c), then report a table `unit | state | merge SHA | tails count | follow-up brief path` (a unit recorded by Input 3 shows `delivered <sha7>`, that short SHA as merge SHA, and `-` for tails count and follow-up brief path, since its Tails ran, or did not, outside this run), then every unit never started with its reason, and the kept worktree, branch and status file of each failed unit, and the leftovers listed for each unit recorded by Input 3.
+When no window is working or awaiting merge and nothing is startable: batch point (c), then report a table `unit | state | merge SHA | tails count | follow-up brief path` (a unit recorded by Input 3 shows `delivered <sha7>`, that short SHA as merge SHA, and `-` for tails count and follow-up brief path, since its Tails ran, or did not, outside this run).
 
-Then, when any unit's tails count in the table is above zero, print one last line `prepare-tasks <tails path> ...`: the absolute `-tails.md` path of each such unit, in queue order, space-separated (a unit delivered in an earlier run or recorded by Input 3 has no count and is left out). With no such unit print no line.
+Directly after the table, when any unit's tails count in the table is above zero, print one line `prepare-tasks <tails path> ...`: the absolute `-tails.md` path of each such unit, in queue order, space-separated (a unit delivered in an earlier run or recorded by Input 3 has no count and is left out). With no such unit print no line.
+
+Then report every unit never started with its reason, and the kept worktree, branch and status file of each failed unit, and the leftovers listed for each unit recorded by Input 3.

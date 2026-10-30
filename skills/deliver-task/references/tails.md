@@ -14,7 +14,7 @@ The docs repository is the nearest Git root at or above the plan's directory: `g
 2. Otherwise, before staging, the docs repository's `git status --short` may show only this tails file; any other dirt stops rather than joining the commit. Stage only the tails file and commit it in the docs repository, on its current branch, as `tails: <branch>` with the task branch name.
 3. With no findings there is no tails commit. Do not put tails on the reviewed child branch. Afterwards require empty `git status --short` in the main checkout and, after a commit, in the docs repository.
 
-Write `${XDG_RUNTIME_DIR:-/tmp}/child-sessions/<branch>-tails-brief.md` outside Git even when there are no tails. Fill this ready follow-up template with absolute paths and actual findings:
+Write `${XDG_RUNTIME_DIR:-/tmp}/child-sessions/<branch>-tails-brief.md` outside Git even when there are no tails. Fill this ready follow-up template with absolute paths and actual findings (the `To prepare through prepare-tasks:` line is present only when there are findings; with none, omit it):
 
 ```text
 Follow up on leftovers from <branch>, merge <full-merge-sha>.
@@ -33,7 +33,5 @@ Read the source inputs, project rules and findings. Establish current code locat
 
 Original review: <final refine mode and unchanged raw reviewer verdict>
 ```
-
-The `To prepare through prepare-tasks:` line is present only when there are findings; with none, omit it.
 
 Print the absolute follow-up brief path. The user chooses whether to open it with child-sessions; deliver-task never launches it automatically. With findings, also print the line `To prepare through prepare-tasks: prepare-tasks <absolute-tails-path>`; nothing runs it automatically.
