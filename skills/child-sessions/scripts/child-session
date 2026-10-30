@@ -13,7 +13,8 @@ export LANG=${LANG:-C.UTF-8}
 usage() {
   cat <<'USAGE'
 child-session open [--agent claude|codex] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
-child-session send <name> <text>
+child-session send <name> <text>       Empty text sends only Enter.
+child-session key <name> <key>      Send one key without Enter: Escape, Up, Down or one digit 0-9.
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
@@ -340,13 +341,36 @@ cmd_peek() {
 cmd_send() {
   require_window "$1"
   if [[ $W == herdr ]]; then
-    herdr pane send-text "$H_PANE" "$2" >/dev/null
-    sleep 0.3
+    if [[ -n $2 ]]; then
+      herdr pane send-text "$H_PANE" "$2" >/dev/null
+      sleep 0.3
+    fi
     herdr pane send-keys "$H_PANE" enter >/dev/null
   else
-    tmux send-keys -t "$(window_target "$1")" -l -- "$2"
-    sleep 0.3
+    if [[ -n $2 ]]; then
+      tmux send-keys -t "$(window_target "$1")" -l -- "$2"
+      sleep 0.3
+    fi
     tmux send-keys -t "$(window_target "$1")" Enter
+  fi
+}
+cmd_key() {
+  case $2 in
+    Escape | Up | Down | [0-9]) ;;
+    *) die 'key must be Escape, Up, Down or one digit 0-9' ;;
+  esac
+  require_window "$1"
+  if [[ $W == herdr ]]; then
+    case $2 in
+      Escape) herdr pane send-keys "$H_PANE" esc >/dev/null ;;
+      Up) herdr pane send-keys "$H_PANE" up >/dev/null ;;
+      Down) herdr pane send-keys "$H_PANE" down >/dev/null ;;
+      *) herdr pane send-text "$H_PANE" "$2" >/dev/null ;;
+    esac
+  elif [[ $2 =~ ^[0-9]$ ]]; then
+    tmux send-keys -t "$(window_target "$1")" -l -- "$2"
+  else
+    tmux send-keys -t "$(window_target "$1")" "$2"
   fi
 }
 cmd_list() {
@@ -389,6 +413,7 @@ case ${1:-} in
     [[ $# == 3 ]] || { usage; exit 2; }
     cmd_open "$split" "$1" "$2" "$3" "$model" "$effort" ;;
   send) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_send "$2" "$3" ;;
+  key) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_key "$2" "$3" ;;
   peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
   alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
   wait) [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}" ;;
