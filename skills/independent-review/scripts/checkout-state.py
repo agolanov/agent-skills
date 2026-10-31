@@ -721,6 +721,19 @@ def read_git(directory, arguments):
     unsafe = ('--output', '--ext-diff', '--textconv', '--no-index', '--remerge-diff', '--diff-merges')
     if any(a.startswith('--') and a != '--' and any(option.startswith(a.split('=', 1)[0]) for option in unsafe) for a in arguments):
         raise ValueError('unsafe git-read option')
+    if arguments[0] in ('diff', 'log', 'show'):
+        for argument in arguments[1:]:
+            key, separator, value = argument.partition('=')
+            if not key.startswith('--') or key == '--':
+                continue
+            if '--ignore-submodules'.startswith(key):
+                if key != '--ignore-submodules' or not separator or value not in ('dirty', 'all'):
+                    raise ValueError('git-read requires ignore-submodules=dirty or all')
+            elif '--submodule'.startswith(key):
+                if key != '--submodule' or not separator or value != 'short':
+                    raise ValueError('git-read requires submodule=short')
+            elif any(option.startswith(key) for option in ('--no-ignore-submodules', '--no-submodule')):
+                raise ValueError('git-read cannot disable submodule safety options')
     if arguments[0] == 'check-ref-format' and (len(arguments) != 3 or arguments[1] != '--branch'):
         raise ValueError('git-read check-ref-format requires --branch and one name')
     if arguments[0] == 'cat-file' and (len(arguments) != 3 or arguments[1] not in ('-e', '-p', '-t', '-s')):
@@ -751,7 +764,8 @@ def read_git(directory, arguments):
             if any(os.path.commonpath((root, path)) != root for path in paths):
                 raise ValueError('git-read diff refuses outside-checkout paths')
     if args[0] in ('log', 'show', 'diff'):
-        args[1:1] = ['--no-ext-diff', '--no-textconv']
+        args[1:1] = ['--no-ext-diff', '--no-textconv',
+                     '--ignore-submodules=dirty', '--submodule=short']
     if args[0] == 'check-ref-format':
         code, output = git_bytes(root, *args, allowed_codes=(0, 1, 128), with_code=True)
         return (1 if code == 128 else code), output

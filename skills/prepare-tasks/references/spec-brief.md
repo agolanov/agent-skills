@@ -46,7 +46,7 @@ Work:
    c. Make sure the file ends with a newline, then git add it and commit it as "docs: <basename>" when anything changed; <sha> is the full git rev-parse HEAD.
    d. Append exactly one last line: Review: <clean|clean except disputed>, <today YYYY-MM-DD>, reviewer <the opposite system that reviewed: claude|codex>, commit <sha>
    e. Commit it as "mark: <basename>".
-   f. Check freshness: the last line is the only line matching that expression, git cat-file -e <sha>:<path relative to this worktree> succeeds, and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. Capture and check the show producer exit before comparing its retained external output; a helper error is unavailable verification, never an empty document. Use the freshness recipe in prepare-tasks/references/units.md. A document changed after marking is reviewed and marked again.
+   f. Check freshness: the last line is the only line matching that expression, git rev-parse --verify --quiet <sha>:<path relative to this worktree> succeeds, and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. The quiet revision/path predicate returns 1 for stale (unknown SHA or missing path), while helper exit 2 blocks as unavailable. Capture and check the show producer exit before comparing its retained external output; a helper error is unavailable verification, never an empty document. Use the freshness recipe in prepare-tasks/references/units.md. A document changed after marking is reviewed and marked again.
 4. Write the status file (below) with STATUS: done.
 5. Then stay in this window and wait for the next instruction; keep the session running.
 
