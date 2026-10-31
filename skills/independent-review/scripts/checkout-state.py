@@ -739,11 +739,16 @@ def read_git(directory, arguments):
         root = parent
     args = list(arguments)
     if args[0] == 'diff':
+        operands = False
         for argument in args[1:]:
-            if argument.startswith('-'):
+            if argument == '--':
+                operands = True
                 continue
-            path = os.path.realpath(os.path.join(root, os.fsencode(argument)))
-            if os.path.commonpath((root, path)) != root:
+            if not operands and argument.startswith('-'):
+                continue
+            joined = os.path.join(root, os.fsencode(argument))
+            paths = (os.path.normpath(joined), os.path.realpath(joined))
+            if any(os.path.commonpath((root, path)) != root for path in paths):
                 raise ValueError('git-read diff refuses outside-checkout paths')
     if args[0] in ('log', 'show', 'diff'):
         args[1:1] = ['--no-ext-diff', '--no-textconv']
