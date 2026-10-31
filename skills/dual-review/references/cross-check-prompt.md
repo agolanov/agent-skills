@@ -1,6 +1,6 @@
 # Cross-Check Prompt
 
-Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The first slot is the "Role and assignment" block of independent-review's [review prompt](../../independent-review/references/review-prompt.md), verbatim, with this verifier's `Assignment:` line; the suite slot is that prompt's dual complete-suite instruction, filled as in the review prompts. "Findings to verify" holds each finding verbatim as its raiser stated it, under the ID its raiser gave it, and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
+Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The first slot is the "Role and assignment" block of independent-review's [review prompt](../../independent-review/references/review-prompt.md), verbatim, with this verifier's `Assignment:` line; the suite slot is that prompt's dual complete-suite instruction, filled as in the review prompts, without its last sentence, the severity request, which the cross-check states itself. "Findings to verify" holds each finding verbatim as its raiser stated it, under the ID its raiser gave it, and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
 
 ```text
 <the "Role and assignment" block of independent-review/references/review-prompt.md, verbatim, with this verifier's Assignment line>
@@ -12,7 +12,7 @@ Target: the findings listed below, raised on <the review prompts' target row, bo
 
 Requirements, rules and checks
 <the requirements, rules and checks of the review prompts, without the final-pass security-focus instruction>
-<the dual complete-suite instruction of independent-review/references/review-prompt.md, filled as in the review prompts>
+<the dual complete-suite instruction of independent-review/references/review-prompt.md, filled as in the review prompts, without its last sentence "Rate each finding critical, important or minor.">
 
 Findings to verify
 <source ID>: <the finding verbatim from the raiser's answer>
