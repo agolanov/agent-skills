@@ -1,8 +1,6 @@
 ---
 name: independent-review
 description: Runs one independent reviewer, a separate Codex or Claude CLI process or a native subagent, over committed work once and validates the result without changing the checkout. Use when the user wants a one-off review by another agent, or when another skill needs one validated review.
-metadata:
-  internal: true
 ---
 
 # Independent Review

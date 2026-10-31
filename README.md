@@ -12,7 +12,7 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | `prepare-tasks` | Prepare ideas, specs, plans and delivery leftovers (deliver-task tails) for delivery in visible child sessions and write an ordered queue file. |
 | `deliver-queue` | Deliver a queue of reviewed plans through deliver-task, in parallel up to a limit, merging in order of readiness. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
-| `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. *(in development)* |
+| `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
 | `refine-with-codex` | Run the cycle with a separate Codex reviewer process. |
 | `refine-with-claude` | Run the cycle with a separate Claude reviewer process. |
 | `refine-with-a-subagent` | Run the cycle with a built-in subagent of the implementing system. |
