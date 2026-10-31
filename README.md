@@ -13,6 +13,8 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | `deliver-queue` | Deliver a queue of reviewed plans through deliver-task, in parallel up to a limit, merging in order of readiness. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
 | `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
+| `dual-review` | Codex and Claude review in parallel; findings only one raised are cross-checked; one severity-ranked list of confirmed findings, without fixes. |
+| `refine-with-dual-review` | Run the cycle with both reviewers in every round. |
 | `refine-with-codex` | Run the cycle with a separate Codex reviewer process. |
 | `refine-with-claude` | Run the cycle with a separate Claude reviewer process. |
 | `refine-with-a-subagent` | Run the cycle with a built-in subagent of the implementing system. |
@@ -36,8 +38,9 @@ The refinement skills share dependencies. Install the complete bundle together:
 
 ```sh
 npx skills add agolanov/agent-skills --skill \
-  review-fix-loop independent-review refine-with-codex refine-with-claude \
-  refine-with-a-subagent auto-cross-refine
+  review-fix-loop independent-review dual-review refine-with-codex \
+  refine-with-claude refine-with-a-subagent refine-with-dual-review \
+  auto-cross-refine
 ```
 
 ## Refinement
@@ -48,14 +51,16 @@ In Codex, invoke a skill with `$`; in Claude Code, use `/`. For example:
 $refine-with-codex
 $refine-with-claude --effort xhigh
 $refine-with-a-subagent
+$refine-with-dual-review
 $auto-cross-refine
+$dual-review
 ```
 
 The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, capabilities, skill composition, scope, and completion rules.
 
 [Reviewer settings](skills/independent-review/references/reviewer-settings.md) defines automatic model/effort defaults and independent overrides. Native mode requires controls and runtime evidence for both settings; it never silently switches to CLI.
 
-`review-fix-loop` can also be invoked directly with an assignment, such as `$review-fix-loop --codex`. Without one it asks which method to use. Only `auto-cross-refine` chooses the opposite system automatically. Launchers require `review-fix-loop` and `independent-review`; the automatic selector additionally requires its selected CLI launcher. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
+`review-fix-loop` can also be invoked directly with an assignment, such as `$review-fix-loop --codex`. Without one it asks which method to use. Only `auto-cross-refine` chooses the opposite system automatically. Launchers require `review-fix-loop` and `independent-review`; `refine-with-dual-review` also requires `dual-review`, and the automatic selector additionally requires its selected CLI launcher. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
 
 ## License
 

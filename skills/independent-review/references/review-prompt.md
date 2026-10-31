@@ -1,6 +1,6 @@
 # Review Prompt
 
-Fill every slot from the caller's record (the loop record, or the direct-use request); resolve identifiers and attachment paths before launch. Use this one body for every target. The caller selects the target and review order. In a final pass, add the complete-suite and security-focus instructions in the indicated slot.
+Fill every slot from the caller's record (the loop record, or the direct-use request); resolve identifiers and attachment paths before launch. Use this one body for every target. The caller selects the target and review order. In a final pass, add the complete-suite and security-focus instructions in the indicated slot. In a dual review (`dual-review`), every review carries the dual complete-suite instruction instead, and a final pass keeps only the security-focus part of the final-pass slot.
 
 ```text
 Role and assignment
@@ -19,6 +19,7 @@ Previous reviewed commit/state and result: <identifier; verdict/coverage>.
 Requirements, rules and checks
 <Original requirements/plan, applicable project rules, required check commands and evidence paths. Distinguish supplied evidence from checks you actually run.>
 <Final pass only: run the project's complete test suite and include a security-focused review. When you run in Codex and the Codex Security plugin's `security-diff-scan` skill is available, run it on the fixed base..reviewed HEAD range from Scope as part of that review: its scan artifacts stay in the plugin's state directory outside the checkout, and its configuration remediation stays a reported proposal, unapplied. A scan that cannot start or complete is a disclosed coverage limitation; your own security review covers the task either way.>
+<Dual review only, every review: Dual review: do not run the project's complete test suite. Its result on the reviewed commit is supplied: `<command>`, exit `<n>`, commit `<sha>` (or: no complete suite defined). Run targeted checks and reproductions as needed. If a targeted check fails in a way a concurrent run by the other reviewer in this checkout could explain, report that instead of a defect. Rate each finding critical, important or minor.>
 
 Prior findings
 <Stable IDs with severity, path:line, failure scenario, violated requirement, evidence, decisions and their basis, fix locations/commit and previous verdict. Include outside-round candidates for the final pass.>

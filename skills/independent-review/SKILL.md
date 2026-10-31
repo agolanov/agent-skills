@@ -17,13 +17,17 @@ Read [reviewer settings](references/reviewer-settings.md); honor independent mod
 
 Fill the [review prompt](references/review-prompt.md), the reviewer's capability contract. The caller supplies the target row, review order, prior findings and requirements/rules/checks; direct use fills them per **Direct use**.
 
+A caller may supply a complete prompt in place of the review prompt, as `dual-review` does for its cross-check: the attempt carries that prompt unchanged wherever the guides name the review prompt, and **Validate** judges its report.
+
 ## Launch
 
 Record `git rev-parse HEAD` and `git status --porcelain` of the checkout, then run one attempt through the assigned [CLI guide](references/cli-reviewers.md) or [native guide](references/subagent-reviewers.md). Every attempt, in loop use too, gets a fresh attempt directory outside the checkout for its prompt, answer, logs, preserved diff and `result.md`; the CLI guide's `round_prompt` and `round_dir` bind to that attempt's prompt file and directory.
 
+A caller may run two attempts concurrently in one checkout, as `dual-review` does; it then owns the phase-level state comparison: it records HEAD and porcelain once before starting both and once after both finish, and both attempts' **Validate** and `result.md` use that one comparison.
+
 ## Validate
 
-Require successful completion (CLI exit 0 or native tool completion), substantive target/stage/report coverage, effective assigned model/effort and unchanged state. Compare `git rev-parse HEAD` and `git status --porcelain` before and after: both outputs must be identical, so porcelain stays empty when nothing was excluded. Optional tool denial with adequate replacement evidence can pass; missing essential coverage/checks cannot. Failed, partial, empty, stale or substituted results are invalid.
+Require successful completion (CLI exit 0 or native tool completion), substantive target/stage/report coverage, effective assigned model/effort and unchanged state. Compare `git rev-parse HEAD` and `git status --porcelain` before and after: both outputs must be identical, so porcelain stays empty when nothing was excluded. Optional tool denial with adequate replacement evidence can pass; missing essential coverage/checks cannot. Failed, partial, empty, stale or substituted results are invalid. With a caller-supplied prompt, the required report and checks are those the prompt and its caller's report checks define; a failed caller check is `invalid: <the caller's reason>`.
 
 Any difference in either output (a moved HEAD, a new or changed file, or an index-only change) requires adjudication by the caller (the loop, or the user in direct use). Preserve the unexpected work and its diff in the attempt directory, identify its source, and return `checkout changed` whatever the other conditions show. This skill never resets it or folds it into a commit; reconciliation, such as the loop's authorized restore after adjudication, belongs to the caller. Still check and record every other condition above, so the caller can use an otherwise valid answer after adjudicating a demonstrably unrelated scratch write.
 
