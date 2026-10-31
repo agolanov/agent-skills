@@ -1,8 +1,6 @@
 ---
 name: refine-with-dual-review
 description: Use when a review/fix cycle should have two independent reviewers, Codex and Claude CLI, in every round, with each finding confirmed by both before it is fixed.
-metadata:
-  internal: true
 ---
 
 # Refine with Dual Review

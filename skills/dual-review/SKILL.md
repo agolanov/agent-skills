@@ -1,8 +1,6 @@
 ---
 name: dual-review
 description: Runs Codex and Claude CLI reviewers in parallel over committed work, has each verify the findings only the other raised, and returns one severity-ranked list of confirmed findings without changing the checkout. Use when the user wants a two-model review to fix from, or when the review/fix loop runs with the dual assignment.
-metadata:
-  internal: true
 ---
 
 # Dual Review
