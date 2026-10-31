@@ -12,9 +12,10 @@ import subprocess
 import sys
 import tempfile
 
-SCHEMA = 1
+SCHEMA = 2
 LIMITS = ('ignored untracked paths not monitored; submodule/nested-repository content '
-          'not recursively monitored; special-file contents not monitored')
+          'not recursively monitored; special-file contents not monitored; '
+          'submodule resolved HEAD and dirty state not monitored')
 _LOCAL_ENV = None
 
 
@@ -80,15 +81,22 @@ def inventory(checkout):
         if item[1:2] != b' ':
             raise ValueError('invalid index flag record')
         flags.append({'path': b64(safe_path(item[2:])), 'flag': item[:1].decode('ascii')})
+    gitlinks = sorted({unb64(e['path']) for e in entries if e['mode'] == '160000'})
     # Git omits special files and may traverse invalid nested gitfiles. Discover
     # nonignored leaves ourselves, pruning only untracked nested boundaries.
     root_fd = os.open(checkout, os.O_RDONLY | os.O_DIRECTORY)
     try:
         others = discover_untracked(checkout, root_fd, {unb64(e['path']) for e in entries},
-                                    {unb64(e['path']) for e in entries if e['mode'] == '160000'})
+                                    set(gitlinks))
     finally:
         os.close(root_fd)
-    status = git_bytes(checkout, 'status', '--porcelain=v1', '-z', '--untracked-files=all')
+    # Ignoring recursion alone still lets Git refresh gitlink HEAD in-process.
+    # Exclude the enumerated gitlinks literally, retaining index/location evidence.
+    status_args = ['status', '--porcelain=v1', '-z', '--untracked-files=all',
+                   '--ignore-submodules=all']
+    if gitlinks:
+        status_args += ['--', *[b':(exclude,literal)' + p for p in gitlinks]]
+    status = git_bytes(checkout, *status_args)
     # Validate NUL grammar, including the extra source path of rename/copy records.
     records = iter(nul_items(status))
     for item in records:
@@ -113,7 +121,7 @@ def discover_untracked(checkout, root_fd, tracked, gitlinks):
                             input=b''.join(b'./'+p+b'\0' for p in paths), allowed_codes=(0, 1)))} if paths else set()
         for name, path in zip(names, paths):
             if path in gitlinks:
-                continue  # Initialization/content is owned by submodule_record.
+                continue  # Literal location/metadata is owned by submodule_record.
             if path in ignored and path not in tracked:
                 continue
             info = os.stat(name, dir_fd=fd, follow_symlinks=False)
@@ -219,23 +227,26 @@ def nested_record(root_fd, path):
     return metadata
 
 
-def submodule_record(checkout, root_fd, path):
+def submodule_record(root_fd, path):
     location = path_record(root_fd, path, tracked=True)
-    result = {'location': location, 'initialized': False}
+    result = {'location': location, 'metadata_present': False}
     if location['at'] != b64(path) or location['kind'] != 'directory':
         return result
-    metadata = path_record(root_fd, path + b'/.git', tracked=True, literal=True)
+    metadata_path = path + b'/.git'
+    metadata = path_record(root_fd, metadata_path, tracked=True, literal=True)
+    if metadata['at'] != b64(metadata_path):
+        raise OSError(f'submodule location changed: {path!r}')
     result['metadata'] = metadata
-    if metadata['kind'] != 'missing':
-        sub = os.path.join(checkout, path)
-        top = git_bytes(sub, 'rev-parse', '--show-toplevel').rstrip(b'\n')
-        if os.path.realpath(top) != os.path.join(os.path.realpath(checkout), path):
-            raise OSError(f'submodule top-level mismatch: {path!r}')
-        result.update(initialized=True, head=git_bytes(sub, 'rev-parse', '--verify', 'HEAD').strip().decode('ascii'),
-                      dirty=bool(git_bytes(sub, 'status', '--porcelain=v1', '-z', '--untracked-files=all')))
+    result['metadata_present'] = metadata['kind'] != 'missing'
+    if metadata['kind'] == 'directory':
+        head_path = metadata_path + b'/HEAD'
+        head = path_record(root_fd, head_path, tracked=True, literal=True)
+        if head['at'] != b64(head_path):
+            raise OSError(f'submodule metadata changed: {path!r}')
+        result['embedded_head'] = head
     if path_record(root_fd, path, tracked=True) != location:
         raise OSError(f'submodule location changed: {path!r}')
-    if path_record(root_fd, path + b'/.git', tracked=True, literal=True) != metadata:
+    if path_record(root_fd, metadata_path, tracked=True, literal=True) != metadata:
         raise OSError(f'submodule metadata changed: {path!r}')
     return result
 
@@ -249,7 +260,7 @@ def observe(checkout, root_fd, fields):
     for path in sorted(tracked | others):
         key = 'path:' + b64(path)
         if path in gitlinks:
-            fields[key] = {'submodule': submodule_record(checkout, root_fd, path)}
+            fields[key] = {'submodule': submodule_record(root_fd, path)}
         else:
             record = path_record(root_fd, path, tracked=path in tracked)
             if record['kind'] == 'directory' and record['at'] == b64(path):
@@ -313,6 +324,43 @@ def validate_metadata(value):
         validate_observation(value)
 
 
+def validate_submodule(sub, path):
+    if not isinstance(sub, dict):
+        raise ValueError('invalid submodule record')
+    required = {'location', 'metadata_present'}
+    if not required <= set(sub) or not set(sub) <= required | {'metadata', 'embedded_head'}:
+        raise ValueError('invalid submodule fields')
+    validate_observation(sub['location'])
+    location = sub['location']
+    at = unb64(location['at'])
+    if at != path and not path.startswith(at + b'/'):
+        raise ValueError('invalid submodule location')
+    if type(sub['metadata_present']) is not bool:
+        raise ValueError('invalid metadata presence')
+    actual_directory = at == path and location['kind'] == 'directory'
+    if not actual_directory:
+        if sub['metadata_present'] or set(sub) != required:
+            raise ValueError('metadata through blocked location')
+        return
+    metadata = sub['metadata']
+    validate_observation(metadata)
+    if metadata['at'] != b64(path + b'/.git'):
+        raise ValueError('invalid metadata location')
+    if sub['metadata_present'] != (metadata['kind'] != 'missing'):
+        raise ValueError('metadata presence mismatch')
+    observations = [metadata]
+    if metadata['kind'] == 'directory':
+        head = sub['embedded_head']
+        validate_observation(head)
+        if head['at'] != b64(path + b'/.git/HEAD'):
+            raise ValueError('invalid embedded HEAD location')
+        observations.append(head)
+    elif 'embedded_head' in sub:
+        raise ValueError('HEAD outside embedded metadata directory')
+    if any(o['kind'] == 'file' and 'literal' not in o for o in observations):
+        raise ValueError('missing literal metadata')
+
+
 def validate_record(record):
     if not isinstance(record, dict) or record.get('schema') != SCHEMA or type(record.get('complete')) is not bool:
         raise ValueError('invalid schema/completeness')
@@ -350,16 +398,11 @@ def validate_record(record):
         elif key == 'status':
             nul_items(unb64(value))
         elif key.startswith('path:'):
-            safe_path(unb64(key[5:]))
+            path = safe_path(unb64(key[5:]))
             if 'submodule' in value:
-                sub = value['submodule']
-                validate_observation(sub['location'])
-                if type(sub['initialized']) is not bool:
-                    raise ValueError('invalid initialization')
-                if 'metadata' in sub:
-                    validate_observation(sub['metadata'])
-                if sub['initialized'] and (type(sub.get('dirty')) is not bool or not re.fullmatch('[0-9a-f]{40}|[0-9a-f]{64}', sub.get('head', ''))):
-                    raise ValueError('invalid submodule summary')
+                if set(value) != {'submodule'}:
+                    raise ValueError('invalid submodule wrapper')
+                validate_submodule(value['submodule'], path)
             else:
                 validate_observation(value)
         else:
