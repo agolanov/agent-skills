@@ -252,7 +252,7 @@ def observe(checkout, root_fd, fields):
             fields[key] = {'submodule': submodule_record(checkout, root_fd, path)}
         else:
             record = path_record(root_fd, path, tracked=path in tracked)
-            if path not in tracked and record['kind'] == 'directory' and record['at'] == b64(path):
+            if record['kind'] == 'directory' and record['at'] == b64(path):
                 nested = nested_record(root_fd, path)
                 if nested is not None:
                     record = {**record, 'kind': 'repository-directory', 'metadata': nested}
