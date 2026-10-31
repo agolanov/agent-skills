@@ -12,6 +12,9 @@ Branch: feature/task
 Base: <fixed base>
 Pre-loop HEAD (squash anchor): <last task commit before the loop>
 Requirements/rules/checks: <links or concise text>
+Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
+Targeted checks: <commands; cwd/source>
+Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <cli|subagent>/<codex|claude>, model <exact>, effort <exact>
 <or> Assignment: dual: codex <model>/<effort>; claude <model>/<effort>
@@ -26,7 +29,7 @@ Next D: <dual: next free D<n>, starting at 1>
 Target: <range|fix commit|dispositions only>
 Reviewed commit: <HEAD>
 Previous verdict: <none or verdict>
-Result validity/completion: <exit or native completion; metadata; unchanged-state evidence; omissions; dual: the dual-review return>
+Result validity/completion: <exit or native completion; metadata; monitored-state evidence; omissions; dual: the dual-review return>
 Dual record: <dual dir>; raw verdicts codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
 Verdict: <CLEAN|CHANGES; dual: the report's derived verdict>
 Findings/decisions:
@@ -34,7 +37,9 @@ Findings/decisions:
 - D2 <severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
-Checks: <commands/results and commit>
+Checks: <commands/cwd/exits/commit/checkout; snapshots/comparison; environment changes; coverage gaps>
+State: <before/after snapshot or diagnostic paths; comparison result/exits/errors; retained recovery baseline>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored
+Verification: complete | incomplete: <checks/coverage gaps>
 Pending-round retry count: <retained across reconciliation; dual: spent attempts per reviewer per call in the round's state.md>
 
 ## Finish

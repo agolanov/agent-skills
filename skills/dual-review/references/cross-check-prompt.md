@@ -11,7 +11,7 @@ Branch: <branch>. Fixed base: <base>. Reviewed HEAD: <reviewed commit>.
 Target: the findings listed below, raised on <the review prompts' target row, bound> by the other independent reviewer of this target.
 
 Requirements, rules and checks
-<the requirements, rules and checks of the review prompts, without the final-pass security-focus instruction>
+<the requirements, rules and checks of the review prompts, without the security-focus instruction, regardless of originating round; retain exact resolved commands/cwd and inherited suite evidence>
 <the dual complete-suite instruction of independent-review/references/review-prompt.md, filled as in the review prompts, without its last sentence "Rate each finding critical, important or minor.">
 
 Findings to verify
