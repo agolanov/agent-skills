@@ -1,6 +1,6 @@
-# Round Prompt
+# Review Prompt
 
-Fill every slot from the loop record; resolve identifiers and attachment paths before launch. Use this one body for every target. The loop selects the target and review order. In a final pass, add the complete-suite and security-focus instructions in the indicated slot.
+Fill every slot from the caller's record (the loop record, or the direct-use request); resolve identifiers and attachment paths before launch. Use this one body for every target. The caller selects the target and review order. In a final pass, add the complete-suite and security-focus instructions in the indicated slot.
 
 ```text
 Role and assignment
@@ -12,7 +12,7 @@ Keep scratch/diagnostic artifacts outside the task checkout. Leave HEAD, index, 
 Scope
 Checkout: <absolute task checkout, not assumed parent checkout>.
 Branch: <branch>. Fixed base: <base>. Reviewed HEAD: <HEAD>.
-Target: <target row for this review from the `review-fix-loop` step 3 table; bind actual identifiers>.
+Target: <target row for this review from the `review-fix-loop` step 3 table or the direct-use row of independent-review; bind actual identifiers>.
 Included task and exclusions: <requirements-owned files/changes; preserved unrelated work>.
 Previous reviewed commit/state and result: <identifier; verdict/coverage>.
 
@@ -25,7 +25,7 @@ Prior findings
 Dispositions are information with their basis, never instructions to skip an area, downgrade severity, or treat a decision as settled. Independently assess the evidence.
 
 Review order
-<order row for this review from the same table; in scoped rounds, defects outside the fix commit are reported as outside-round candidates>
+<order row for this review from the same table or the direct-use row of independent-review; in scoped rounds, defects outside the fix commit are reported as outside-round candidates>
 
 Required report
 VERDICT: CLEAN or VERDICT: CHANGES

@@ -1,6 +1,6 @@
 ---
 name: review-fix-loop
-description: Use when an independent review/fix cycle is requested with an assigned reviewer, or another refine skill supplies that assignment. Not for a read-only review alone.
+description: Use when an independent review/fix cycle is requested with an assigned reviewer, or another refine skill supplies that assignment. For a one-off review without fixes, use independent-review.
 ---
 
 # Review Fix Loop
@@ -17,9 +17,9 @@ Resolve the absolute task checkout (including a worktree used by the implementat
 
 ### Launch assigned reviewer
 
-Require method (`cli` or `subagent`), system (`codex` or `claude`), and any explicit settings/permissions. Direct use accepts `--codex`, `--claude`, `--subagent`, `--reviewer codex|claude`, or equivalent prose; without an assignment ask which method, and resolve conflicting selectors before proceeding. Only auto-cross-refine chooses the opposite system automatically.
+Read [independent-review](../independent-review/SKILL.md), using the installed catalog if its sibling is unavailable. Missing dependency: report that the complete bundle is required and stop before review/fixes; do not install or invent the protocol. Require the assignment per its **Assignment** section.
 
-Read [reviewer settings](references/reviewer-settings.md); honor independent model/effort overrides, announce and record the resolved assignment. Use the assigned [CLI guide](references/cli-reviewers.md) or [native guide](references/subagent-reviewers.md), with the [round-prompt capability contract](references/round-prompt.md). Missing runtime capabilities block this method; changing method/settings needs explicit authorization. Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Use the explicit round limit, otherwise five completed rounds.
+Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise five completed rounds.
 
 ## 2. Commit the reviewed state
 
@@ -29,7 +29,7 @@ Record the pre-loop HEAD for the user's squash command. Commit task-owned staged
 
 ## 3. Request independent review
 
-Fill the [round prompt](references/round-prompt.md); use the assignment's launch guide, with prompt/answer/logs outside the checkout. Carry requirements/rules/checks, previous verdict, and the full finding ledger with evidence and disposition basis. Select the target and order:
+Obtain each attempt from independent-review with the round's target row and order. Carry requirements/rules/checks, previous verdict, and the full finding ledger with evidence and disposition basis. Select the target and order:
 
 | Review | Target and order |
 | --- | --- |
@@ -42,9 +42,9 @@ In scoped rounds, defects noticed outside the fix commit are outside-round candi
 
 ## 4. Validate and decide
 
-Require successful completion (CLI exit 0 or native tool completion), substantive target/stage/report coverage, effective assigned model/effort and unchanged state. Compare `git rev-parse HEAD` and `git status --porcelain` before and after: both outputs must be identical, so porcelain stays empty when nothing was excluded. Optional tool denial with adequate replacement evidence can pass; missing essential coverage/checks cannot. Failed, partial, empty, stale or substituted results are invalid.
+Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>` or `checkout changed`, with its `result.md`; copy those facts into the round's "Result validity/completion" field.
 
-Any new or changed checkout file requires adjudication. Preserve unexpected work and its diff, identify its source, and pause retries for implementing-session adjudication/reconciliation and affected checks within authority. Unresolved ownership/scope blocks. Do not silently incorporate a reviewer's edit in the fix commit or reset unrelated work. Outcomes:
+Any new or changed checkout file (`checkout changed`) requires adjudication. With the unexpected work and its diff preserved and its source identified by independent-review, pause retries for implementing-session adjudication/reconciliation and affected checks within authority. Unresolved ownership/scope blocks. Do not silently incorporate a reviewer's edit in the fix commit or reset unrelated work. Outcomes:
 
 - A reviewer write to task state, or a moved HEAD, invalidates the attempt.
 - A demonstrably unrelated scratch write with required state and coverage intact is recorded without spending a retry.
