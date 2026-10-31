@@ -41,7 +41,7 @@ def isolated_env():
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
     env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_SYSTEM=os.devnull,
                GIT_CONFIG_GLOBAL=os.devnull, GIT_OPTIONAL_LOCKS='0',
-               GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0')
+               GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0', GIT_ATTR_NOSYSTEM='1')
     return env
 
 
@@ -66,7 +66,7 @@ def admin_open(path, directory=False):
             os.close(fd)
 
 
-def admin_read(path, optional=False, limit=256*1024*1024):
+def admin_read(path, optional=False, limit=256*1024*1024, with_mtime=False):
     try:
         fd = admin_open(path)
     except FileNotFoundError:
@@ -88,7 +88,8 @@ def admin_read(path, optional=False, limit=256*1024*1024):
                 raise OSError('administrative file exceeded size bound')
         if identity(before) != identity(os.fstat(fd)):
             raise OSError('administrative file changed during read')
-        return b''.join(chunks)
+        data = b''.join(chunks)
+        return (data, before.st_mtime_ns) if with_mtime else data
     finally:
         os.close(fd)
 
@@ -132,13 +133,16 @@ def private_git(checkout):
         yield _VIEWS[checkout]
         return
     gitdir, common, selected = administration(checkout)
-    with tempfile.TemporaryDirectory(prefix='checkout-state-admin-') as temp:
+    temp_root = os.path.realpath(os.fsencode(next((os.environ[k] for k in ('TMPDIR', 'TEMP', 'TMP') if os.environ.get(k)), '/tmp')))
+    if any(os.path.commonpath((temp_root, protected)) == protected for protected in (checkout, gitdir, common)):
+        raise OSError('temporary administration must be outside checkout and source metadata')
+    with tempfile.TemporaryDirectory(prefix='checkout-state-admin-', dir=os.fsdecode(temp_root)) as temp:
         target = Path(temp)
         config = admin_read(os.path.join(common, b'config'), optional=True, limit=8*1024*1024) or b''
         source = target/'source-config'
         source.write_bytes(config)
         parsed = subprocess.run(['git', 'config', '--file', str(source), '--no-includes', '--null', '--list'],
-            cwd=temp, env=isolated_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            cwd=temp, env={**isolated_env(), 'GIT_CEILING_DIRECTORIES': os.path.dirname(temp)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
         if parsed.returncode:
             raise OSError('unreadable repository config')
         object_format = 'sha1'
@@ -152,14 +156,18 @@ def private_git(checkout):
             raise OSError('unsupported object format')
         (target/'config').write_text('[core]\nrepositoryformatversion = '+
             ('1' if object_format == 'sha256' else '0')+
-            '\nbare = false\nhooksPath = /dev/null\nfsmonitor = false\n'+
+            '\nbare = false\nhooksPath = /dev/null\nfsmonitor = false\n'
+            'excludesFile = /dev/null\nattributesFile = /dev/null\n'+
             ('[extensions]\nobjectformat = sha256\n' if object_format == 'sha256' else ''))
         def copy_file(root, relative, optional=True):
-            data = admin_read(os.path.join(root, relative), optional=optional)
-            if data is not None:
+            observed = admin_read(os.path.join(root, relative), optional=optional, with_mtime=True)
+            if observed is not None:
+                data, mtime = observed
                 dest = target/os.fsdecode(relative)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(data)
+                # Git's racy-clean check depends on index/shared-index mtime.
+                os.utime(dest, ns=(mtime, mtime))
         copy_file(gitdir, b'HEAD', optional=False)
         copy_file(gitdir, b'index')
         copy_file(common, b'packed-refs')
@@ -268,11 +276,26 @@ def private_inventory(checkout):
         try:
             if stat.S_ISDIR(os.lstat(os.path.join(checkout, path)).st_mode):
                 replaced.append(path)
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             pass
     excluded = sorted(set(gitlinks) | set(replaced))
     if excluded:
         status_args += ['--', *[b':(exclude,literal)' + p for p in excluded]]
+    # Inspect present files even if the source index asks Git to skip them.
+    # Mutate only this inventory's private index; retain original flags above.
+    index_path = os.path.join(_VIEWS[checkout][0], b'index')
+    index_time = os.stat(index_path).st_mtime_ns if entries else None
+    stage_zero = {unb64(e['path']) for e in entries if e['stage'] == 0}
+    for option, paths in (
+        ('--no-assume-unchanged', [unb64(e['path']) for e in flags if e['flag'].islower()]),
+        ('--no-skip-worktree', [unb64(e['path']) for e in flags if e['flag'].upper() == 'S'
+                              and os.path.lexists(os.path.join(checkout, unb64(e['path'])))])):
+        selected = sorted(set(paths) & stage_zero)
+        if selected:
+            git_bytes(checkout, 'update-index', option, '-z', '--stdin',
+                      input=b''.join(p+b'\0' for p in selected))
+    if index_time is not None:
+        os.utime(index_path, ns=(index_time, index_time))
     status = git_bytes(checkout, *status_args)
     status += b''.join(b' D '+p+b'\0' for p in sorted(replaced))
     status += b''.join(b'?? '+p+b'\0' for p in others)
@@ -624,6 +647,13 @@ def preflight(record):
         raise ValueError('preflight capture unavailable')
     fields = record['fields']
     paths = {unb64(p) for p in fields['untracked']}
+    flags = {e['path']: e['flag'].upper() for e in fields['flags']}
+    for entry in fields['index']:
+        if entry['mode'] != '160000':
+            continue
+        location = fields['path:'+entry['path']]['submodule']['location']
+        if location['kind'] != 'directory' and not (location['kind'] == 'missing' and flags.get(entry['path']) == 'S'):
+            paths.add(unb64(entry['path']))
     records = iter(nul_items(unb64(fields['status'])))
     for item in records:
         if len(item) < 4 or item[2:3] != b' ':
@@ -685,12 +715,14 @@ def publish(directory, name, value):
 
 
 def read_git(directory, arguments):
-    allowed = {'rev-parse', 'log', 'show', 'diff', 'merge-base', 'check-ignore', 'symbolic-ref', 'cat-file', 'worktree'}
+    allowed = {'rev-parse', 'log', 'show', 'diff', 'merge-base', 'check-ignore', 'symbolic-ref', 'cat-file', 'worktree', 'check-ref-format'}
     if not arguments or arguments[0] not in allowed:
         raise ValueError('git-read requires an allowed read-only command')
-    unsafe = ('--output', '--ext-diff', '--textconv', '--no-index')
+    unsafe = ('--output', '--ext-diff', '--textconv', '--no-index', '--remerge-diff', '--diff-merges')
     if any(a.startswith('--') and a != '--' and any(option.startswith(a.split('=', 1)[0]) for option in unsafe) for a in arguments):
         raise ValueError('unsafe git-read option')
+    if arguments[0] == 'check-ref-format' and (len(arguments) != 3 or arguments[1] != '--branch'):
+        raise ValueError('git-read check-ref-format requires --branch and one name')
     if arguments[0] == 'cat-file' and (len(arguments) != 3 or arguments[1] not in ('-e', '-p', '-t', '-s')):
         raise ValueError('git-read cat-file requires one object and -e/-p/-t/-s')
     if arguments[0] == 'worktree' and arguments[1:] != ['list', '--porcelain', '-z']:
@@ -706,8 +738,18 @@ def read_git(directory, arguments):
             raise ValueError('no containing checkout')
         root = parent
     args = list(arguments)
+    if args[0] == 'diff':
+        for argument in args[1:]:
+            if argument.startswith('-'):
+                continue
+            path = os.path.realpath(os.path.join(root, os.fsencode(argument)))
+            if os.path.commonpath((root, path)) != root:
+                raise ValueError('git-read diff refuses outside-checkout paths')
     if args[0] in ('log', 'show', 'diff'):
         args[1:1] = ['--no-ext-diff', '--no-textconv']
+    if args[0] == 'check-ref-format':
+        code, output = git_bytes(root, *args, allowed_codes=(0, 1, 128), with_code=True)
+        return (1 if code == 128 else code), output
     if args[0] != 'worktree':
         return git_bytes(root, *args, allowed_codes=(0, 1), with_code=True)
     with private_git(root) as (private, selected):
