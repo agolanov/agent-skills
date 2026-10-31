@@ -21,20 +21,20 @@ Fill the [review prompt](references/review-prompt.md), the reviewer's capability
 
 ## Launch
 
-Record `git rev-parse HEAD` and `git status --porcelain` of the checkout, then run one attempt through the assigned [CLI guide](references/cli-reviewers.md) or [native guide](references/subagent-reviewers.md), with prompt/answer/logs in an attempt directory outside the checkout.
+Record `git rev-parse HEAD` and `git status --porcelain` of the checkout, then run one attempt through the assigned [CLI guide](references/cli-reviewers.md) or [native guide](references/subagent-reviewers.md). Every attempt, in loop use too, gets a fresh attempt directory outside the checkout for its prompt, answer, logs, preserved diff and `result.md`; the CLI guide's `round_prompt` and `round_dir` bind to that attempt's prompt file and directory.
 
 ## Validate
 
 Require successful completion (CLI exit 0 or native tool completion), substantive target/stage/report coverage, effective assigned model/effort and unchanged state. Compare `git rev-parse HEAD` and `git status --porcelain` before and after: both outputs must be identical, so porcelain stays empty when nothing was excluded. Optional tool denial with adequate replacement evidence can pass; missing essential coverage/checks cannot. Failed, partial, empty, stale or substituted results are invalid.
 
-Any new or changed checkout file, or a moved HEAD, requires adjudication by the caller (the loop, or the user in direct use). Preserve the unexpected work and its diff in the attempt directory, identify its source, and return `checkout changed` whatever the other conditions show; never reset it or fold it into a commit. Still check and record every other condition above, so the caller can use an otherwise valid answer after adjudicating a demonstrably unrelated scratch write.
+Any difference in either output (a moved HEAD, a new or changed file, or an index-only change) requires adjudication by the caller (the loop, or the user in direct use). Preserve the unexpected work and its diff in the attempt directory, identify its source, and return `checkout changed` whatever the other conditions show. This skill never resets it or folds it into a commit; reconciliation, such as the loop's authorized restore after adjudication, belongs to the caller. Still check and record every other condition above, so the caller can use an otherwise valid answer after adjudicating a demonstrably unrelated scratch write.
 
 ## Result
 
 Write `<attempt dir>/result.md` for every attempt and return its path with the result:
 
 ```text
-Result: valid | invalid: <reason> | checkout changed
+Result: valid | invalid: <reason> | checkout changed; otherwise valid | checkout changed; otherwise invalid: <reason>
 Assignment: <cli|subagent>/<codex|claude>, model <exact>, effort <exact>
 Settings evidence: <runtime records>
 Target: <target row>; reviewed commit <full sha>
@@ -48,10 +48,9 @@ Coverage gaps: <None | list>
 
 `independent-review [--codex|--claude|--subagent|--reviewer codex|claude] [--model M] [--effort E] [<range|commit>]`
 
-- **Target:** the given range or commit in the current checkout, otherwise `$(git merge-base <default branch> HEAD)..HEAD`, with full SHAs; resolve the default branch (`main`/`master` or configured default) as review-fix-loop step 2 does. An empty range (merge-base equals HEAD), or a checkout on the default branch without an explicit target, asks for the target.
-- **Uncommitted changes:** any `git status --porcelain` line stops before launch and asks the user to commit them or to review the committed state only; in the second case the report lists those paths as not reviewed.
+- **Target:** the given range `X..Y` (Fixed base `X`, reviewed commit `Y`) or commit `C` (`C^..C`) in the current checkout, otherwise `$(git merge-base <default branch> HEAD)..HEAD`, with full SHAs; resolve the default branch (`main`/`master` or configured default) as review-fix-loop step 2 does. An empty range (merge-base equals HEAD), or a checkout on the default branch without an explicit target, asks for the target.
+- **Uncommitted changes:** any `git status --porcelain` line stops before launch and asks the user to commit them or to review the committed state only; in the second case the prompt's "Included task and exclusions" slot lists those paths as excluded uncommitted work, and the report lists them as not reviewed.
 - **Requirements:** the documents or text the user names; with none named, the project rules and the commit messages, stated in the prompt as the only requirement sources.
 - **Direct-use row:** the final-pass row of the review-fix-loop step 3 table: complete target, complete test suite and security-focused review; prior findings `None`.
-- **Attempt files:** a fresh attempt directory outside the checkout; the CLI guide's `round_prompt` and `round_dir` bind to the attempt's prompt file and that directory.
 - **Retry:** one retry after `invalid`, with the same system, method and settings, never another; a second invalid attempt is reported as blocked. `checkout changed` is shown to the user with the preserved diff and is not retried.
 - **Output:** the reviewer's verdict and findings as given, labelled "not adjudicated", plus the `result.md` path. No commit, no fix.
