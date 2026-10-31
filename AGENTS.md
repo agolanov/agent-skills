@@ -27,38 +27,34 @@ docs/superpowers/plans/       # implementation plans (YYYY-MM-DD-<slug>.md)
 
 ## Developing a skill
 
-Every change to a skill has a delivery mode. **Full** is the default: every new skill and every change to what a skill or script does. **Light** is for small changes to the text of existing skills. The spec declares the mode in its header, beside the date and status: `**Delivery mode:** light` or `**Delivery mode:** full`; no line means full. The agent that writes the spec decides against the criteria below and takes full when in doubt; it tells the user the mode and its reason inside the spec and asks no separate question; the spec's cross review checks the decision as a requirement. Once the spec is approved the mode is frozen: a planning or implementing agent that finds the criteria violated does not change the header or widen the change, it ends `STATUS: blocked` with the question (widen to full, or narrow the change). In full mode the plan carries the test-first process below; an implementing agent whose plan leaves it out ends `STATUS: blocked` with the question (stop so the plan can be revised with the test-first steps and delivered again, or deliver as planned) instead of running the plan as written or adding the steps itself.
+Every spec has a `## Verification` section in free form: what the change could break, the check that covers each risk, and how to run it. The spec's author chooses the checks from the change's risk and asks the user no separate question about them. The section is frozen once the spec is approved, like the rest of the spec.
 
-### Light mode
+Two minimums hold for every spec, whatever its author decides:
 
-A change is light when all of the following hold:
+1. **Behaviour: one RED and one GREEN.** When the change alters what an agent following a skill does (a rule, a step, a stop condition, a brief or prompt the agent acts on, or a script's behaviour), Verification includes:
+   - **RED**: a fresh subagent on a copied fixture with the skill text as it is before the edits, run once, before any edit. Its result goes to `tests/<name>/baseline-notes.md`.
+   - **GREEN**: a fresh subagent on the same kind of fixture with the edited skill, run once, after all edits of the plan. Its result goes to `tests/<name>/green-notes.md`.
 
-- it adds no new skill and no new script command;
-- it adds no new state: no new status field or section, no new labelled brief line, no new queue state, no new runtime or test file that a skill reads or writes;
-- it changes only wording or a few rules of existing skills (`SKILL.md`, files under `references/`, `README.md`, `AGENTS.md`); a script only where the edit changes no behaviour (a message, a usage line, a comment).
+   GREEN runs again only after a failed GREEN, once the failure is fixed; fixes made later by the cross review trigger no further GREEN. A change that alters only wording, with no change in what the agent does, needs neither run, and its spec says why the change is wording only.
+2. **One external cross review.** Every delivery ends with one `auto-cross-refine` invocation with its normal round limit; that skill chooses the opposite system as the reviewer. Specs name the skill, not a reviewer system.
 
-"A few rules" is not a line count: the test is whether a reviewer can check the change against the spec by reading the diff. A change that needs a fixture to be understood is full.
+Further checks a spec may name, each because a named risk needs it:
 
-A light change is the edit, the checks that already exist for the touched skills, and one review:
-
-1. Structural validation (below) for each changed skill directory.
-2. The scripted suites under `tests/` that exist in the checkout for the touched skills (`tests/<name>/test_*.sh`, `tests/<name>/test_*.py`, `tests/<name>/tools/check-*.sh`) and `tests/refine/test_stub_reviewer.py`. Suites that exercise a skill's script or fakes resolve it from their own location, so from a task worktree run them through a mirror: a temporary directory with `skills` symlinked to the worktree and every `tests/<name>` directory the suite reads copied in (`tests/deliver-task/test_fakes.py` also reads `tests/child-sessions/tools`). Run `tests/refine/test_stub_reviewer.py` in place from the main checkout: one of its cases expects its own repository outside the temporary directory. An absent suite is unavailable coverage, never recreated; no suite is edited for a light change.
-3. The installation check (below): `npx -y skills add <checkout> --list`.
-4. One `auto-cross-refine` invocation with its normal round limit.
-
-Not part of a light change: new fixtures, fake-agent scenarios, replay cases, RED or GREEN runs with fresh subagents, reruns of the existing subagent replays, and entries in `baseline-notes.md` or `green-notes.md`.
-
-### Full mode
-
-Skills are developed test-first, following `superpowers:writing-skills`:
-
-1. **RED** — run a fresh subagent on a fixture *without* the skill and write down what it gets wrong (`tests/<name>/baseline-notes.md`).
-2. **GREEN** — write SKILL.md against those observed failures, then verify with fresh subagents until they pass.
-3. **REFACTOR** — add edge-case fixtures, close the loopholes they expose, confirm installation via the skills CLI.
-
-Every iteration (what failed → what changed in the skill → rerun result) is recorded in `tests/<name>/green-notes.md`.
+- Structural validation (below) of each changed skill directory.
+- The scripted suites under `tests/` that exist in the checkout for the touched skills (`tests/<name>/test_*.sh`, `tests/<name>/test_*.py`, `tests/<name>/tools/check-*.sh`) and `tests/refine/test_stub_reviewer.py`. Suites that exercise a skill's script or fakes resolve it from their own location, so from a task worktree run them through a mirror: a temporary directory with `skills` symlinked to the worktree and every `tests/<name>` directory the suite reads copied in (`tests/deliver-task/test_fakes.py` also reads `tests/child-sessions/tools`). Run `tests/refine/test_stub_reviewer.py` in place from the main checkout: one of its cases expects its own repository outside the temporary directory. An absent suite is unavailable coverage, never recreated.
+- The installation check (below): `npx -y skills add <checkout> --list`.
+- Edge-case fixtures and replay scenarios (see Local behavioral checks).
 
 Subagent tests always run on **copies** of the fixtures in a temp directory (`mktemp -d`), never on the repository files. When a test expects the agent to notice uncommitted changes, `git init` the temp directory and commit the fixture there first.
+
+The reviewer of a spec checks its Verification section for proportion in both directions: a check the named risks do not need is a finding, and so is a risk of the change no check covers, a missing minimum included.
+
+The implementing agent:
+
+- runs exactly the checks Verification names, no fewer. A further check is allowed only with its reason written under Checks in the status file. A named check that cannot run (an absent suite, a missing validator) is reported unavailable, never recreated or replaced by another check;
+- follows `superpowers:writing-skills` and `superpowers:test-driven-development` for how to run a RED or GREEN, and Verification for how many: the spec takes precedence over their test-first rules ("no skill without a failing test first", iterate until bulletproof);
+- lets the final `auto-cross-refine` replace the execution skill's own final review of the whole implementation (for example the final code review of `superpowers:subagent-driven-development`); per-task reviews inside the execution skill stay at its discretion;
+- chooses the execution skill from the plan and names it with the reason in its report: `superpowers:executing-plans` when the plan is a few tasks done in order, where a task builds on an earlier one or edits the same files; `superpowers:subagent-driven-development` when the plan has many tasks independent of each other (separate files, no task needs another's result).
 
 ## Installation check
 
