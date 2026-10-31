@@ -18,6 +18,8 @@ Existing plan: <absolute plan path inside this worktree>
 Tails file: <absolute tails file inside this worktree>
 Source plan: <absolute source plan inside this worktree, or None>
 Source spec: <absolute source spec inside this worktree, or None>
+For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
+
 Ownership: you are the only writer in this worktree. The root owns merging, cleanup and the queue file.
 
 Read and honor all applicable project rules: <absolute AGENTS.md/CLAUDE.md paths, plus any rule to repeat verbatim>.
@@ -44,7 +46,7 @@ Work:
    c. Make sure the file ends with a newline, then git add it and commit it as "docs: <basename>" when anything changed; <sha> is the full git rev-parse HEAD.
    d. Append exactly one last line: Review: <clean|clean except disputed>, <today YYYY-MM-DD>, reviewer <the opposite system that reviewed: claude|codex>, commit <sha>
    e. Commit it as "mark: <basename>".
-   f. Check freshness: the last line is the only line matching that expression, git cat-file -e <sha>:<path relative to this worktree> succeeds, and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. A document changed after marking is reviewed and marked again.
+   f. Check freshness: the last line is the only line matching that expression, git cat-file -e <sha>:<path relative to this worktree> succeeds, and diff <(git show <sha>:<path relative to this worktree>) <(sed '$d' <file>) prints nothing. Capture and check the show producer exit before comparing its retained external output; a helper error is unavailable verification, never an empty document. Use the freshness recipe in prepare-tasks/references/units.md. A document changed after marking is reviewed and marked again.
 4. Write the status file (below) with STATUS: done.
 5. Then stay in this window and wait for the next instruction; keep the session running.
 
@@ -58,4 +60,4 @@ Read and follow the complete child-sessions status contract at <absolute child-s
 
 For a silent-exit reopen, retain the brief and append:
 
-> Continue from the current state of the checkout: read git log and git status first.
+> Continue from the current state of the checkout: read git log and run the checkout-state preflight first.

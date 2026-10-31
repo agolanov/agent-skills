@@ -13,6 +13,8 @@ Spec: <spec>
 Agent: <agent>
 Window name: <name>
 Launch options: <explicit model/effort, or CLI defaults>
+For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
+
 Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and recording tails.
 
 Layout facts (gitignored material is not in this worktree):
@@ -45,4 +47,4 @@ Read and follow the complete child-sessions status contract at <absolute child-s
 
 For explicit resume or silent-exit recovery, retain the original identity/task and append this line before opening:
 
-> Continue from the current state of the checkout: read git log and git status first.
+> Continue from the current state of the checkout: read git log and run the checkout-state preflight first.
