@@ -38,7 +38,7 @@ Findings/decisions:
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
 Checks: <commands/cwd/exits/commit/checkout; snapshots/comparison; environment changes; coverage gaps>
-State: <before/after snapshot or diagnostic paths; comparison result/exits/errors; retained recovery baseline>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored
+State: <before/after snapshot or diagnostic paths; comparison result/exits/errors; retained recovery baseline>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored; submodule resolved HEAD and dirty state not monitored
 Verification: complete | incomplete: <checks/coverage gaps>
 Pending-round retry count: <retained across reconciliation; dual: spent attempts per reviewer per call in the round's state.md>
 

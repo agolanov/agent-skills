@@ -34,7 +34,7 @@ Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the s
 - voided by restart on <new sha> (spend nothing): <result.md paths with their commit>
 
 ## Phases
-- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <snapshot or diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored
+- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <snapshot or diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored; submodule resolved HEAD and dirty state not monitored
 - Reconciled new-commit baseline: <explicit caller target/authorization, snapshots, unexplained residual changes check | None>
 ```
 
