@@ -2,7 +2,7 @@
 
 Reuse an existing task log outside the checkout when possible. This is a short Markdown example, not a parser format. Fill it with inspected facts; do not copy illustrative status/evidence as a result.
 
-With the `dual` assignment, findings carry dual-review's merged IDs `D<n>` with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. A cross-check rejection keeps the raiser, source ID, the finding as raised and the verifier's evidence: each next round passes those entries and `Next D` to dual-review as its ledger input.
+With the `dual` assignment, findings carry dual-review's merged IDs `D<n>` with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to dual-review as its ledger input; a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
 
 ```markdown
 # Review Fix Loop record
@@ -35,7 +35,7 @@ Findings/decisions:
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
 Checks: <commands/results and commit>
-Pending-round retry count: <retained across reconciliation>
+Pending-round retry count: <retained across reconciliation; dual: spent attempts per reviewer per call in the round's state.md>
 
 ## Finish
 Status: <running | clean | clean except disputed | blocked: reason>

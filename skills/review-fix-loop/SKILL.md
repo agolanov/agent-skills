@@ -17,7 +17,7 @@ Resolve the absolute task checkout (including a worktree used by the implementat
 
 ### Launch assigned reviewer
 
-Read [independent-review](../independent-review/SKILL.md), using the installed catalog if its sibling is unavailable. Missing dependency: report that the complete bundle is required and stop before review/fixes; do not install or invent the protocol. Require the assignment per its **Assignment** section.
+Read [independent-review](../independent-review/SKILL.md), using the installed catalog if its sibling is unavailable. Missing dependency: report that the complete bundle is required and stop before review/fixes; do not install or invent the protocol. Require the assignment per its **Assignment** section, or the `dual` assignment below.
 
 The assignment `dual` (`--dual` or equivalent prose) has Codex CLI and Claude CLI review every round through [dual-review](../dual-review/SKILL.md): read it too, located the same way with the same missing-dependency stop, and resolve both reviewers' settings by its step 1. A `--codex`, `--claude`, `--subagent` or `--reviewer` selector beside it conflicts: ask which assignment applies.
 
@@ -42,7 +42,7 @@ Obtain each attempt from independent-review with the round's target row and orde
 
 In scoped rounds, defects noticed outside the fix commit are outside-round candidates: without widening this review, record them for the final pass if it is still pending. After that sole pass has run, adjudicate new candidates immediately by evidence; accepted task defects get a fix commit and scoped verification within the remaining limit, other candidates get a recorded disposition. Pre-existing outside-task problems stay separate and never block.
 
-In a dual assignment each review in the table, final pass and disposition rounds included, is one `dual-review` call, and that call is one round whatever reviewer and cross-check calls it makes. Pass it both recorded settings, the round's target row and order, the ledger with its `Next D` per the [loop record](references/loop-record.md), the step 2 suite run and a fresh round directory beside the loop record as `<dual dir>`.
+In a dual assignment each review in the table, final pass and disposition rounds included, is one dual review, its resumes included, and that review is one round whatever reviewer and cross-check calls it makes. Pass `dual-review` both recorded settings, the round's target row and order, the full finding ledger with its `Next D` from the [loop record](references/loop-record.md) as the ledger input of its step 4, the step 2 suite run and a fresh round directory beside the loop record as `<dual dir>`.
 
 ## 4. Validate and decide
 
@@ -56,8 +56,8 @@ Any new or changed checkout file (`checkout changed`) requires adjudication. Wit
 
 In a dual assignment the round's result is the `dual-review` return instead: it validates and retries each reviewer's attempts under its **Budget**, which replaces the loop's per-round budget, and the loop adds no retry of its own. Record the return and its `state.md` facts in the round.
 
-- `<dual dir>/report.md` completes the round. Its derived verdict is the round's verdict wherever steps 4 and 5 read one, the `clean` and `clean except disputed` conditions included, whatever either reviewer's raw verdict; record and report both raw verdicts beside it as given, never relabelled. dual-review has already cross-checked every finding only one reviewer raised: adjudicate the report's confirmed findings below, take its cross-check results as given, and handle its `Candidates` by step 3 and **Outside-scope**, a verifier's noticed-not-verified item as an outside-round candidate.
-- `checkout changed: <state.md>`: adjudicate and reconcile as above, restoring the checkout, then resume with `dual-review --resume <state.md> --write scratch` for the demonstrably unrelated scratch write, otherwise `--write invalidating`; when reconciliation committed, add the round's target row bound to the new HEAD.
+- `<dual dir>/report.md` completes the round. Its derived verdict is the round's verdict wherever steps 4 and 5 read one, the `clean` and `clean except disputed` conditions included, whatever either reviewer's raw verdict; record and report both raw verdicts beside it as given, never relabelled. Adjudicate the report's confirmed findings below and take its cross-check results as given. Its `Candidates` (outside-round, outside-task, a verifier's noticed-not-verified item) follow step 3 and **Outside-scope** with one difference: no candidate is fixed on this session's own evidence. A candidate is carried in the ledger input of the next dual review, scoped or final, as prior-finding context, where the reviewers may raise it as a finding that goes through matching and cross-check; a candidate that surfaces after the final pass with no further review pending is recorded for the user, not fixed. For the dual assignment this replaces step 3's immediate adjudication of candidates after the final pass.
+- `checkout changed: <state.md>`: adjudicate and reconcile as above, restoring the checkout; a write `state.md` leaves unattributable between the two reviewers (after a parallel phase) is a reviewer write under the ownership rule above, never unresolved ownership, and is `invalidating` unless it is the demonstrably unrelated scratch write. Then resume with `dual-review --resume <state.md> --write scratch` for the demonstrably unrelated scratch write, otherwise `--write invalidating`; when reconciliation committed, add the round's target row bound to the new HEAD.
 - `blocked: <codex|claude|codex and claude> invalid result` blocks the round.
 
 Adjudicate every finding in the [record](references/loop-record.md):
@@ -67,7 +67,7 @@ Adjudicate every finding in the [record](references/loop-record.md):
 - **Deferred:** minor/style findings are fixed cheaply alongside defects or listed for the user. They never start a fix round alone and are not open blocking defects.
 - **Disputed:** after a recorded rejection with basis, a reviewer re-raises the same scenario/violated requirement without new evidence. A moved line alone preserves identity; new evidence instead requires fresh evaluation. Record both positions and the fix-or-dismiss question for the user, continue other work and spend no further rounds on that finding.
 - **Outside-scope:** record pre-existing/outside-task candidates once for the final report; outside-round candidates follow step 3.
-- **Rejected by cross-check:** in a dual assignment, each finding in the report's `Rejected by cross-check` section, a `repeat` included, is recorded `rejected by cross-check: <verifier evidence>` with its raiser and source ID, and is closed: not fixed, not `disputed`, never blocking `clean`. A later report decides its next state: a repeat changes nothing, a renewed rejection records the new verifier evidence, and a confirmation brings it under the rules above.
+- **Rejected by cross-check:** in a dual assignment, each finding in the report's `Rejected by cross-check` section, a `repeat` included, is recorded `rejected by cross-check: <verifier evidence>` with its raiser and source ID, and is closed: not fixed, not `disputed`, never blocking `clean`. A later report decides its next state: a repeat changes nothing, a renewed rejection records the re-raise's evidence beside the new verifier evidence, and a confirmation brings it under the rules above.
 
 ## 5. Fix, repeat and finish
 

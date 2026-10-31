@@ -86,9 +86,10 @@ Raw (each reviewer's own, as given): codex CHANGES; claude CHANGES
 
 ## Ledger input
 
-A caller such as `review-fix-loop` passes its earlier cross-check rejections and the next free ID; direct use has none.
+A caller such as `review-fix-loop` passes its full finding ledger and `Next D` (dual-review step 4); direct use has none.
 
 ```markdown
-Next D: 4
-- D2: raised by claude R2; scenario <as stated>; requirement <as stated>; evidence <as stated>; rejected by cross-check: codex, <verifier evidence>
+Next D: 3
+- D1 critical (codex minor, claude critical); module.py:5; raised by codex F1, claude R1; scenario <as stated>; requirement <as stated>; evidence <as stated>; accepted; fixed in <fix commit>
+- D2; module.py:2; raised by claude R2; scenario <as stated>; requirement <as stated>; evidence <as stated>; rejected by cross-check: codex, <verifier evidence>; re-raised with <re-raised evidence>; rejected by cross-check again: codex, <verifier evidence>
 ```
