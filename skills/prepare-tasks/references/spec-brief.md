@@ -27,6 +27,7 @@ Required installed skills (read these absolute SKILL.md paths):
 - Automatic cross review: <absolute auto-cross-refine SKILL.md>
 - Opposite CLI launcher: <absolute refine-with-codex or refine-with-claude SKILL.md>
 - Shared review protocol: <absolute review-fix-loop SKILL.md>
+- Reviewer launch: <absolute independent-review SKILL.md>
 
 Work:
 1. Run brainstorming with the user in this window, starting from the idea, from the existing plan, which the spec must fully cover, or from the tails file as below. The user is beside this window: ask your questions here. Write the spec to Spec path (it replaces brainstorming's default location) and commit it on this branch. Brainstorming ends here at the approved, committed spec; the plan comes in a later instruction. When the project rules define delivery modes, decide the mode against those rules while brainstorming (take the default mode when in doubt), put its header line in the spec, and state the mode and its reason in the spec; ask the user no separate question about it. In step 2 the mode is a requirement of the review: a spec whose change does not meet the rules' criteria for its mode is a finding.

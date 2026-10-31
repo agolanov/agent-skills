@@ -39,6 +39,7 @@ Required installed skills (read these absolute SKILL.md paths):
 - Automatic cross review: <absolute auto-cross-refine SKILL.md>
 - Opposite CLI launcher: <absolute refine-with-codex or refine-with-claude SKILL.md>
 - Shared review protocol: <absolute review-fix-loop SKILL.md>
+- Reviewer launch: <absolute independent-review SKILL.md>
 
 Work:
 1. Read the Spec, every predecessor spec and every document to review completely, and read the project code they concern.
