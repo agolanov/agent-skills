@@ -81,7 +81,7 @@ def inventory(checkout):
             raise ValueError('invalid index flag record')
         flags.append({'path': b64(safe_path(item[2:])), 'flag': item[:1].decode('ascii')})
     # Git omits special files and may traverse invalid nested gitfiles. Discover
-    # nonignored leaves ourselves, pruning every literal nested .git boundary.
+    # nonignored leaves ourselves, pruning only untracked nested boundaries.
     root_fd = os.open(checkout, os.O_RDONLY | os.O_DIRECTORY)
     try:
         others = discover_untracked(checkout, root_fd, {unb64(e['path']) for e in entries},
@@ -125,10 +125,10 @@ def discover_untracked(checkout, root_fd, tracked, gitlinks):
                     except FileNotFoundError:
                         walk(child, path+b'/')
                     else:
+                        if path not in tracked:
+                            found.add(path)  # Preserve literal metadata too.
                         if path in tracked_dirs:
                             walk(child, path+b'/')
-                        elif path not in tracked:
-                            found.add(path)
                 finally:
                     os.close(child)
             elif path not in tracked:
