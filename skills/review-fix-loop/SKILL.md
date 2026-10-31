@@ -42,7 +42,7 @@ In scoped rounds, defects noticed outside the fix commit are outside-round candi
 
 ## 4. Validate and decide
 
-Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>` or `checkout changed`, with its `result.md`; copy those facts into the round's "Result validity/completion" field.
+Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>` or `checkout changed`, with its `result.md`; copy those facts into the round's "Result validity/completion" field. A result not obtained from independent-review on a recorded commit, such as a review taken on uncommitted changes, is an invalid attempt of the pending round and never a completed round.
 
 Any new or changed checkout file (`checkout changed`) requires adjudication. With the unexpected work and its diff preserved and its source identified by independent-review, pause retries for implementing-session adjudication/reconciliation and affected checks within authority. Unresolved ownership/scope blocks. Do not silently incorporate a reviewer's edit in the fix commit or reset unrelated work. Outcomes:
 
