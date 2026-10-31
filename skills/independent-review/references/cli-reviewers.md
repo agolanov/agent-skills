@@ -1,6 +1,6 @@
 # CLI Reviewers
 
-Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [review prompt](review-prompt.md) and finding ledger from the caller (the loop record, or the direct-use request). 
+Use a separate CLI session for the assigned system. Start a fresh reviewer for each attempt with the filled [review prompt](review-prompt.md) and finding ledger from the caller (the loop record, or the direct-use request).
 Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the caller's review finishes or blocks.
 
 Carry the [review prompt](review-prompt.md) unchanged into the independent session; it owns the reviewer's capability and unchanged-state contract, and vendor review commands are tools inside it. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
@@ -9,7 +9,7 @@ Carry the [review prompt](review-prompt.md) unchanged into the independent sessi
 
 The Codex launch uses `codex review -` as an independent session carrying the complete review prompt through stdin. Put the target in that prompt: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
 
-Set `task_checkout`, `review_model`, `review_effort`, `round_prompt`, and `round_dir` from the caller (the loop record, or the direct-use request):
+Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request), and `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**:
 
 ```bash
 (
@@ -24,7 +24,7 @@ review_exit=$?
 
 Review mode has no `--json` or `--output-last-message` in the tested CLI. Its stdout is the report; stderr contains runtime/command evidence and its session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
 
-**Why stdin review mode:** on codex-cli 0.165.0 (2026-10-29) identical round prompts sent to `codex exec` and `codex review -` produced the same findings, verdicts and coverage, with exit 0, HEAD and porcelain unchanged and the assigned model/effort in the runtime records; in round 2 both verified the fix commit first. This is evidence for the tested version only: rerun the comparison after relevant runtime/launch changes. Raw artifacts live in ignored `tests/refine/e2e-notes.md`, not in a fresh clone.
+**Why stdin review mode:** on codex-cli 0.165.0 (2026-10-29) identical round prompts sent to `codex exec` and `codex review -` produced the same findings, verdicts and coverage, with exit 0, HEAD and porcelain unchanged and the assigned model/effort in the runtime records; in round 2 both verified the fix commit first. This is evidence for the tested version only: rerun the comparison after relevant runtime/launch changes. On codex-cli 0.166.0 (2026-10-31) review mode completed the `dual-review` real run and the three review rounds of that skill's delivery; the `exec`/`review` comparison was not rerun on that version. Raw artifacts live in ignored `tests/refine/e2e-notes.md` and `tests/dual-review/e2e-notes.md`, not in a fresh clone.
 
 ## Claude reviewer
 
