@@ -1,15 +1,15 @@
 # CLI Reviewers
 
-Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [round prompt](round-prompt.md) and finding ledger supplied by `review-fix-loop`. 
-Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the loop finishes or blocks.
+Use a separate CLI session for the assigned system. Start a fresh reviewer each round with the filled [review prompt](review-prompt.md) and finding ledger from the caller (the loop record, or the direct-use request). 
+Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the caller's review finishes or blocks.
 
-Carry the [round prompt](round-prompt.md) unchanged into the independent session; it owns the reviewer's capability and unchanged-state contract, and vendor review commands are tools inside it. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
+Carry the [review prompt](review-prompt.md) unchanged into the independent session; it owns the reviewer's capability and unchanged-state contract, and vendor review commands are tools inside it. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
 
 ## Codex reviewer
 
-The Codex launch uses `codex review -` as an independent session carrying the complete round prompt through stdin. Put the target in that prompt: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
+The Codex launch uses `codex review -` as an independent session carrying the complete review prompt through stdin. Put the target in that prompt: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
 
-Set `task_checkout`, `review_model`, `review_effort`, `round_prompt`, and `round_dir` from the loop record:
+Set `task_checkout`, `review_model`, `review_effort`, `round_prompt`, and `round_dir` from the caller (the loop record, or the direct-use request):
 
 ```bash
 (
@@ -46,7 +46,7 @@ Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 ## Result handling
 
-Read answer, coverage, runtime model/effort metadata, errors and exit status together, then apply the validation and retry rules of `review-fix-loop` step 4:
+Read answer, coverage, runtime model/effort metadata, errors and exit status together, then apply the validation rules of `independent-review` **Validate**; the caller owns the retry budget:
 
 - Verify effective settings from runtime records, not invocation flags or self-report. Codex review startup headers expose model/effort, corroborated by persisted `thread_settings_applied.thread_settings` (model/reasoning_effort); exec sessions may instead expose `turn_context` (model/effort). Claude initialization/model usage plus the matching persisted session transcript's `output_config.effort` expose the pair where supported. Unavailable evidence means unverified settings: invalidate the result.
 - A model/effort rejection, capacity error, startup/account permission failure, or missing executable is a launch failure.

@@ -1,6 +1,6 @@
 # Implementer brief
 
-Fill this template with absolute resolved paths before opening. Keep the identity labels for resume and the fixed `Status file:` line. Project rules list absolute applicable AGENTS.md/CLAUDE.md paths plus any required verbatim rules. Select one available execution skill; include the actual opposite CLI launcher and shared loop, not just the selector. Replace every placeholder, including the owned status-contract path; the child has no parent conversation or loaded skills. `Delivery mode:` carries the spec's mode, read from the first line of the spec that starts with `**Delivery mode:** `: a value of exactly `light` or `full` is carried as written, and a spec with no such line gives `full`. Any other value, `Light` or `light` with trailing spaces included, is carried as `full` and named, with the spec path and the raw value, in the final report only; the root asks no question about it and leaves the spec as it is. The root copies the value and never judges it. Copy the fenced text whole: the paragraph that starts "When Delivery mode is light" stays in every brief, whatever the mode.
+Fill this template with absolute resolved paths before opening. Keep the identity labels for resume and the fixed `Status file:` line. Project rules list absolute applicable AGENTS.md/CLAUDE.md paths plus any required verbatim rules. Select one available execution skill; include the actual opposite CLI launcher, shared loop and `independent-review`, not just the selector. Replace every placeholder, including the owned status-contract path; the child has no parent conversation or loaded skills. `Delivery mode:` carries the spec's mode, read from the first line of the spec that starts with `**Delivery mode:** `: a value of exactly `light` or `full` is carried as written, and a spec with no such line gives `full`. Any other value, `Light` or `light` with trailing spaces included, is carried as `full` and named, with the spec path and the raw value, in the final report only; the root asks no question about it and leaves the spec as it is. The root copies the value and never judges it. Copy the fenced text whole: the paragraph that starts "When Delivery mode is light" stays in every brief, whatever the mode.
 
 ```text
 Implement one reviewed plan in this checkout.
@@ -28,6 +28,7 @@ Required installed skills (read these absolute SKILL.md paths):
 - Automatic cross review: <absolute auto-cross-refine SKILL.md>
 - Opposite CLI launcher: <absolute refine-with-codex or refine-with-claude SKILL.md>
 - Shared review protocol: <absolute review-fix-loop SKILL.md>
+- Reviewer launch: <absolute independent-review SKILL.md>
 
 Execute the entire plan with the selected execution skill in this existing isolated worktree. Run all required checks and commit task changes on this branch. Every commit message ends with its own content, unsigned: no `Co-Authored-By` trailer and no "Generated with" line, even when your harness asks for one; give this rule to every subagent that commits. Keep only task implementation and review-fix commits here; delivery notes/tails belong to the root after merge.
 
