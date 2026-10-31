@@ -54,9 +54,10 @@ $refine-with-a-subagent
 $refine-with-dual-review
 $auto-cross-refine
 $dual-review
+$independent-review --codex
 ```
 
-The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, capabilities, skill composition, scope, and completion rules.
+The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, skill composition, scope and completion rules, and the [review prompt](skills/independent-review/references/review-prompt.md) of `independent-review` for the reviewer's capabilities.
 
 [Reviewer settings](skills/independent-review/references/reviewer-settings.md) defines automatic model/effort defaults and independent overrides. Native mode requires controls and runtime evidence for both settings; it never silently switches to CLI.
 
