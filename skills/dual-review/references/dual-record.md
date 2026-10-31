@@ -12,12 +12,15 @@ Fixed base: <full sha>
 Reviewed commit: <full sha>
 Target row and order: <final pass, direct use | caller's row and order>
 Requirements/rules/checks: <links or concise text>
+Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
+Targeted checks: <commands; cwd/source>
+Unavailable coverage: <None | checks/reasons>
 Assignment: codex cli, model <exact>, effort <exact>; claude cli, model <exact>, effort <exact>
 Settings evidence: <per reviewer: discovery and runtime records>
-Complete suite: `<command>`, exit <n>, commit <full sha>, run by this session (state check under Phases) <or: the caller's run | no complete suite defined>
+Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (snapshots/comparison under Phases) <or: the caller's run | no complete suite defined>
 Ledger: none <or the caller's ledger input, below>; next D: 1
 Phase: suite | review | cross-check | done | blocked: <codex|claude|codex and claude> invalid result
-Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the suite); answer pending | scratch | invalidating; resume refused: not restored, porcelain <current>>
+Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the suite); answer pending | scratch | invalidating; resume refused: monitored content not restored, comparison <path>; retained recovery baseline <path>>
 
 ## Attempts
 - codex review: spent 0 of 2
@@ -31,10 +34,8 @@ Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the s
 - voided by restart on <new sha> (spend nothing): <result.md paths with their commit>
 
 ## Phases
-- suite, this session's run: HEAD <before> -> <after>; porcelain <identical | differs: <dual dir>/suite/<diff path>>
-- review, codex attempt-1 + claude attempt-1 in parallel: HEAD <before> -> <after>; porcelain <identical | differs: <preserved diff paths>>
-- review retry, claude attempt-2 alone: HEAD <before> -> <after>; porcelain identical
-- cross-check, codex attempt-1 alone: HEAD <before> -> <after>; porcelain identical
+- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <snapshot or diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored
+- Reconciled new-commit baseline: <explicit caller target/authorization, snapshots, unexplained residual changes check | None>
 ```
 
 ## report.md
@@ -46,6 +47,7 @@ Checkout: /absolute/checkout; target <base>..<reviewed commit>; state <dual dir>
 ## Verdict
 Derived: CHANGES
 Raw (each reviewer's own, as given): codex CHANGES; claude CHANGES
+Verification: complete | incomplete: <specific required commands/cwd/exits/reasons and coverage gaps; no complete suite defined when applicable>
 
 ## Confirmed findings
 ### D1 critical (codex minor, claude critical)
@@ -72,7 +74,7 @@ Raw (each reviewer's own, as given): codex CHANGES; claude CHANGES
 - claude R2: no match; no codex finding shares its location or requirement.
 
 ## Complete suite
-`<command>` exit <n> on <full sha>, run by this session <or: no complete suite defined>
+`<ordered commands/cwd/source>` exits <n> on <full sha>, checkout <absolute>, snapshots/comparison <paths>, environment changes <None|details>, coverage limits <details>, run by this session <or: no complete suite defined>
 
 ## Codex
 - Settings and evidence: <model/effort and runtime records; result.md paths>
