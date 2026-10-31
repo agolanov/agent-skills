@@ -71,13 +71,13 @@ Use `quick_validate.py` supplied by the installed skill-creator skill to validat
 
 The ignored `tests/refine/` material is available only in a working checkout that has it. A fresh clone may lack these tools, fixtures and notes: report that behavioral coverage unavailable rather than claiming PASS or force-adding the files.
 
-When present, run the controlled reviewer process tests:
+When a spec's Verification names them, run the controlled reviewer process tests:
 
 ```sh
 python3 tests/refine/test_stub_reviewer.py
 ```
 
-Replay scenarios through fresh implementing agents on disposable copied Git checkouts, using `tests/refine/regression-checklist.md` and `tests/refine/stub-scenarios/README.md` for independent grading. Each agent applies the skill, builds actual prompts and records actions; the utility only emits scripted results. Bind the following variables to the copied case, external state/prompt and marked temporary checkout:
+When Verification names replay scenarios, run them through fresh implementing agents on disposable copied Git checkouts, using `tests/refine/regression-checklist.md` and `tests/refine/stub-scenarios/README.md` for independent grading. Each agent applies the skill, builds actual prompts and records actions; the utility only emits scripted results. Bind the following variables to the copied case, external state/prompt and marked temporary checkout:
 
 ```sh
 python3 tests/refine/tools/stub_reviewer.py \
