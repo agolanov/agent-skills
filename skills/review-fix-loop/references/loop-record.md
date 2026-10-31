@@ -31,8 +31,8 @@ Dual record: <dual dir>; raw verdicts codex <CLEAN|CHANGES>, claude <CLEAN|CHANG
 Verdict: <CLEAN|CHANGES; dual: the report's derived verdict>
 Findings/decisions:
 - F1 <severity>; <path:line>; <scenario/requirement/evidence>; <accepted | rejected: quoted requirement or test | deferred | disputed | outside-scope>; <fix/verification or both disputed positions and human question>
-- D2 <severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged>
-- C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran>
+- D2 <severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
+- C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
 Checks: <commands/results and commit>
 Pending-round retry count: <retained across reconciliation; dual: spent attempts per reviewer per call in the round's state.md>

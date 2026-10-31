@@ -14,10 +14,10 @@ Target row and order: <final pass, direct use | caller's row and order>
 Requirements/rules/checks: <links or concise text>
 Assignment: codex cli, model <exact>, effort <exact>; claude cli, model <exact>, effort <exact>
 Settings evidence: <per reviewer: discovery and runtime records>
-Complete suite: `<command>`, exit <n>, commit <full sha> <or: no complete suite defined>
+Complete suite: `<command>`, exit <n>, commit <full sha>, run by this session (state check under Phases) <or: the caller's run | no complete suite defined>
 Ledger: none <or the caller's ledger input, below>; next D: 1
-Phase: review | cross-check | done | blocked: <codex|claude|codex and claude> invalid result
-Interrupted: none <or: checkout changed after <phase> (<reviewers in it>); answer pending | scratch | invalidating; resume refused: not restored, porcelain <current>>
+Phase: suite | review | cross-check | done | blocked: <codex|claude|codex and claude> invalid result
+Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the suite); answer pending | scratch | invalidating; resume refused: not restored, porcelain <current>>
 
 ## Attempts
 - codex review: spent 0 of 2
@@ -31,6 +31,7 @@ Interrupted: none <or: checkout changed after <phase> (<reviewers in it>); answe
 - voided by restart on <new sha> (spend nothing): <result.md paths with their commit>
 
 ## Phases
+- suite, this session's run: HEAD <before> -> <after>; porcelain <identical | differs: <dual dir>/suite/<diff path>>
 - review, codex attempt-1 + claude attempt-1 in parallel: HEAD <before> -> <after>; porcelain <identical | differs: <preserved diff paths>>
 - review retry, claude attempt-2 alone: HEAD <before> -> <after>; porcelain identical
 - cross-check, codex attempt-1 alone: HEAD <before> -> <after>; porcelain identical
@@ -92,4 +93,5 @@ A caller such as `review-fix-loop` passes its full finding ledger and `Next D` (
 Next D: 3
 - D1 critical (codex minor, claude critical); module.py:5; raised by codex F1, claude R1; scenario <as stated>; requirement <as stated>; evidence <as stated>; accepted; fixed in <fix commit>
 - D2; module.py:2; raised by claude R2; scenario <as stated>; requirement <as stated>; evidence <as stated>; rejected by cross-check: codex, <verifier evidence>; re-raised with <re-raised evidence>; rejected by cross-check again: codex, <verifier evidence>
+- C1 (outside-round): <finding and evidence>; raised by claude R3; carried from round 2
 ```
