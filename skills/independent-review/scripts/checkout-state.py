@@ -44,6 +44,8 @@ def git_bytes(checkout, *args, input=None, allowed_codes=(0,)):
         _LOCAL_ENV = set(result.stdout.decode('ascii').splitlines())
     env = {k: v for k, v in os.environ.items()
            if k not in _LOCAL_ENV and not k.startswith(('GIT_CONFIG_', 'GIT_DIR', 'GIT_WORK_TREE'))}
+    for name in ('GIT_LITERAL_PATHSPECS', 'GIT_GLOB_PATHSPECS', 'GIT_NOGLOB_PATHSPECS', 'GIT_ICASE_PATHSPECS'):
+        env.pop(name, None)
     env['GIT_OPTIONAL_LOCKS'] = '0'
     result = subprocess.run([b'git', b'-C', checkout, *[os.fsencode(x) for x in args]],
                             env=env, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -82,7 +84,8 @@ def inventory(checkout):
     # nonignored leaves ourselves, pruning every literal nested .git boundary.
     root_fd = os.open(checkout, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        others = discover_untracked(checkout, root_fd, {unb64(e['path']) for e in entries})
+        others = discover_untracked(checkout, root_fd, {unb64(e['path']) for e in entries},
+                                    {unb64(e['path']) for e in entries if e['mode'] == '160000'})
     finally:
         os.close(root_fd)
     status = git_bytes(checkout, 'status', '--porcelain=v1', '-z', '--untracked-files=all')
@@ -97,14 +100,20 @@ def inventory(checkout):
             'untracked': [b64(p) for p in others], 'status': b64(status)}
 
 
-def discover_untracked(checkout, root_fd, tracked):
+def discover_untracked(checkout, root_fd, tracked, gitlinks):
     found = set()
+    tracked_dirs = {b'/'.join(path.split(b'/')[:i]) for path in tracked
+                    for i in range(1, len(path.split(b'/')))}
     def walk(fd, prefix):
         names = sorted(os.fsencode(n) for n in os.listdir(fd) if os.fsencode(n) != b'.git')
         paths = [prefix + n for n in names]
-        ignored = set(nul_items(git_bytes(checkout, 'check-ignore', '--stdin', '-z',
-                            input=b''.join(p+b'\0' for p in paths), allowed_codes=(0, 1)))) if paths else set()
+        # check-ignore rejects literal-pathspec mode. A ./ prefix prevents a
+        # leading :(...) filename being parsed as magic; its output keeps ./ .
+        ignored = {p[2:] for p in nul_items(git_bytes(checkout, 'check-ignore', '--stdin', '-z',
+                            input=b''.join(b'./'+p+b'\0' for p in paths), allowed_codes=(0, 1)))} if paths else set()
         for name, path in zip(names, paths):
+            if path in gitlinks:
+                continue  # Initialization/content is owned by submodule_record.
             if path in ignored and path not in tracked:
                 continue
             info = os.stat(name, dir_fd=fd, follow_symlinks=False)
@@ -116,7 +125,9 @@ def discover_untracked(checkout, root_fd, tracked):
                     except FileNotFoundError:
                         walk(child, path+b'/')
                     else:
-                        if path not in tracked:
+                        if path in tracked_dirs:
+                            walk(child, path+b'/')
+                        elif path not in tracked:
                             found.add(path)
                 finally:
                     os.close(child)
