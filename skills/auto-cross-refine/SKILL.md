@@ -14,6 +14,6 @@ Choose the reviewer system, then delegate to its launcher. The launcher supplies
    | Codex | Claude | [refine-with-claude](../refine-with-claude/SKILL.md) |
    | Claude Code | Codex | [refine-with-codex](../refine-with-codex/SKILL.md) |
 
-2. Unknown host without an explicit reviewer, conflicting CLI selectors, or a subagent selector requires clarification. Announce the chosen system and any explicit override of opposite-system selection.
+2. Unknown host without an explicit reviewer, conflicting CLI selectors, a subagent selector, or a `--dual` selector requires clarification. Announce the chosen system and any explicit override of opposite-system selection.
 3. Locate and read the selected launcher through its sibling path or installed skill catalog. If unavailable, report the missing dependency and stop before review or fixes. Tell the user that the complete refinement bundle is required; do not install it as part of this cycle. Preserve an unavailable selected system rather than substitute the parent's CLI.
 4. Forward all task/worktree context, explicit model/effort, limits, and permissions unchanged to that launcher. It forwards the assignment to review-fix-loop's **Launch assigned reviewer** section and executes the shared protocol. This skill adds no separate review loop, fixes, or integration authority.

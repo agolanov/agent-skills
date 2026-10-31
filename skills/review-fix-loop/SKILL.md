@@ -19,13 +19,15 @@ Resolve the absolute task checkout (including a worktree used by the implementat
 
 Read [independent-review](../independent-review/SKILL.md), using the installed catalog if its sibling is unavailable. Missing dependency: report that the complete bundle is required and stop before review/fixes; do not install or invent the protocol. Require the assignment per its **Assignment** section.
 
+The assignment `dual` (`--dual` or equivalent prose) has Codex CLI and Claude CLI review every round through [dual-review](../dual-review/SKILL.md): read it too, located the same way with the same missing-dependency stop, and resolve both reviewers' settings by its step 1. A `--codex`, `--claude`, `--subagent` or `--reviewer` selector beside it conflicts: ask which assignment applies.
+
 Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise five completed rounds.
 
 ## 2. Commit the reviewed state
 
 Invoking review-fix-loop or a launcher explicitly requests a task-state commit and one fix commit per round on the task branch, satisfying "commit only when asked" rules. Before the first commit, stop on detached HEAD or the default branch (`main`/`master` or configured default) and ask for branch/commit confirmation unless already authorized in the request. This authority covers exactly those commits on the task branch; anything else (push, merge, rebase, amend, squash, deploy, worktree creation, installation, persistent configuration changes) needs its own authorization.
 
-Record the pre-loop HEAD for the user's squash command. Commit task-owned staged/unstaged and untracked changes as `review-fix-loop: task state before review` if present. Select exact task paths and commit only them; an ordinary commit of the whole index could absorb unrelated staged work. Preserve unrelated index/worktree changes and record their exclusions and existing status. After each fix batch, run affected checks and make exactly one commit naming the round and finding IDs. Run the complete suite before creating any commit that may become the final reviewed HEAD; when its role is unknown, assume it may. The final-pass reviewer runs the suite again independently. Every review targets a recorded commit; keep it stable during review.
+Record the pre-loop HEAD for the user's squash command. Commit task-owned staged/unstaged and untracked changes as `review-fix-loop: task state before review` if present. Select exact task paths and commit only them; an ordinary commit of the whole index could absorb unrelated staged work. Preserve unrelated index/worktree changes and record their exclusions and existing status. After each fix batch, run affected checks and make exactly one commit naming the round and finding IDs. Run the complete suite before creating any commit that may become the final reviewed HEAD; when its role is unknown, assume it may. The final-pass reviewer runs the suite again independently. In a dual assignment the loop's own run replaces the reviewers' in every round, final pass included: pass `dual-review` the complete-suite run on the reviewed commit, running the suite there first when the loop has none on that commit. Every review targets a recorded commit; keep it stable during review.
 
 ## 3. Request independent review
 
@@ -40,6 +42,8 @@ Obtain each attempt from independent-review with the round's target row and orde
 
 In scoped rounds, defects noticed outside the fix commit are outside-round candidates: without widening this review, record them for the final pass if it is still pending. After that sole pass has run, adjudicate new candidates immediately by evidence; accepted task defects get a fix commit and scoped verification within the remaining limit, other candidates get a recorded disposition. Pre-existing outside-task problems stay separate and never block.
 
+In a dual assignment each review in the table, final pass and disposition rounds included, is one `dual-review` call, and that call is one round whatever reviewer and cross-check calls it makes. Pass it both recorded settings, the round's target row and order, the ledger with its `Next D` per the [loop record](references/loop-record.md), the step 2 suite run and a fresh round directory beside the loop record as `<dual dir>`.
+
 ## 4. Validate and decide
 
 Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>` or `checkout changed`, with its `result.md`; copy those facts into the round's "Result validity/completion" field. A result not obtained from independent-review on a recorded commit, such as a review taken on uncommitted changes, is an invalid attempt of the pending round and never a completed round.
@@ -50,6 +54,12 @@ Any new or changed checkout file (`checkout changed`) requires adjudication. Wit
 - A demonstrably unrelated scratch write with required state and coverage intact is recorded without spending a retry.
 - Any other invalid attempt spends the shared budget: initial attempt plus one retry per pending round, same assignment; reconciliation or new commits do not reset it. A second invalid attempt blocks.
 
+In a dual assignment the round's result is the `dual-review` return instead: it validates and retries each reviewer's attempts under its **Budget**, which replaces the loop's per-round budget, and the loop adds no retry of its own. Record the return and its `state.md` facts in the round.
+
+- `<dual dir>/report.md` completes the round. Its derived verdict is the round's verdict wherever steps 4 and 5 read one, the `clean` and `clean except disputed` conditions included, whatever either reviewer's raw verdict; record and report both raw verdicts beside it as given, never relabelled. dual-review has already cross-checked every finding only one reviewer raised: adjudicate the report's confirmed findings below, take its cross-check results as given, and handle its `Candidates` by step 3 and **Outside-scope**, a verifier's noticed-not-verified item as an outside-round candidate.
+- `checkout changed: <state.md>`: adjudicate and reconcile as above, restoring the checkout, then resume with `dual-review --resume <state.md> --write scratch` for the demonstrably unrelated scratch write, otherwise `--write invalidating`; when reconciliation committed, add the round's target row bound to the new HEAD.
+- `blocked: <codex|claude|codex and claude> invalid result` blocks the round.
+
 Adjudicate every finding in the [record](references/loop-record.md):
 
 - **Accepted:** a critical/important defect or spec-compliance gap requires a fix. A runnable reproduction that demonstrates a violated requirement is accepted after verification, regardless of opinion.
@@ -57,6 +67,7 @@ Adjudicate every finding in the [record](references/loop-record.md):
 - **Deferred:** minor/style findings are fixed cheaply alongside defects or listed for the user. They never start a fix round alone and are not open blocking defects.
 - **Disputed:** after a recorded rejection with basis, a reviewer re-raises the same scenario/violated requirement without new evidence. A moved line alone preserves identity; new evidence instead requires fresh evaluation. Record both positions and the fix-or-dismiss question for the user, continue other work and spend no further rounds on that finding.
 - **Outside-scope:** record pre-existing/outside-task candidates once for the final report; outside-round candidates follow step 3.
+- **Rejected by cross-check:** in a dual assignment, each finding in the report's `Rejected by cross-check` section, a `repeat` included, is recorded `rejected by cross-check: <verifier evidence>` with its raiser and source ID, and is closed: not fixed, not `disputed`, never blocking `clean`. A later report decides its next state: a repeat changes nothing, a renewed rejection records the new verifier evidence, and a confirmation brings it under the rules above.
 
 ## 5. Fix, repeat and finish
 
@@ -74,4 +85,4 @@ Report:
 - `clean except disputed`: the same coverage, final-pass, commit and check conditions, plus disputed findings with both positions and the fix-or-dismiss question. A substantive final/scoped/disposition `CHANGES` may close in this status when its only remaining blocking claims are evidence-free repeats now adjudicated `disputed`, every other finding is resolved/deferred/outside-scope, and no further required review remains. Preserve the raw `CHANGES` verdict and explain this disposition-based closure; never relabel the reviewer result CLEAN. Deferred minors alone do not qualify for this exception.
 - `blocked: <reason>`: exhausted invalid attempts or round limit, failed required checks, missing dependencies, unresolved edit ownership, or unmet completion requirements.
 
-Later task edits invalidate the reviewed result. Report rounds/targets/commits, assignment/evidence, checks, all decisions, deferred/disputed findings and outside-scope candidates. Print the user's squash command without executing it; leave round history unsquashed. With no excluded staged work: `git reset --soft <pre-loop HEAD> && git commit`. If unrelated staged changes remain, print `git reset --soft <pre-loop HEAD> && git commit --only -- <exact task paths>` instead, binding and quoting the task paths so the commit preserves excluded staging.
+Later task edits invalidate the reviewed result. Report rounds/targets/commits, assignment/evidence, checks, all decisions, deferred/disputed findings and outside-scope candidates. In a dual assignment also report the findings rejected by cross-check in their own section, each with both positions. Print the user's squash command without executing it; leave round history unsquashed. With no excluded staged work: `git reset --soft <pre-loop HEAD> && git commit`. If unrelated staged changes remain, print `git reset --soft <pre-loop HEAD> && git commit --only -- <exact task paths>` instead, binding and quoting the task paths so the commit preserves excluded staging.
