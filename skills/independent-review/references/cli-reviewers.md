@@ -9,14 +9,15 @@ Carry the [review prompt](review-prompt.md) unchanged into the independent sessi
 
 The Codex launch uses `codex review -` as an independent session carrying the complete review prompt through stdin. Put the target in that prompt: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
 
-Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request), and `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**:
+Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request; a field may be `cli-default`), and `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**:
 
 ```bash
+settings=()
+[ "$review_model" = cli-default ] || settings+=(-c "model=\"$review_model\"")
+[ "$review_effort" = cli-default ] || settings+=(-c "model_reasoning_effort=\"$review_effort\"")
 (
   cd "$task_checkout" || exit
-  codex review \
-    -c "model=\"$review_model\"" \
-    -c "model_reasoning_effort=\"$review_effort\"" - \
+  codex review "${settings[@]}" - \
     < "$round_prompt" > "$round_dir/answer.md" 2> "$round_dir/stderr.log"
 )
 review_exit=$?
@@ -31,9 +32,12 @@ Review mode has no `--json` or `--output-last-message` in the tested CLI. Its st
 Use a subshell so the implementing session keeps its working directory:
 
 ```bash
+settings=()
+[ "$review_model" = cli-default ] || settings+=(--model "$review_model")
+[ "$review_effort" = cli-default ] || settings+=(--effort "$review_effort")
 (
   cd "$task_checkout" || exit
-  claude --print --model "$review_model" --effort "$review_effort" \
+  claude --print "${settings[@]}" \
     --output-format stream-json --verbose \
     < "$round_prompt" > "$round_dir/events.jsonl" 2> "$round_dir/stderr.log"
 )
@@ -48,10 +52,10 @@ Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 Read answer, coverage, runtime model/effort metadata, errors and exit status together, then apply the validation rules of `independent-review` **Validate**; the caller owns the retry budget:
 
-- Verify effective settings from runtime records, not invocation flags or self-report. Codex review startup headers expose model/effort, corroborated by persisted `thread_settings_applied.thread_settings` (model/reasoning_effort); exec sessions may instead expose `turn_context` (model/effort). Claude initialization/model usage plus the matching persisted session transcript's `output_config.effort` expose the pair where supported. Unavailable evidence means unverified settings: invalidate the result.
+- Verify effective settings from runtime records, not invocation flags or self-report. Codex review startup headers expose model/effort, corroborated by persisted `thread_settings_applied.thread_settings` (model/reasoning_effort); exec sessions may instead expose `turn_context` (model/effort). Claude initialization/model usage plus the matching persisted session transcript's `output_config.effort` expose the pair where supported. Unavailable evidence means unverified settings: invalidate the result. Verify only the fields not opted out; for an opted-out field record the observed value, or `unavailable`.
 - A model/effort rejection, capacity error, startup/account permission failure, or missing executable is a launch failure.
 - A denied tool call inside an otherwise running session is a coverage limitation, not automatically a failed launch: require disclosure and judge whether required review coverage and checks were completed.
 
-With a CLI-defaults opt-out ([reviewer settings](reviewer-settings.md)), omit the model and effort overrides; otherwise pass both resolved settings explicitly.
+With a [CLI-defaults opt-out](launch-settings.md#cli-defaults-opt-out) for a field, omit that field's override and pass the other; otherwise pass both resolved settings explicitly.
 
 Sources for command semantics: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [Claude Code CLI](https://code.claude.com/docs/en/cli-reference). Installed help takes precedence for version-specific flags.

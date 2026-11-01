@@ -17,7 +17,7 @@ Read [checkout state and suite evidence](../independent-review/references/checko
 
 `dual-review [--codex-model M] [--codex-effort E] [--claude-model M] [--claude-effort E] [--effort E] [<range|commit>]`
 
-The assignments are `cli/codex` and `cli/claude`. `--effort` sets both efforts unless a per-reviewer flag sets that reviewer's; a `--model` without a reviewer prefix asks which reviewer it is for; equivalent prose counts as the flag. Everything else follows independent-review's [reviewer settings](../independent-review/references/reviewer-settings.md) per reviewer; announce and record both resolved assignments.
+The assignments are `cli/codex` and `cli/claude`. `--effort` sets both efforts unless a per-reviewer flag sets that reviewer's; a `--model` without a reviewer prefix asks which reviewer it is for; equivalent prose counts as the flag. Everything else follows independent-review's [launch settings](../independent-review/references/launch-settings.md) for the reviewer role per reviewer; the cross-check phase uses each reviewer's same recorded settings; announce and record both resolved assignments.
 
 Direct use takes the target, the nonexecuting preflight/uncommitted-change stop and the requirement sources from independent-review **Direct use**; run that preflight before the suite and any launch, including on its no-changes branch. It reviews with the final-pass row (complete target, security-focused review), prior findings `None`, and numbers from `D1`.
 

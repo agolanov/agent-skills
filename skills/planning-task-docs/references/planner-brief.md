@@ -1,6 +1,6 @@
 # Planner brief
 
-Fill this template with absolute resolved paths and write it to `<runtime>/plan-<slug>-brief.md`; the status is `<runtime>/plan-<slug>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:` and `Base SHA:` literally. Keep exactly one of the `Task text:`, `Brief:`, `Spec:` and `Follow-ups file:` lines: the task text verbatim, or the input file's absolute path. Drop the `Brainstorming:` line for a spec input. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/plan-<slug>-brief.md`; the status is `<runtime>/plan-<slug>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Base SHA:` and `Launch settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. Keep exactly one of the `Task text:`, `Brief:`, `Spec:` and `Follow-ups file:` lines: the task text verbatim, or the input file's absolute path. Drop the `Brainstorming:` line for a spec input. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Write one task's spec and plan with superpowers, working in this checkout.
@@ -9,6 +9,7 @@ Checkout: <absolute project checkout>
 Docs repository: <absolute top level of the docs repository; the project checkout itself when the documents are tracked by it>
 Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
+Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Window name: plan-<slug>
 Task text: <the task text, verbatim>
 Brief: <absolute brief path>
