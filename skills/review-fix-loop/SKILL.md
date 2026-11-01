@@ -9,7 +9,7 @@ The implementing session owns decisions, fixes and the loop. An independent revi
 
 ## Skill composition
 
-Keep normal skill discovery and automatic invocation active in both sessions; read and apply matching skills at each stage. Compose their methods and style with review-fix-loop's role, scope, verdict, finding evidence, prior dispositions, coverage and checks.
+Keep normal skill discovery and automatic invocation active in both sessions; read and apply matching skills at each stage. Compose their methods with review-fix-loop's role, scope, verdict, finding evidence, prior dispositions, coverage and checks. Skills that set output style or compress text (for example caveman-review or caveman) never change the format, length or completeness of a report or record this loop or its review prompts require; the required format wins.
 
 ## 1. Establish scope and reviewer
 
