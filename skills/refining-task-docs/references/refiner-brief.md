@@ -1,6 +1,6 @@
 # Refiner brief
 
-Fill this template with absolute resolved paths and write it to `<runtime>/refine-<stem>-brief.md`; the status is `<runtime>/refine-<stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Documents to review:` and `Base SHA:` literally. `Documents to review:` lists every stale document and `Context documents:` every fresh one, absolute paths separated by `, `; omit `Context documents:` when there are none, never write `None` on it. `Review mark rules:` is the absolute path of this skill's installed `references/review-mark.md`. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/refine-<stem>-brief.md`; the status is `<runtime>/refine-<stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Documents to review:`, `Base SHA:`, `Launch settings:` and `Reviewer settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. `<absolute launch-settings.md>` is the installed independent-review `references/launch-settings.md`. `Documents to review:` lists every stale document and `Context documents:` every fresh one, absolute paths separated by `, `; omit `Context documents:` when there are none, never write `None` on it. `Review mark rules:` is the absolute path of this skill's installed `references/review-mark.md`. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Cross-review one task's documents and mark them, working in this checkout.
@@ -9,6 +9,8 @@ Checkout: <absolute project checkout> (read the code here)
 Docs repository: <absolute top level of the repository holding the documents> (commit the documents here)
 Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
+Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
+Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 Window name: refine-<stem>
 Documents to review: <absolute document path>[, <absolute document path>]
 Context documents: <absolute document path>[, <absolute document path>]
@@ -27,7 +29,7 @@ Required installed skills (read these absolute SKILL.md paths):
 
 Work:
 1. Read every document to review, every context document and the Review mark rules completely, and read the project code the documents concern.
-2. Invoke auto-cross-refine over the documents to review and run it until it ends clean or clean except disputed. Do not squash. A plan is checked against its spec like any requirement of the spec, including the spec's Verification section; a spec's Verification section is reviewed for proportion in both directions: a check the change's risks do not need is a finding, and so is a risk no check covers. Context documents are already reviewed: read them for context and edit one only to fix a finding.
+2. Invoke auto-cross-refine over the documents to review and run it until it ends clean or clean except disputed. Do not squash. A plan is checked against its spec like any requirement of the spec, including the spec's Verification section; a spec's Verification section is reviewed for proportion in both directions: a check the change's risks do not need is a finding, and so is a risk no check covers. Context documents are already reviewed: read them for context and edit one only to fix a finding. Pass the Reviewer settings' explicit values to auto-cross-refine as explicit model/effort; with `reviewer policy` pass none. Launch settings govern only this session; subagents you start follow the skill and host that start them (see `<absolute launch-settings.md>`, section Nested agents).
 3. After the review ends clean or clean except disputed, apply the Marking procedure of the Review mark rules to every document to review and every context document you changed, committing in the docs repository. Run its freshness check on each marked document.
 4. Write the status file (below) with STATUS: done, then stay in this window; the root closes it.
 
