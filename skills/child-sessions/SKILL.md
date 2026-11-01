@@ -1,6 +1,6 @@
 ---
 name: child-sessions
-description: Runs Claude Code or Codex in a visible terminal window (herdr tab or tmux) from a brief file and waits for its status file. Use when a task must run in a separate agent session the user can watch, or when another skill needs to open, answer, or close such a session.
+description: Runs Claude Code or Codex in a visible terminal window (herdr tab or pane, or tmux) from a brief file and waits for its status file. Use when a task must run in a separate agent session the user can watch, or when another skill needs to open, answer, or close such a session.
 ---
 
 # Child Sessions
@@ -25,7 +25,7 @@ Before opening, read [brief-writing.md](references/brief-writing.md) and [status
 
 `checkout` and `brief` are absolute paths. Quote every path, including paths containing spaces or `$`. Optional `--model M` and `--effort E` pass through to the CLI; omission keeps CLI defaults. The script defaults to Claude unless `CHILD_SESSION_AGENT` is set. The caller chooses the agent.
 
-Herdr is selected when `HERDR_ENV=1`; otherwise tmux is used. Herdr opens a tab by default; `--split right|down` opens a pane and requires herdr. In tmux, attach to the named tmux session if the best-effort Windows Terminal tab does not appear.
+Herdr is selected when `HERDR_ENV=1`; otherwise tmux is used. Herdr opens a tab by default. `--split right|down` asks for a pane beside the opener's pane (`HERDR_PANE_ID`), opened without moving focus; the calling skill decides which children ask for one. The pane opens only when the opener's pane is alone in its tab; otherwise the child opens as a tab, and under tmux as a tmux window, with a one-line note on stderr that the caller passes on to the user. A `HERDR_PANE_ID` not found in the workspace stops `open` (exit 2), and the stale-ID paragraph below applies. In tmux, attach to the named tmux session if the best-effort Windows Terminal tab does not appear.
 
 If herdr reports workspace/pane not found, validate this session's live workspace and pane using the herdr CLI before retrying: inherited IDs may be stale. Match this session's identity and checkout; never guess or select the user's focused pane as a substitute. Stop if ownership is ambiguous.
 
@@ -91,6 +91,6 @@ Close the stale named window with `close "$name"` if it still exists, then `open
 | `CHILD_SESSION_CLAUDE_ARGS` | Replace Claude's default `--permission-mode bypassPermissions`. |
 | `CHILD_SESSION_CODEX_ARGS` | Replace Codex's default `--dangerously-bypass-approvals-and-sandbox`. |
 | `XDG_RUNTIME_DIR` | Runtime parent directory; fallback `/tmp`. |
-| `HERDR_ENV`, `HERDR_WORKSPACE_ID`, `HERDR_PANE_ID` | Herdr detection/workspace and source pane for splits. |
+| `HERDR_ENV`, `HERDR_WORKSPACE_ID`, `HERDR_PANE_ID` | Herdr detection/workspace; `HERDR_PANE_ID` is the source pane for `--split`. |
 
 Argument overrides are whitespace-separated words without shell evaluation. Children have parent session metadata matching `^(CLAUDE|CODEX_COMPANION_|CODEX_)` stripped; the configuration variables `CLAUDE_CONFIG_DIR` and `CODEX_HOME` are preserved.
