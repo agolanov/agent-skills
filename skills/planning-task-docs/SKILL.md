@@ -17,8 +17,8 @@ One task per run. The child writes the documents with superpowers `brainstorming
 The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Resolve the input; read a given file completely. Classify it by the first rule that matches; every stop happens before any window:
 
 1. **Follow-ups file**: a file whose name ends `-follow-ups.md`, or `-tails.md` (the older format of the same file). Each line starting with `- ` is one finding. With none, report "nothing to plan" and stop.
-2. **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`). Refuse: "already planned; review it with `reviewing-task-docs` or execute it with `executing-task-docs`".
-3. **Spec**: named `*-design.md` or lying in a `specs/` directory. Find its plans in the sibling `plans/` directory, with no question: the naming pair (`specs/YYYY-MM-DD-<slug>-design.md` with `plans/YYYY-MM-DD-<slug>.md`), and every plan whose `**Spec:**` header (path relative to the project checkout) names this spec. Any found: report "already planned", naming each plan, with the same pointer to `reviewing-task-docs` or `executing-task-docs`, and stop. None: the child writes the plan only.
+2. **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`). Refuse: "already planned; review it with `refining-task-docs` or execute it with `executing-task-docs`".
+3. **Spec**: named `*-design.md` or lying in a `specs/` directory. Find its plans in the sibling `plans/` directory, with no question: the naming pair (`specs/YYYY-MM-DD-<slug>-design.md` with `plans/YYYY-MM-DD-<slug>.md`), and every plan whose `**Spec:**` header (path relative to the project checkout) names this spec. Any found: report "already planned", naming each plan, with the same pointer to `refining-task-docs` or `executing-task-docs`, and stop. None: the child writes the plan only.
 4. **Brief**: any other existing file.
 5. **Task text**: a quoted text that is not an existing path.
 
@@ -58,4 +58,4 @@ A mismatch goes back to the child once: archive the status to `<file>-rejected-<
 
 ## Report
 
-Report the spec and plan paths, the repository and commits that hold them, and every Out of scope line. After a verified `done`, `close plan-<slug>`; otherwise the window and status stay for the user. Nothing is merged, reviewed or executed here: review is `reviewing-task-docs`, execution `executing-task-docs`.
+Report the spec and plan paths, the repository and commits that hold them, and every Out of scope line. After a verified `done`, `close plan-<slug>`; otherwise the window and status stay for the user. Nothing is merged, reviewed or executed here: review is `refining-task-docs`, execution `executing-task-docs`.
