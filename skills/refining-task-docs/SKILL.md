@@ -51,13 +51,13 @@ Fill [refiner-brief.md](references/refiner-brief.md) with absolute resolved path
 On `done`, all of these must hold:
 
 1. Full status format with `## Artifacts`; BRANCH, CHECKOUT and HEAD name the docs repository's current branch, top level and full HEAD.
-2. Commits lists the child's own commits in the docs repository: each is in `<base-sha>..HEAD` and changes only Artifacts paths (`git show --name-only --format= --no-renames <sha>`, relative to the docs repository). Every other commit of that range is the user's parallel work and changes neither an Artifacts path nor a document to review; one that does stops Verify and goes to the user, naming the commit, never back to the child. A project checkout that is another repository may move freely.
+2. Commits lists the child's own commits in the docs repository: each is in `<base-sha>..HEAD` and changes only Artifacts paths (`git show --name-only --format= --no-renames <sha>`, relative to the docs repository). Every other commit of that range is the user's parallel work and changes neither an Artifacts path nor any document of the run, context documents included; one that does stops Verify and goes to the user, naming the commit, never back to the child. A project checkout that is another repository may move freely.
 3. A fresh own-paths gate on the docs repository over the Artifacts paths and the documents to review passes: no document of the run is left uncommitted.
 4. Review gives final refine mode `CLEAN` or `CLEAN EXCEPT DISPUTED`, with the raw reviewer verdict reported separately; dispute-only closure can keep raw `CHANGES`, never relabelled CLEAN.
 5. Every document to review is under Artifacts, and every Artifacts path lies in the docs repository and passes the freshness check of review-mark.md, run by the root.
 6. The final [child settings check](../independent-review/references/launch-settings.md#child-settings-check) over every opening's record matches, or the user accepted its result.
 
-A settings mismatch or `settings unverified: <reason>` never goes back to the child: show expected and observed values and the record paths, and ask the user to accept the result with the observed settings or stop with everything preserved. A user commit changing an owned document goes to the user per Verify 2. Any other mismatch goes back to the child once: archive the status to `<file>-rejected-<n>`, `send` one line naming the mismatch and asking for a fresh report at the same path, wait and verify again. A repeated mismatch goes to the user, with window and status kept.
+A settings mismatch or `settings unverified: <reason>` never goes back to the child: show expected and observed values and the record paths, and ask the user to accept the result with the observed settings or stop with everything preserved. A user commit changing a document of the run goes to the user per Verify 2. Any other mismatch goes back to the child once: archive the status to `<file>-rejected-<n>`, `send` one line naming the mismatch and asking for a fresh report at the same path, wait and verify again. A repeated mismatch goes to the user, with window and status kept.
 
 ## Report
 
