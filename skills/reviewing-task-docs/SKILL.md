@@ -5,7 +5,7 @@ description: Cross-reviews one task's spec and plan in a visible child agent ses
 
 # Reviewing Task Docs
 
-
+For every checkout cleanliness or changed-path gate below and in child briefs/references, use [checkout-state Direct-use preflight](../independent-review/references/checkout-state.md#direct-use-preflight). Resolve its installed helper, retain fresh evidence, and require `uncommitted: false` for clean. Unavailable verification stops the dependent action; raw status/diff is not a fallback. Path allowlists use the result's decoded exact `paths`. This applies separately to project, docs and child checkouts. Every read-only Git verification below and in references/child briefs (log, refs, roots, ancestry and diffs included) uses that reference's `git-read` command; displayed `git <read-command>` notation means this wrapper, never a raw invocation. Resolve paths relative to the containing checkout root. Mutating commands keep their explicit authorization.
 
 
 `reviewing-task-docs <spec|plan> [<plan|spec>] [--agent claude|codex] [--model M] [--effort E]`
@@ -14,7 +14,7 @@ One task per run. The child owns the review, its fixes and the review marks, and
 
 ## Input
 
-1. Resolve the project checkout (top level of the current repository) and applicable project rules. Resolve each given path to an absolute path, read it completely and recognise it:
+1. The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Resolve applicable project rules. Resolve each given path to an absolute path, read it completely and recognise it:
    - **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`) and is not a `*-follow-ups.md` or `*-tails.md` file.
    - **Spec**: named `*-design.md` or lying in a `specs/` directory.
 

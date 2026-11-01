@@ -5,7 +5,7 @@ description: Turns one task (a task text, a brief, a spec without a plan, or a f
 
 # Planning Task Docs
 
-
+For every checkout cleanliness or changed-path gate below and in child briefs/references, use [checkout-state Direct-use preflight](../independent-review/references/checkout-state.md#direct-use-preflight). Resolve its installed helper, retain fresh evidence, and require `uncommitted: false` for clean. Unavailable verification stops the dependent action; raw status/diff is not a fallback. Path allowlists use the result's decoded exact `paths`. This applies separately to project, docs and child checkouts. Every read-only Git verification below and in references/child briefs (log, refs, roots, ancestry and diffs included) uses that reference's `git-read` command; displayed `git <read-command>` notation means this wrapper, never a raw invocation. Resolve paths relative to the containing checkout root. Mutating commands keep their explicit authorization.
 
 
 `planning-task-docs <"task text"|brief|spec|follow-ups file> [--agent claude|codex] [--model M] [--effort E]`
@@ -14,7 +14,7 @@ One task per run. The child writes the documents with superpowers `brainstorming
 
 ## Input
 
-Resolve the project checkout (top level of the current repository) and the input; read a given file completely. Classify it by the first rule that matches; every stop happens before any window:
+The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Resolve the input; read a given file completely. Classify it by the first rule that matches; every stop happens before any window:
 
 1. **Follow-ups file**: a file whose name ends `-follow-ups.md`, or `-tails.md` (the older format of the same file). Each line starting with `- ` is one finding. With none, report "nothing to plan" and stop.
 2. **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`). Refuse: "already planned; review it with `reviewing-task-docs` or execute it with `executing-task-docs`".
