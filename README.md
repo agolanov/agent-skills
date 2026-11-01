@@ -13,7 +13,7 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
 | `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan, or a follow-ups file) into a superpowers spec and plan in a child session. |
 | `reviewing-task-docs` | Cross-review one task's spec and plan in a child session and mark the documents that pass with a `Review:` line. |
-| `deliver-queue` | Deliver a queue of reviewed plans through `delivering-task`, in parallel up to a limit, merging in order of readiness. |
+| `delivering-task-queue` | Deliver several task documents, a list or a directory, through `delivering-task`, ordered by their `**Depends on:**` headers, in parallel up to a limit. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
 | `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
 | `dual-review` | Codex and Claude review in parallel; findings only one raised are cross-checked; one severity-ranked list of confirmed findings, without fixes. |
@@ -37,7 +37,7 @@ Install a single skill:
 npx skills add agolanov/agent-skills --skill consolidating-plans
 ```
 
-After upgrading, uninstall old installed copies of `deliver-task` and `prepare-tasks`: `delivering-task` replaces `deliver-task`, and `planning-task-docs` with `reviewing-task-docs` replace `prepare-tasks`.
+After upgrading, uninstall old installed copies of `deliver-task`, `prepare-tasks` and `deliver-queue`: `delivering-task` replaces `deliver-task`, `planning-task-docs` with `reviewing-task-docs` replace `prepare-tasks`, and `delivering-task-queue` replaces `deliver-queue`.
 
 The refinement skills share dependencies. Install the complete bundle together:
 

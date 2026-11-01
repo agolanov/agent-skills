@@ -10,7 +10,7 @@ For every checkout cleanliness or changed-path gate below and in child briefs/re
 
 `delivering-task <task-document> [--spec <spec>] [--agent claude|codex] [--model M] [--effort E] [--branch B] [--resume]`
 
-Two halves: Execute, then Merge and Cleanup. Standalone they run in sequence; `deliver-queue` decides when each half runs. The child owns implementation, refinement and, in the tracked layout, its follow-ups commit. The root checks Git/status facts and integrates; it does not write product code, add commits to the task branch, or repeat the child's tests or review. Follow-ups are written only by `executing-task-docs` End; the merge half carries them to main with the branch.
+Two halves: Execute, then Merge and Cleanup. Standalone they run in sequence; `delivering-task-queue` decides when each half runs. The child owns implementation, refinement and, in the tracked layout, its follow-ups commit. The root checks Git/status facts and integrates; it does not write product code, add commits to the task branch, or repeat the child's tests or review. Follow-ups are written only by `executing-task-docs` End; the merge half carries them to main with the branch.
 
 ## Execute
 
@@ -19,7 +19,7 @@ Locate the root's installed `executing-task-docs/SKILL.md`, read it and its refe
 ## Merge
 
 1. Immediately before merging, require main still on its branch and clean, and compare full main HEAD to recorded base. If changed, archive status, retain the prior brief and append the new target plus this one-time authorization: “main moved to <sha>: rebase onto it, rerun the checks and one fix-review round, write a new status”. Tell the child to use `<sha>` as its reporting/review base. Send that sentence word for word, with `<sha>` filled in, to the same child through `executing-task-docs` Open and wait 5: a dead child gets that step's reopen with the authorization as the line to send, counted against the same run. Then wait, verify a fresh report against that target, then update the recorded Base SHA in the runtime brief. Perform `executing-task-docs` Verify and End again, then repeat this latest-main check; no stale status or merge before refresh.
-2. In the main checkout run `git merge --no-ff <branch>` with Git's default message: no `-m`, no `-F`, no edited message (`deliver-queue` Input 3 finds merged units by the subject `Merge branch '<branch>'`). On conflict run `git merge --abort`, report and preserve the child/worktree. Capture the merge SHA, then explicitly compare `git rev-parse HEAD^{tree}` with `git rev-parse <branch>^{tree}`. Inequality stops cleanup. Run checks again only when project rules explicitly require them after merge; ordinary “after changing code” requirements are satisfied by the child's verified results. Post-merge check failures stop with evidence preserved.
+2. In the main checkout run `git merge --no-ff <branch>` with Git's default message: no `-m`, no `-F`, no edited message (`delivering-task-queue` Input 3 finds merged units by the subject `Merge branch '<branch>'`). On conflict run `git merge --abort`, report and preserve the child/worktree. Capture the merge SHA, then explicitly compare `git rev-parse HEAD^{tree}` with `git rev-parse <branch>^{tree}`. Inequality stops cleanup. Run checks again only when project rules explicitly require them after merge; ordinary “after changing code” requirements are satisfied by the child's verified results. Post-merge check failures stop with evidence preserved.
 
 ## Cleanup
 
