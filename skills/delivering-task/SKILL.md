@@ -8,13 +8,13 @@ description: Takes one task document from implementation in a visible child agen
 For every checkout cleanliness or changed-path gate below and in child briefs/references, use [checkout-state Direct-use preflight](../independent-review/references/checkout-state.md#direct-use-preflight). Resolve its installed helper, retain fresh evidence, and require `uncommitted: false` for clean. Unavailable verification stops the dependent action; raw status/diff is not a fallback. Path allowlists use the result's decoded exact `paths`. This applies separately to project, docs and child checkouts. Every read-only Git verification below and in references/child briefs (log, refs, roots, ancestry and diffs included) uses that reference's `git-read` command; displayed `git <read-command>` notation means this wrapper, never a raw invocation. Resolve paths relative to the containing checkout root. Mutating commands keep their explicit authorization.
 
 
-`delivering-task <task-document> [--spec <spec>] [--agent claude|codex] [--model M|cli-default] [--effort E|cli-default] [--reviewer-model M|cli-default] [--reviewer-effort E|cli-default] [--branch B] [--resume]`
+`delivering-task <task-document> [--spec <spec>] [--agent claude|codex] [--execution inline|subagents|direct] [--model M|cli-default] [--effort E|cli-default] [--reviewer-model M|cli-default] [--reviewer-effort E|cli-default] [--branch B] [--resume]`
 
 Two halves: Execute, then Merge and Cleanup. Standalone they run in sequence; `delivering-task-queue` decides when each half runs. The child owns implementation, refinement and, in the tracked layout, its follow-ups commit. The root checks Git/status facts and integrates; it does not write product code, add commits to the task branch, or repeat the child's tests or review. Follow-ups are written only by `executing-task-docs` End; the merge half carries them to main with the branch.
 
 ## Execute
 
-Locate the root's installed `executing-task-docs/SKILL.md`, read it and its references completely, and perform it exactly as written with this run's task document and options, through its End. `--model/--effort` set the implementer only; `--reviewer-model/--reviewer-effort` go to `executing-task-docs` unchanged; this skill sets no default of its own. A refusal, a stop or a `failed` status ends the run here, with nothing merged.
+Locate the root's installed `executing-task-docs/SKILL.md`, read it and its references completely, and perform it exactly as written with this run's task document and options, through its End. `--model/--effort` set the implementer only; `--execution` and `--reviewer-model/--reviewer-effort` go to `executing-task-docs` unchanged; this skill sets no default of its own. A refusal, a stop or a `failed` status ends the run here, with nothing merged.
 
 ## Merge
 
@@ -24,4 +24,4 @@ Locate the root's installed `executing-task-docs/SKILL.md`, read it and its refe
 ## Cleanup
 
 1. After tree equality and required post-merge checks succeed, run non-forced `git worktree remove <path>`, `git branch -d <branch>`, then `child-session close <name>` using the resolved executable and recorded window name. A failure is reported, not forced away.
-2. Report merge SHA, child commits, the implementer and reviewer settings lines from `executing-task-docs` End 4, follow-ups path and count (with its commit, or where it was written locally), and required post-merge check results. Root writes only runtime artifacts and what `executing-task-docs` End records; one task yields one merge.
+2. Report merge SHA, child commits, the execution mode line and the implementer and reviewer settings lines from `executing-task-docs` End 4, follow-ups path and count (with its commit, or where it was written locally), and required post-merge check results. Root writes only runtime artifacts and what `executing-task-docs` End records; one task yields one merge.
