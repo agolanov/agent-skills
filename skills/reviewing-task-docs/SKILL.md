@@ -1,8 +1,6 @@
 ---
 name: reviewing-task-docs
 description: Cross-reviews one task's spec and plan in a visible child agent session and marks each document that ends the review clean with a Review line, leaving freshly marked documents as context. Use when task documents should be reviewed before execution, or when a document's Review mark is missing or stale.
-metadata:
-  internal: true
 ---
 
 # Reviewing Task Docs

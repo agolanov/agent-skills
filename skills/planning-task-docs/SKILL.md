@@ -1,8 +1,6 @@
 ---
 name: planning-task-docs
 description: Turns one task (a task text, a brief, a spec without a plan, or a follow-ups file) into a superpowers spec and plan written in a visible child agent session, where the user answers the brainstorming questions. Use when a task needs its spec or plan written before review or execution, or when delivery follow-ups should become a new task.
-metadata:
-  internal: true
 ---
 
 # Planning Task Docs
