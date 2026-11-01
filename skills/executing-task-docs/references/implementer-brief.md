@@ -1,6 +1,6 @@
 # Implementer brief
 
-Fill this template with absolute resolved paths before opening. Keep the identity labels for resume and the fixed `Status file:` line; `Launch settings:` and `Reviewer settings:` are identity labels kept for resume. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. `<absolute launch-settings.md>` is the installed independent-review `references/launch-settings.md`. Project rules list absolute applicable AGENTS.md/CLAUDE.md paths plus any required verbatim rules. For a plan, list every execution skill the child has (`executing-plans`, `subagent-driven-development`, as Preflight 4 found them) on the Execution line; for any other task document write `None: not a plan` there. Include the actual opposite CLI launcher, shared loop and `independent-review`, not just the selector. Fill the Follow-ups line with its first form in the tracked layout (the follow-ups path inside this worktree and the child's `writing-task-follow-ups` SKILL.md), else with `the root records them`. Replace every placeholder, including the owned status-contract path; the child has no parent conversation or loaded skills.
+Fill this template with absolute resolved paths before opening. Keep the identity labels for resume and the fixed `Status file:` line; `Execution mode:`, `Launch settings:` and `Reviewer settings:` are identity labels kept for resume. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. `<absolute launch-settings.md>` is the installed independent-review `references/launch-settings.md`. Project rules list absolute applicable AGENTS.md/CLAUDE.md paths plus any required verbatim rules. Fill the `Execution mode:` line with the mode, its source and its reason as Preflight 2 decided them per [Execution mode](../SKILL.md#execution-mode), and the Execution line, for a plan, with the absolute SKILL.md of the one skill that mode names (`executing-plans` for `inline`, `subagent-driven-development` for `subagents`, as Preflight 4 found it), or `None: direct implementation` for any other task document. Include the actual opposite CLI launcher, shared loop and `independent-review`, not just the selector. Fill the Follow-ups line with its first form in the tracked layout (the follow-ups path inside this worktree and the child's `writing-task-follow-ups` SKILL.md), else with `the root records them`. Replace every placeholder, including the owned status-contract path; the child has no parent conversation or loaded skills.
 
 ```text
 Implement one task document in this checkout.
@@ -10,6 +10,7 @@ Branch: <branch>
 Base SHA: <base-sha>
 Task document: <document>
 Plan kind: <plan|other>
+Execution mode: <inline | subagents | direct> (<rule | explicit>); <reason, one sentence>
 Spec: <spec or None>
 Agent: <agent>
 Window name: <name>
@@ -28,13 +29,13 @@ Edit ignored material by absolute path in the main checkout; commit only files i
 Read the task document and the spec completely. Read and honor all applicable project rules: <project-rules>.
 
 Required installed skills (read these absolute SKILL.md paths):
-- Execution (choose one by the plan; None for another document): <absolute SKILL.md of every one of executing-plans and subagent-driven-development the child has>
+- Execution: <absolute SKILL.md of the skill the Execution mode line names | None: direct implementation>
 - Automatic cross review: <absolute auto-cross-refine SKILL.md>
 - Opposite CLI launcher: <absolute refine-with-codex or refine-with-claude SKILL.md>
 - Shared review protocol: <absolute review-fix-loop SKILL.md>
 - Reviewer launch: <absolute independent-review SKILL.md>
 
-For Plan kind plan, choose one execution skill from the Execution line by the plan: `executing-plans` when the plan is a few tasks done in order, where a task builds on an earlier one or edits the same files; `subagent-driven-development` when it has many tasks independent of each other. When only one is listed, use it. Write the skill and the reason as the first line under Checks in the status file. Execute the entire plan with it in this existing isolated worktree. For Plan kind other, implement the task directly from the task document in this existing isolated worktree, and write `direct: not a plan` as the first line under Checks. Never create a task document: no spec, plan or brief. Run the required checks below and commit task changes on this branch. Every commit message ends with its own content, unsigned: no `Co-Authored-By` trailer and no "Generated with" line, even when your harness asks for one; give this rule to every subagent that commits. Keep only task implementation, review-fix and follow-ups commits here.
+The root decided the execution mode; you make no choice of execution skill. For Plan kind plan, execute the entire plan with the skill on the Execution line in this existing isolated worktree, and never switch to another execution skill. For Plan kind other, implement the task directly from the task document in this existing isolated worktree. Either way, write `Execution mode: <mode> — <skill | direct: not a plan>; <reason from the brief>` as the first line under Checks in the status file. Never create a task document: no spec, plan or brief. Run the required checks below and commit task changes on this branch. Every commit message ends with its own content, unsigned: no `Co-Authored-By` trailer and no "Generated with" line, even when your harness asks for one; give this rule to every subagent that commits. Keep only task implementation, review-fix and follow-ups commits here.
 
 Launch settings govern only this session; subagents an execution skill starts follow that skill and the host (see `<absolute launch-settings.md>`, section Nested agents).
 
