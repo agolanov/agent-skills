@@ -11,8 +11,8 @@ Use the merge commit's seven-character SHA, a concrete `path:line` location, and
 The docs repository is the nearest Git root at or above the plan's directory: `git -C <plan-dir> rev-parse --show-toplevel`. It is the project repository when the project tracks the plans, or a nested repository inside a directory the project ignores. Record tails immediately after merge:
 
 1. If the toplevel is the project and `git -C <main-checkout> check-ignore -q <plan-dir>` exits 0, the plans directory is ignored without its own repository: append locally, no commit, no force-add.
-2. Otherwise, before staging, the docs repository's `git status --short` may show only this tails file; any other dirt stops rather than joining the commit. Stage only the tails file and commit it in the docs repository, on its current branch, as `tails: <branch>` with the task branch name.
-3. With no findings there is no tails commit. Do not put tails on the reviewed child branch. Afterwards require empty `git status --short` in the main checkout and, after a commit, in the docs repository.
+2. Otherwise, before staging, the docs repository's fresh checkout-state preflight (see the owning skill) must list only this tails file in decoded `paths`; any other dirt stops rather than joining the commit. Stage only the tails file and commit it in the docs repository, on its current branch, as `tails: <branch>` with the task branch name.
+3. With no findings there is no tails commit. Do not put tails on the reviewed child branch. Afterwards require a clean checkout-state preflight in the main checkout and, after a commit, in the docs repository.
 
 Write `${XDG_RUNTIME_DIR:-/tmp}/child-sessions/<branch>-tails-brief.md` outside Git even when there are no tails. Fill this ready follow-up template with absolute paths and actual findings. Its `To prepare through prepare-tasks:` line appears only when there are findings, in its repository-first form after a local append (step 1; see the end of this file):
 

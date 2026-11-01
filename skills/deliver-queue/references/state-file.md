@@ -32,7 +32,7 @@ Never at any other moment: a failure, a block, a Verify return, a failed rebase 
 
 At a batch point:
 
-1. Require the docs main checkout on its main branch with empty `git status --short` (with tracked documents this is the project main checkout).
+1. Require the docs main checkout on its main branch with a clean checkout-state preflight as defined by the owning skill (with tracked documents this is the project main checkout).
 2. Rewrite only the `State` cell of each queue-file row from the state file, matching rows by `Unit`. Leave every other line unchanged.
 3. If the file changed: stage only the queue file and commit it in the docs repository, on its current branch, as `queue: <slug> progress`. No empty commit.
 4. Require the docs main checkout clean afterwards.
