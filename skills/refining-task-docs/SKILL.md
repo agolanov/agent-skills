@@ -52,7 +52,7 @@ On `done`, all of these must hold:
 
 1. Full status format with `## Artifacts`; BRANCH, CHECKOUT and HEAD name the docs repository's current branch, top level and full HEAD.
 2. Commits lists the child's own commits in the docs repository: each is in `<base-sha>..HEAD` and changes only Artifacts paths (`git show --name-only --format= --no-renames <sha>`, relative to the docs repository). Every other commit of that range is the user's parallel work and changes neither an Artifacts path nor any document of the run, context documents included; one that does stops Verify and goes to the user, naming the commit, never back to the child. A project checkout that is another repository may move freely.
-3. A fresh own-paths gate on the docs repository over the Artifacts paths and the documents to review passes: no document of the run is left uncommitted.
+3. A fresh own-paths gate on the docs repository over the Artifacts paths and every document of the run, context documents included, passes: no owned document is left uncommitted.
 4. Review gives final refine mode `CLEAN` or `CLEAN EXCEPT DISPUTED`, with the raw reviewer verdict reported separately; dispute-only closure can keep raw `CHANGES`, never relabelled CLEAN.
 5. Every document to review is under Artifacts, and every Artifacts path lies in the docs repository and passes the freshness check of review-mark.md, run by the root.
 6. The final [child settings check](../independent-review/references/launch-settings.md#child-settings-check) over every opening's record matches, or the user accepted its result.
