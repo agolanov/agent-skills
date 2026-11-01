@@ -1,0 +1,47 @@
+Authoritative copy. `executing-task-docs/references/review-mark.md` holds a display copy of the format and freshness rule; keep both equal.
+
+# Review mark
+
+Last line of a reviewed spec or plan, exact shape:
+
+```text
+Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex>, commit <full SHA>
+```
+
+`commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the opposite system that performed the review. `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `auto-cross-refine` ends `clean` or `clean except disputed`, never by the root.
+
+## Freshness
+
+A document is **fresh** when all three hold for its content (the working file in a checkout, or `git -C <docs-main> show <ref>:<rel>` when checking a branch):
+
+1. The last line matches `^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit [0-9a-f]{40}$`.
+2. It is the only line matching `^Review: (clean|clean except disputed), `.
+3. The named commit holds the document (`git -C <docs-repo> rev-parse --verify --quiet <sha>:<rel>` succeeds) and the content without that line equals that version: `diff <(git -C <docs-repo> show <sha>:<rel>) <(sed '$d' <file>)` prints nothing and exits 0. Without the revision/path existence check, an unknown SHA yields an empty stream and a mark-only document passes.
+
+Exit 1 from the quiet revision/path existence predicate means stale (unknown commit or absent path); exit 2 is unavailable, not stale. A helper error/timeout is unavailable verification and stops the dependent action; it is not evidence of a stale document. Retain each exit, including the `show` producer: do not hide a failed producer in process substitution.
+
+Everything else is **stale** and the document needs review: no mark, a mark that is not the last line, two marks, a SHA unknown to the docs repository, or any edit after the mark's commit, committed or not. Name the failing condition in the report.
+
+```bash
+last=$(tail -n 1 -- "$file")
+re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit ([0-9a-f]{40})$'
+[[ $last =~ $re ]] && sha=${BASH_REMATCH[3]} &&
+[[ $(grep -cE '^Review: (clean|clean except disputed), ' -- "$file") -eq 1 ]] &&
+python3 "$state_helper" git-read --checkout "$docs_repo" -- rev-parse --verify --quiet "$sha:$rel" >/dev/null &&
+freshness_dir=$(mktemp -d) &&
+python3 "$state_helper" git-read --checkout "$docs_repo" -- show "$sha:$rel" > "$freshness_dir/committed" &&
+sed '$d' -- "$file" > "$freshness_dir/current" &&
+diff "$freshness_dir/committed" "$freshness_dir/current" >/dev/null
+```
+
+`rel` is the path relative to the repository that holds `file` (the docs main checkout, or the window's worktree, whose relative paths are the same).
+
+## Marking procedure
+
+Performed by the child for every document it reviewed or changed, after the review ends `clean` or `clean except disputed`; the reviewer brief points here:
+
+1. Delete every line matching `^Review: (clean|clean except disputed), ` anywhere in the document (a stale mark may have been displaced by later edits).
+2. For `clean except disputed`, keep the disputed findings and both positions in the document.
+3. Make sure the file ends with a newline (else the mark joins its last line), then commit the content (`git add <file>`, commit `docs: <basename>` when anything changed); `<sha>` = full `git rev-parse HEAD`.
+4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <opposite system>, commit <sha>` as the last line; commit it as `mark: <basename>`.
+5. Run the freshness check; it must pass. A document changed after marking is reviewed and marked again.

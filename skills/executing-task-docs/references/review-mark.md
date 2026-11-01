@@ -1,4 +1,4 @@
-Display copy. `prepare-tasks/references/units.md` (later `reviewing-task-docs`) holds the marking procedure; keep the format and freshness rule equal in both.
+Display copy. `reviewing-task-docs/references/review-mark.md` holds the marking procedure; keep the format and freshness rule equal in both.
 
 # Review mark
 
@@ -18,7 +18,7 @@ A document is **fresh** when all three hold for its content (the working file in
 
 Exit 1 from the quiet revision/path existence predicate means stale (unknown commit or absent path); exit 2 is unavailable, not stale. A helper error/timeout is unavailable verification and stops the dependent action; it is not evidence of a stale document. Retain each exit, including the `show` producer: do not hide a failed producer in process substitution.
 
-Everything else is **stale** and the unit needs review: no mark, a mark that is not the last line, two marks, a SHA unknown to the docs repository, or any edit after the mark's commit, committed or not. Name the failing condition in the unit table.
+Everything else is **stale** and the document needs review: no mark, a mark that is not the last line, two marks, a SHA unknown to the docs repository, or any edit after the mark's commit, committed or not. Name the failing condition in the report.
 
 ```bash
 last=$(tail -n 1 -- "$file")
@@ -32,4 +32,4 @@ sed '$d' -- "$file" > "$freshness_dir/current" &&
 diff "$freshness_dir/committed" "$freshness_dir/current" >/dev/null
 ```
 
-`rel` is the path relative to the repository that holds `file` (the docs main checkout, or the window's worktree, whose relative paths are the same). Checking a branch, use `git -C <docs-main> show prep-<slug>:<rel>` as the content; once the worktree's checkout-state preflight is clean (per the owning skill), its working file is equivalent.
+`rel` is the path relative to the repository that holds `file` (the docs main checkout, or the window's worktree, whose relative paths are the same).

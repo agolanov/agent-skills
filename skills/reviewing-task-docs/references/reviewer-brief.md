@@ -1,0 +1,46 @@
+# Reviewer brief
+
+Fill this template with absolute resolved paths and write it to `<runtime>/review-<stem>-brief.md`; the status is `<runtime>/review-<stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Documents to review:` and `Base SHA:` literally. `Documents to review:` lists every stale document and `Context documents:` every fresh one, absolute paths separated by `, `; omit `Context documents:` when there are none, never write `None` on it. `Review mark rules:` is the absolute path of this skill's installed `references/review-mark.md`. Replace every placeholder, including the owned status-contract path.
+
+```text
+Cross-review one task's documents and mark them, working in this checkout.
+
+Checkout: <absolute project checkout> (read the code here)
+Docs repository: <absolute top level of the repository holding the documents> (commit the documents here)
+Base SHA: <full docs repository HEAD>
+Agent: <claude|codex>
+Window name: review-<stem>
+Documents to review: <absolute document path>[, <absolute document path>]
+Context documents: <absolute document path>[, <absolute document path>]
+Review mark rules: <absolute reviewing-task-docs/references/review-mark.md>
+For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
+
+Ownership: you are the only writer of these documents. The root verifies your report; it writes no document or mark.
+
+Read and honor all applicable project rules: <absolute AGENTS.md/CLAUDE.md paths, plus any rule to repeat verbatim>.
+
+Required installed skills (read these absolute SKILL.md paths):
+- Automatic cross review: <absolute auto-cross-refine SKILL.md>
+- Opposite CLI launcher: <absolute refine-with-codex or refine-with-claude SKILL.md>
+- Shared review protocol: <absolute review-fix-loop SKILL.md>
+- Reviewer launch: <absolute independent-review SKILL.md>
+
+Work:
+1. Read every document to review, every context document and the Review mark rules completely, and read the project code the documents concern.
+2. Invoke auto-cross-refine over the documents to review and run it until it ends clean or clean except disputed. Do not squash. A plan is checked against its spec like any requirement of the spec, including the spec's Verification section; a spec's Verification section is reviewed for proportion in both directions: a check the change's risks do not need is a finding, and so is a risk no check covers. Context documents are already reviewed: read them for context and edit one only to fix a finding.
+3. After the review ends clean or clean except disputed, apply the Marking procedure of the Review mark rules to every document to review and every context document you changed, committing in the docs repository. Run its freshness check on each marked document.
+4. Write the status file (below) with STATUS: done, then stay in this window; the root closes it.
+
+When the review cannot end clean or clean except disputed, mark nothing and write STATUS: failed, naming under Review the open findings and the documents left unmarked.
+
+Boundaries: commit only on the current branch of the docs repository, and only the documents to review and the context documents you changed. Do not create a worktree or branch, merge, push or rebase. Edit no other file. Ask the user your own questions in this window; use STATUS: blocked only for what the root must resolve (a Git problem, a missing input).
+
+Record each out-of-scope finding as: what — where (path:line) — why it is out of scope. In Review, report the final refine mode separately from the raw reviewer verdict; a clean except disputed closure may keep raw CHANGES. Never rename that raw verdict CLEAN. Include disputed findings and both positions.
+
+Status file: <absolute status path>
+Read and follow the complete child-sessions status contract at <absolute child-sessions/references/status-file.md>, including the optional ## Artifacts section, which this task requires. Write every identity field and section for done, blocked or failed; BRANCH, CHECKOUT and HEAD name the docs repository (current branch, top level, full HEAD). Commits must match git log --oneline <base sha>..HEAD in the docs repository. Checks: one line per marked document, the freshness check -> PASS or FAIL. Review: the final refine mode and the raw reviewer verdict, separately. Artifacts: every document you marked or changed, one absolute path per line. Use None where empty and state unrun work honestly. For blocked, Questions includes the question, options and recommendation. Write the complete report atomically (temporary file, then rename); its exact first line must be STATUS: done, STATUS: blocked or STATUS: failed. The root reads it and never edits it.
+```
+
+For a silent-exit reopen, retain the brief and append:
+
+> Continue from the current state of the checkout: read git log and run the checkout-state preflight first.
