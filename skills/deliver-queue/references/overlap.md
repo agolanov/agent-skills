@@ -1,6 +1,6 @@
 # Overlap
 
-Two units may not have live windows at the same time when their plans name a common path. The check is advisory and cheap: a missed overlap only costs a rebase round under `deliver-task`'s main-moved rule, never a wrong merge. Compute each unit's path set once, before the first scheduling.
+Two units may not have live windows at the same time when their plans name a common path. The check is advisory and cheap: a missed overlap only costs a rebase round under `delivering-task`'s main-moved rule, never a wrong merge. Compute each unit's path set once, before the first scheduling.
 
 ## Reading a plan
 

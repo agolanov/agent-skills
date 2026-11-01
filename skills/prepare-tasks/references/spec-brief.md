@@ -1,6 +1,6 @@
 # Spec brief (Phase 1)
 
-Fill this template with absolute resolved paths and write it to `<runtime>/prep-<slug>-spec-brief.md`; the status is `<runtime>/prep-<slug>-spec-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space): `Spec path:` marks this as a spec brief, and tools read `Status file:`, `Spec path:` and `Base SHA:` literally. Keep exactly one of the `Idea:`, `Existing plan:` and `Tails file:` lines; `Source plan:` and `Source spec:` appear only with `Tails file:`. `Spec path:`, `Existing plan:`, `Tails file:`, `Source plan:` and `Source spec:` are absolute paths inside this window's worktree; only the two source lines may be `None`. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/prep-<slug>-spec-brief.md`; the status is `<runtime>/prep-<slug>-spec-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space): `Spec path:` marks this as a spec brief, and tools read `Status file:`, `Spec path:` and `Base SHA:` literally. Keep exactly one of the `Idea:`, `Existing plan:` and `Follow-ups file:` lines; `Source plan:` and `Source spec:` appear only with `Follow-ups file:`. `Spec path:`, `Existing plan:`, `Follow-ups file:`, `Source plan:` and `Source spec:` are absolute paths inside this window's worktree; only the two source lines may be `None`. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Write and cross-review one spec in this docs worktree.
@@ -15,7 +15,7 @@ Window name: prep-<slug>
 Spec path: <absolute spec path inside this worktree>
 Idea: <the user's idea text, verbatim>
 Existing plan: <absolute plan path inside this worktree>
-Tails file: <absolute tails file inside this worktree>
+Follow-ups file: <absolute follow-ups file inside this worktree>
 Source plan: <absolute source plan inside this worktree, or None>
 Source spec: <absolute source spec inside this worktree, or None>
 For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
@@ -32,13 +32,13 @@ Required installed skills (read these absolute SKILL.md paths):
 - Reviewer launch: <absolute independent-review SKILL.md>
 
 Work:
-1. Run brainstorming with the user in this window, starting from the idea, from the existing plan, which the spec must fully cover, or from the tails file as below. The user is beside this window: ask your questions here. Write the spec to Spec path (it replaces brainstorming's default location) and commit it on this branch. Brainstorming ends here at the approved, committed spec; the plan comes in a later instruction. When the project rules ask a spec for a verification section, write it while brainstorming as the rules say, without a separate question to the user. In step 2 its proportion is a requirement of the review, in both directions: a check the change's risks do not need is a finding, and so is a risk no check covers.
-   With a Tails file line (each of its lines starting with "- " is one finding):
-   a. Read the tails file, the source spec and plan, and the project code. Recheck every finding against the current code: it may have been fixed or moved since it was recorded.
+1. Run brainstorming with the user in this window, starting from the idea, from the existing plan, which the spec must fully cover, or from the follow-ups file as below. The user is beside this window: ask your questions here. Write the spec to Spec path (it replaces brainstorming's default location) and commit it on this branch. Brainstorming ends here at the approved, committed spec; the plan comes in a later instruction. When the project rules ask a spec for a verification section, write it while brainstorming as the rules say, without a separate question to the user. In step 2 its proportion is a requirement of the review, in both directions: a check the change's risks do not need is a finding, and so is a risk no check covers.
+   With a Follow-ups file line (each of its lines starting with "- " is one finding):
+   a. Read the follow-ups file, the source spec and plan, and the project code. Recheck every finding against the current code: it may have been fixed or moved since it was recorded.
    b. Brainstorm with the user which findings to fix.
-   c. Put the header line "**Source tails:** <tails path relative to the project checkout>" (docs/superpowers/plans/<basename> in the usual layout) in the spec, and give every finding in its body exactly one disposition: "fix", "retain: <reason>" or "obsolete: <evidence>". A fix that changes a reviewed decision of the source spec names that decision and states the amendment.
-   d. Leave the tails file, the source spec and the source plan byte-identical: never edit them.
-   e. When the user selects no finding to fix, write the status file with STATUS: failed and "Not run: no tails selected" under Checks and under Review, skip steps 2 to 4, and stay in this window.
+   c. Put the header line "**Source follow-ups:** <follow-ups path relative to the project checkout>" (docs/superpowers/plans/<basename> in the usual layout) in the spec, and give every finding in its body exactly one disposition: "fix", "retain: <reason>" or "obsolete: <evidence>". A fix that changes a reviewed decision of the source spec names that decision and states the amendment.
+   d. Leave the follow-ups file, the source spec and the source plan byte-identical: never edit them.
+   e. When the user selects no finding to fix, write the status file with STATUS: failed and "Not run: no follow-ups selected" under Checks and under Review, skip steps 2 to 4, and stay in this window.
 2. Invoke auto-cross-refine on the spec and run it until it ends clean or clean except disputed. Do not squash.
 3. Mark the spec:
    a. Delete every line matching the regular expression '^Review: (clean|clean except disputed), ' anywhere in the document.

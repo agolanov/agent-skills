@@ -43,7 +43,7 @@ Required installed skills (read these absolute SKILL.md paths):
 
 Work:
 1. Read the Spec, every predecessor spec and every document to review completely, and read the project code they concern.
-2. For each path on the Plan paths line, in that order: write the plan with writing-plans against the Spec and its predecessors, at that path (it replaces writing-plans' default location), with its header lines; commit it on this branch. Planning ends at the committed plan; execution belongs to deliver-task later. When the spec has a Verification section, the plan's check steps are exactly those checks, each with how to run it, and no tasks for checks it does not name.
+2. For each path on the Plan paths line, in that order: write the plan with writing-plans against the Spec and its predecessors, at that path (it replaces writing-plans' default location), with its header lines; commit it on this branch. Planning ends at the committed plan; execution belongs to delivering-task later. When the spec has a Verification section, the plan's check steps are exactly those checks, each with how to run it, and no tasks for checks it does not name.
 3. Invoke auto-cross-refine over every plan written and every document to review, plans checked against the Spec, and run it until it ends clean or clean except disputed. Do not squash. A plan is reviewed against the spec's Verification section like any requirement of the spec.
 4. Mark each of those documents, and any other document of this spec you changed:
    a. Delete every line matching the regular expression '^Review: (clean|clean except disputed), ' anywhere in the document.

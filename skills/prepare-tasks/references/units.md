@@ -12,14 +12,13 @@ A **unit** is one plan with its spec; the queue lists units. A **window** maps t
 | Plan without spec | one unit; needs spec (Phase 1, written from the plan with the user), then review of both; the plan is reviewed in Phase 2 even with a fresh mark |
 | Spec and plan, either without a fresh mark | needs review of each document lacking one |
 | Spec and plan, both fresh | ready |
-| Tails file: explicit path ending `-tails.md` inside the docs dir (a tails file, never a plan, even under `plans/`) | one unit; needs spec, plan, review |
-| Follow-up brief: explicit path to a file whose first line starts with `Follow up on leftovers from ` | one unit; needs spec, plan, review |
+| Follow-ups file: explicit path ending `-follow-ups.md`, or the older `-tails.md`, inside the docs dir (a follow-ups file, never a plan, even under `plans/`) | one unit; needs spec, plan, review |
 
-A follow-up brief stands for the file on its `Recorded tails:` line. `Recorded tails: None: no findings`, or a tails file with no line starting with `- ` (each such line is one finding), means nothing to prepare: report it and make no unit. One tails file reached twice (directly and through a brief, compared by `realpath`) is one unit. A spec references a tails file when it has a line `**Source tails:** <p>` and `<project>/<p>` resolves to that file.
+A follow-ups file with no line starting with `- ` (each such line is one finding) means nothing to prepare: report it and make no unit. One follow-ups file reached twice (compared by `realpath`) is one unit. A spec references a follow-ups file when it has a line `**Source follow-ups:** <p>` and `<project>/<p>` resolves to that file.
 
 A document "lacks review" whenever it is not fresh (below); a missing, stale, displaced or duplicated mark all count. Review scope is per document: a spec without a plan that was never marked is reviewed in Phase 2 together with its new plan. The one exception to reviewing only non-fresh documents: the plan of a plan-without-spec unit is always reviewed in Phase 2, because any older mark predates its spec, so it was never reviewed against it.
 
-A directory input expands to every `.md` file inside it, except `*-tails.md` (delivery leftovers, not plans), anything under `.worktrees/` or `queues/`, and any path inside a linked worktree of the docs repository (every `git -C <docs-main> worktree list --porcelain -z` entry except `<docs-main>` itself). A path under `specs/` or named `*-design.md` is a spec; under `plans/` a plan; anything else, ask. For every included spec, also include its plans found in `plans/` by the matching rules.
+A directory input expands to every `.md` file inside it, except `*-follow-ups.md` and `*-tails.md` (follow-ups files, not plans), anything under `.worktrees/` or `queues/`, and any path inside a linked worktree of the docs repository (every `git -C <docs-main> worktree list --porcelain -z` entry except `<docs-main>` itself). A path under `specs/` or named `*-design.md` is a spec; under `plans/` a plan; anything else, ask. For every included spec, also include its plans found in `plans/` by the matching rules.
 
 ## Matching
 
@@ -33,11 +32,11 @@ All document paths below are relative to the docs dir (`specs/...`, `plans/...`)
 
 - Spec slug: `<slug>` of `YYYY-MM-DD-<slug>-design.md`. Window and branch are `prep-<slug>`; replace characters outside `[A-Za-z0-9_-]` with `-`.
 - Plan without spec: slug = plan stem without its date; spec path `specs/<plan-date>-<slug>-design.md`.
-- Idea: slug of `[a-z0-9-]` from the idea's key words (`add a --version flag` → `version-flag`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`. A derived slug ending in `-tails` counts as a collision (last bullet): ask the user for a distinct one.
+- Idea: slug of `[a-z0-9-]` from the idea's key words (`add a --version flag` → `version-flag`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`. A derived slug ending in `-follow-ups` or `-tails` counts as a collision (last bullet): ask the user for a distinct one.
 - Spec without plan: plan `plans/<spec-date>-<slug>.md`.
-- Tails file: source plan = the tails path without `-tails` (`plans/2026-10-29-omega-tails.md` → `plans/2026-10-29-omega.md`), `None` when that file does not exist; source spec = Matching rules 1 and 2 applied to the source plan, else `None` without a question (it is context for the child, not a pairing). Slug = source plan stem without its date plus `-tail-fixes` (`omega-tail-fixes`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`; unit name = slug.
+- Follow-ups file: source plan = the path without its `-follow-ups` or `-tails` suffix (`plans/2026-10-29-omega-follow-ups.md` → `plans/2026-10-29-omega.md`), `None` when that file does not exist; source spec = Matching rules 1 and 2 applied to the source plan, else `None` without a question (it is context for the child, not a pairing). Slug = source plan stem without its date plus `-follow-up-fixes` (`omega-follow-up-fixes`), date = today; spec `specs/<today>-<slug>-design.md`, plan `plans/<today>-<slug>.md`; unit name = slug.
 - Unit name: plan stem without its date (`gamma-2`), or the slug when no plan exists yet.
-- Two units or windows colliding on a slug, or a slug colliding with an existing branch, worktree or window: ask the user for a distinct one. A tails or idea unit's slug also collides with an existing `specs/YYYY-MM-DD-<slug>-design.md` or `plans/YYYY-MM-DD-<slug>.md` of any date; for an idea, name those documents in the question, since the user may mean them: given as inputs instead, they replace the idea unit. Check every replacement slug the same way; refuse one ending in `-tails` and ask again (a plan named `*-tails.md` reads as a tails file).
+- Two units or windows colliding on a slug, or a slug colliding with an existing branch, worktree or window: ask the user for a distinct one. A follow-ups or idea unit's slug also collides with an existing `specs/YYYY-MM-DD-<slug>-design.md` or `plans/YYYY-MM-DD-<slug>.md` of any date; for an idea, name those documents in the question, since the user may mean them: given as inputs instead, they replace the idea unit. Check every replacement slug the same way; refuse one ending in `-follow-ups` or `-tails` and ask again (a plan so named reads as a follow-ups file).
 
 In a brief every path becomes absolute inside the window's worktree: `<worktree>/<path relative to the docs repository>`. Tracked layout: `<worktree>/docs/superpowers/specs/x-design.md`; nested layout (`docs/superpowers` is the repository): `<worktree>/specs/x-design.md`. Plan headers always use the path relative to the project checkout (`docs/superpowers/specs/<basename>` in the usual layout).
 
@@ -50,6 +49,8 @@ Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex>, co
 ```
 
 `commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the opposite system that performed the review. `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `auto-cross-refine` ends `clean` or `clean except disputed`, never by the root.
+
+`executing-task-docs/references/review-mark.md` holds a display copy of this format and the Freshness rule below; keep both equal.
 
 ## Freshness
 

@@ -24,7 +24,7 @@ Docs repository: <absolute docs main checkout>
 ## Commands
 
 ```sh
-deliver-task <absolute plan in the project checkout> --spec <absolute spec in the project checkout>
+delivering-task <absolute plan in the project checkout> --spec <absolute spec in the project checkout>
 ```
 ~~~
 
@@ -32,4 +32,4 @@ deliver-task <absolute plan in the project checkout> --spec <absolute spec in th
 - `Plan` and `Spec` are paths relative to the project checkout. A plan never written keeps its intended path.
 - `State` is final only as `ready` (spec and plan merged into docs main, or already there, both fresh) or `not ready: <reason>`: `<window> failed: <reported reason>`, `stopped by the user`, `merge conflict`, `verification failed: <what>`.
 - Delivery states: `deliver-queue` later overwrites `State` with `running`, `done awaiting merge`, `rebasing`, `delivered <sha7>`, `failed: <reason>`, `blocked: <question>`, `not started: depends on failed <unit>`, `not started: depends on stopped <unit>`, `not started: depends on not ready <unit>` or `stopped by the user`, at its batch points. `prepare-tasks` never writes them. The bare `stopped by the user` is the delivery state; `not ready: stopped by the user` is preparation-time. On a rerun, `delivered <sha7>` units are done, `ready` and every other delivery state are candidates again, and every `not ready: ...` stays skipped.
-- Commands: one `deliver-task <plan> --spec <spec>` line per `ready` unit, in table order, absolute paths in the main checkout (never a `prep-<slug>` worktree path), in the fenced `sh` block. Not-ready units get no line. A ready unit whose predecessor is not ready keeps its line; name the gap in the final report.
+- Commands: one `delivering-task <plan> --spec <spec>` line per `ready` unit, in table order, absolute paths in the main checkout (never a `prep-<slug>` worktree path), in the fenced `sh` block. Not-ready units get no line. A ready unit whose predecessor is not ready keeps its line; name the gap in the final report.

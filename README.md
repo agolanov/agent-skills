@@ -8,9 +8,11 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 |-------|-------------|
 | `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
 | `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux window from a brief and wait for its status. |
-| `deliver-task` | Execute one reviewed plan in a child session with cross review, then merge and record leftovers. |
-| `prepare-tasks` | Prepare ideas, specs, plans and delivery leftovers (deliver-task tails) for delivery in visible child sessions and write an ordered queue file. |
-| `deliver-queue` | Deliver a queue of reviewed plans through deliver-task, in parallel up to a limit, merging in order of readiness. |
+| `executing-task-docs` | Implement one task document in a child session with cross review, ending with a reviewed branch ready to merge and its follow-ups recorded. |
+| `writing-task-follow-ups` | Create, replace or clear a task branch's section in the follow-ups file beside its task document. |
+| `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
+| `prepare-tasks` | Prepare ideas, specs, plans and delivery follow-ups for delivery in visible child sessions and write an ordered queue file for `delivering-task`. |
+| `deliver-queue` | Deliver a queue of reviewed plans through `delivering-task`, in parallel up to a limit, merging in order of readiness. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
 | `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
 | `dual-review` | Codex and Claude review in parallel; findings only one raised are cross-checked; one severity-ranked list of confirmed findings, without fixes. |
@@ -33,6 +35,8 @@ Install a single skill:
 ```sh
 npx skills add agolanov/agent-skills --skill consolidating-plans
 ```
+
+After upgrading from a version that shipped `deliver-task`, uninstall its old installed copy: `delivering-task` replaces it.
 
 The refinement skills share dependencies. Install the complete bundle together:
 
