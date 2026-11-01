@@ -9,10 +9,10 @@ Two units may not have live windows at the same time when their plans name a com
 3. From each such line take every backticked span as one path. Without backticks, split the text after the label on commas. Drop a trailing parenthetical (`(new)`, `(function foo)`) and a trailing line range (`:123`, `:123-145`).
 4. Normalize each path relative to the project checkout: strip `./`, resolve `..`, turn an absolute path inside the project into its relative form (from the project checkout, `realpath -m --relative-to=. <path>`). A path ending in `/`, or naming an existing directory in the project, is a directory.
 
-A plan with no `**Files:**` block has an empty set and overlaps nothing.
+A task document with no `**Files:**` block (a plain brief, for one) has an empty set and overlaps nothing.
 
 ## Comparing units
 
 Units A and B overlap when some path of A equals some path of B, or one of them is a directory containing the other (`src/` contains `src/a.sh`; `src/a` does not contain `src/ab.sh`). Overlap is symmetric and not transitive.
 
-When scheduling, a startable unit is held back if it overlaps a unit with a live window or an earlier unit chosen in the same pass; the earlier unit in queue order goes first and the other waits for its merge. A window left alive by a unit that `deliver-queue` Input 3 recorded as already merged holds nothing back: its changes are already on main. Name the shared path when reporting why a unit waited.
+When scheduling, a startable unit is held back if it overlaps a unit with a live window or an earlier unit chosen in the same pass; the earlier unit in queue order goes first and the other waits for its merge. A window left alive by a unit that `delivering-task-queue` Input 3 recorded as already merged holds nothing back: its changes are already on main. Name the shared path when reporting why a unit waited.
