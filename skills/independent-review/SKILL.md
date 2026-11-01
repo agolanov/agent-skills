@@ -11,7 +11,7 @@ One assigned reviewer reviews one recorded commit target once; this skill launch
 
 Require method (`cli` or `subagent`), system (`codex` or `claude`), and any explicit settings/permissions. Direct use, of this skill or of review-fix-loop, accepts `--codex`, `--claude`, `--subagent`, `--reviewer codex|claude`, or equivalent prose; without an assignment ask which method, and resolve conflicting selectors before proceeding. Only auto-cross-refine chooses the opposite system automatically.
 
-Read [reviewer settings](references/reviewer-settings.md); honor independent model/effort overrides, announce and record the resolved assignment. Missing runtime capabilities block this method; changing method/settings needs explicit authorization.
+Read [launch settings](references/launch-settings.md) for the reviewer role; honor independent model/effort overrides, announce and record the resolved assignment. Missing runtime capabilities block this method; changing method/settings needs explicit authorization.
 
 ## Review prompt
 
