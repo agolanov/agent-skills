@@ -4,7 +4,7 @@
 
 - `<runtime>` is `${XDG_RUNTIME_DIR:-/tmp}/child-sessions`, outside Git.
 - `<queue-slug>`: the queue file's stem (`2026-10-29-fixture` for `queues/2026-10-29-fixture.md`); for a plain list, the first plan's stem plus `-list`.
-- `<slug>`: the queue file's slug as `prepare-tasks` named it, the stem without its `YYYY-MM-DD-` date prefix. It appears only in commit messages.
+- `<slug>`: the queue file's stem without its `YYYY-MM-DD-` date prefix. It appears only in commit messages.
 
 ## State file
 
@@ -16,7 +16,7 @@ Header: `# <absolute queue file>`, or for a plain list `# plain list` followed b
 <unit> | <state> | <branch> | <window> | <status-file> | <base-sha>
 ```
 
-- `<state>` comes from the vocabulary in `prepare-tasks/references/queue-file.md`: `ready`, `not ready: <reason>` (kept from preparation), `running`, `done awaiting merge`, `rebasing`, `delivered <sha7>`, `failed: <reason>`, `blocked: <question>`, `not started: depends on failed <unit>`, `not started: depends on stopped <unit>`, `not started: depends on not ready <unit>`, `stopped by the user`. No other spelling.
+- `<state>` comes from the vocabulary in [queue-file.md](queue-file.md) beside this file: `ready`, `not ready: <reason>` (kept from preparation), `running`, `done awaiting merge`, `rebasing`, `delivered <sha7>`, `failed: <reason>`, `blocked: <question>`, `not started: depends on failed <unit>`, `not started: depends on stopped <unit>`, `not started: depends on not ready <unit>`, `stopped by the user`. No other spelling.
 - `<branch>` and `<window>` exactly as `executing-task-docs` derives them; `<status-file>` the absolute status path; `<base-sha>` the full recorded base, rewritten when a main-moved return updates the runtime brief's Base SHA. Use `-` for a field not known yet.
 - Rewrite the unit's line at every state change, before acting on the next step. It is the root's only live record; the queue file is touched only at batch points.
 
