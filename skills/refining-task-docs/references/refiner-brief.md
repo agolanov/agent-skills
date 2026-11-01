@@ -1,6 +1,6 @@
-# Reviewer brief
+# Refiner brief
 
-Fill this template with absolute resolved paths and write it to `<runtime>/review-<stem>-brief.md`; the status is `<runtime>/review-<stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Documents to review:` and `Base SHA:` literally. `Documents to review:` lists every stale document and `Context documents:` every fresh one, absolute paths separated by `, `; omit `Context documents:` when there are none, never write `None` on it. `Review mark rules:` is the absolute path of this skill's installed `references/review-mark.md`. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/refine-<stem>-brief.md`; the status is `<runtime>/refine-<stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Documents to review:` and `Base SHA:` literally. `Documents to review:` lists every stale document and `Context documents:` every fresh one, absolute paths separated by `, `; omit `Context documents:` when there are none, never write `None` on it. `Review mark rules:` is the absolute path of this skill's installed `references/review-mark.md`. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Cross-review one task's documents and mark them, working in this checkout.
@@ -9,10 +9,10 @@ Checkout: <absolute project checkout> (read the code here)
 Docs repository: <absolute top level of the repository holding the documents> (commit the documents here)
 Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
-Window name: review-<stem>
+Window name: refine-<stem>
 Documents to review: <absolute document path>[, <absolute document path>]
 Context documents: <absolute document path>[, <absolute document path>]
-Review mark rules: <absolute reviewing-task-docs/references/review-mark.md>
+Review mark rules: <absolute refining-task-docs/references/review-mark.md>
 For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
 
 Ownership: you are the only writer of these documents. The root verifies your report; it writes no document or mark.

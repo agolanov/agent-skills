@@ -38,7 +38,7 @@ diff "$freshness_dir/committed" "$freshness_dir/current" >/dev/null
 
 ## Marking procedure
 
-Performed by the child for every document it reviewed or changed, after the review ends `clean` or `clean except disputed`; the reviewer brief points here:
+Performed by the child for every document it reviewed or changed, after the review ends `clean` or `clean except disputed`; the refiner brief points here:
 
 1. Delete every line matching `^Review: (clean|clean except disputed), ` anywhere in the document (a stale mark may have been displaced by later edits).
 2. For `clean except disputed`, keep the disputed findings and both positions in the document.
