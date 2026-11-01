@@ -29,7 +29,7 @@ The root writes no code. Per-unit work is `executing-task-docs`' and `delivering
 
 1. Project main checkout: the top level of the current repository; when that is a separate docs repository rather than the project, ask the user for the project checkout. Require it on its main branch with a clean preflight. Docs repository = `git -C <document-dir> rev-parse --show-toplevel` for every unit's document, its toplevel the docs main checkout; all documents must share one, else stop before anything opens, naming them. Both layouts are allowed (documents tracked by the project, or a separate docs repository). Require docs main on its main branch and clean.
 2. Locate the installed `executing-task-docs/SKILL.md`, `delivering-task/SKILL.md` and `writing-task-follow-ups/SKILL.md` with their references, `child-sessions/SKILL.md` with its references and `scripts/child-session` (absolute path, never PATH); read them completely.
-3. Select the agent as `executing-task-docs` Preflight 2 does. Run `executing-task-docs` Preflight 3–4 (child-sessions and the child's dependency check, for a plan in this queue's layout) once for that agent; missing dependencies stop before anything opens.
+3. Select the agent as `executing-task-docs` Preflight 2 does. Run `executing-task-docs` Preflight 3–4 (child-sessions and the child's dependency check in this queue's layout, for a plan when any unit is a plan, otherwise for a plain document) once for that agent; missing dependencies stop before anything opens.
 4. Create the runtime state file per [state-file.md](references/state-file.md) with every unit in queue order and its normalized state.
 
 ## Scheduling
@@ -43,7 +43,7 @@ Runs at the start, at the end of each drain that merged (Finish half 2), and whe
 
 ## Start half
 
-For each chosen unit in queue order, perform `executing-task-docs` Preflight 1–2, Worktree, Brief and Open and wait 1 (open), exactly as written, with the unit's resolved document; a resumed unit takes its `--resume` path. The Wait loop below replaces Open and wait 2. Record branch, window, status file and base SHA in the state file. A stop inside the start half makes the unit `failed: <reason>` (Wait loop 4).
+For each chosen unit in queue order, perform `executing-task-docs` Preflight 1–2, Worktree, Brief and Open and wait 1 (open), exactly as written, with the unit's resolved document and, for a unit Input 1 resolved from a spec, `--spec <that spec>`; a resumed unit takes its `--resume` path. The Wait loop below replaces Open and wait 2. Record branch, window, status file and base SHA in the state file. A stop inside the start half makes the unit `failed: <reason>` (Wait loop 4).
 
 ## Wait loop
 
