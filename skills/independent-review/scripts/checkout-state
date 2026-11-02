@@ -1,0 +1,64 @@
+#!/bin/sh
+# Native OS precedes shell choice. Source this file only for classifier unit tests.
+classify_discovery_candidate() {
+    # Injected unit seam: path, colon-delimited Apple launcher table, CLT result.
+    # Production supplies the fixed table below; there is no redirect environment.
+    case ":$2:" in *":$1:"*) [ "$3" = available ] || return 2;; esac
+    return 0
+}
+resolve_discovery_path() {
+    # Resolve installed aliases without running the candidate or an Apple stub.
+    discovery_path=$1
+    discovery_hops=0
+    while [ -L "$discovery_path" ]; do
+        discovery_hops=$((discovery_hops + 1))
+        [ "$discovery_hops" -le 40 ] || return 2
+        discovery_link=$(/usr/bin/readlink "$discovery_path") || return 2
+        case "$discovery_link" in
+            /*) discovery_path=$discovery_link;;
+            *) discovery_path=$(dirname "$discovery_path")/$discovery_link;;
+        esac
+    done
+    discovery_dir=$(CDPATH= cd -- "$(dirname "$discovery_path")" && pwd -P) || return 2
+    printf '%s/%s\n' "$discovery_dir" "$(basename "$discovery_path")"
+}
+checkout_state_main() {
+    system=$(uname -s) || return 2
+    case "$system" in MINGW*|MSYS*|CYGWIN*)
+        printf '%s\n' 'state verification unavailable: native Windows requires PowerShell -NoProfile -ExecutionPolicy Bypass -File <installed>/scripts/checkout-state.ps1; use Invoke-CheckoutStateCommand.' >&2
+        return 2;; esac
+    base=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P) || return 2
+    clt=available
+    if [ "$system" = Darwin ]; then
+        /usr/bin/xcode-select -p >/dev/null 2>&1 || clt=unavailable
+    fi
+    for name in python3 python; do
+        candidate=$(command -v "$name") || continue
+        case "$candidate" in /*) ;; *) continue;; esac
+        candidate=$(resolve_discovery_path "$candidate") || continue
+        classify_discovery_candidate "$candidate" '/usr/bin/python:/usr/bin/python3:/usr/bin/python2.7:/Library/Developer/CommandLineTools/usr/bin/python3' "$clt" || continue
+        # Feature/syntax probe, not a new version floor. No application imports.
+        "$candidate" -I -c 'import os,sys,pathlib,subprocess; assert os.name == "posix"; assert all(hasattr(os,k) for k in ("O_NOFOLLOW","O_DIRECTORY")); assert os.open in os.supports_dir_fd; compile(pathlib.Path(sys.argv[1]).read_bytes(),sys.argv[1],"exec")' "$base/checkout-state.py" >/dev/null 2>&1 || continue
+        if [ "$system" = Darwin ]; then
+            git_path=$(command -v git) || return 2
+            git_path=$(resolve_discovery_path "$git_path") || return 2
+            classify_discovery_candidate "$git_path" '/usr/bin/git' "$clt" || {
+                printf '%s\n' 'state verification unavailable: Apple Git launcher lacks developer tools; no installer was launched.' >&2; return 2;
+            }
+        fi
+        if [ "${1-}" = resolve ]; then
+            "$candidate" -I -c 'import json,sys,platform; print(json.dumps({"argv":[sys.executable,"-I",sys.argv[1]],"os":platform.system(),"engine":"python","version":sys.version}))' "$base/checkout-state.py"
+        else
+            exec "$candidate" -I "$base/checkout-state.py" "$@"
+        fi
+        return $?
+    done
+    if [ "$system" = Darwin ]; then
+        /usr/bin/osascript -l JavaScript "$base/checkout-state.jxa.js" "$@"
+        return 2  # No proven native architecture: bridge failures are unavailable too.
+    fi
+    printf '%s\n' 'state verification unavailable: no compatible installed observation runtime; host portability remains incomplete.' >&2
+    return 2
+}
+# Sourceable discovery seam has no environment-controlled production override.
+case "$0" in */checkout-state|checkout-state) checkout_state_main "$@";; esac

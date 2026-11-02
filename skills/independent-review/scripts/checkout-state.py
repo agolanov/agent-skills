@@ -156,8 +156,9 @@ def private_git(checkout):
             raise OSError('unsupported object format')
         (target/'config').write_text('[core]\nrepositoryformatversion = '+
             ('1' if object_format == 'sha256' else '0')+
-            '\nbare = false\nhooksPath = /dev/null\nfsmonitor = false\n'
-            'excludesFile = /dev/null\nattributesFile = /dev/null\n'+
+            '\nbare = false\nhooksPath = '+os.devnull+'\nfsmonitor = false\n'
+            'excludesFile = '+os.devnull+'\nattributesFile = '+os.devnull+'\n'
+            'autocrlf = false\nsafecrlf = false\n'+
             ('[extensions]\nobjectformat = sha256\n' if object_format == 'sha256' else ''))
         def copy_file(root, relative, optional=True):
             observed = admin_read(os.path.join(root, relative), optional=optional, with_mtime=True)
@@ -206,7 +207,13 @@ def private_git(checkout):
         # damaged objects/alternates point at streams or external storage.
         objects = os.path.join(common, b'objects')
         admin_directory(objects)
-        (target/'objects').symlink_to(os.fsdecode(objects), target_is_directory=True)
+        (target/'objects'/'info').mkdir(parents=True)
+        # Git accepts C-quoted alternate pathnames. Escape bytes rather than
+        # decoding arbitrary POSIX filenames or requiring symlink privileges.
+        quoted = b'"' + b''.join(
+            bytes((c,)) if 32 <= c < 127 and c not in (34, 92)
+            else ('\\%03o' % c).encode('ascii') for c in objects) + b'"\n'
+        (target/'objects'/'info'/'alternates').write_bytes(quoted)
         view = (os.fsencode(temp), selected)
         _VIEWS[checkout] = view
         try:
@@ -805,6 +812,29 @@ def read_git(directory, arguments):
 
 
 def main():
+    if os.name == 'nt':
+        # Compatibility CLI uses the same native consumer boundary. Only fixed
+        # PowerShell source is encoded; arbitrary argv remains JSON data.
+        helper = str(Path(__file__).with_suffix('.ps1').resolve())
+        payload = b64(canonical({'script': helper, 'arguments': sys.argv[1:]}))
+        source = (
+            "$ErrorActionPreference='Stop'; try { "
+            "$p=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString("
+            "[Convert]::FromBase64String('" + payload + "'))); "
+            ". $p.script; $roots=[string[]]@(); "
+            "$i=[Array]::IndexOf([string[]]$p.arguments,'--checkout'); "
+            "if($i -ge 0 -and $i+1 -lt $p.arguments.Count) { $roots=[string[]]@($p.arguments[$i+1]) }; "
+            "Initialize-CheckoutStateEngine $p.script $roots; "
+            "$j=ConvertTo-Json -InputObject ([string[]]$p.arguments) -Compress; "
+            "$r=[CheckoutState.Engine]::InvokeJson((Get-Process -Id $PID).Path,$p.script,$j,$roots); "
+            "[Console]::OpenStandardOutput().Write($r.Stdout,0,$r.Stdout.Length); "
+            "[Console]::OpenStandardError().Write($r.Stderr,0,$r.Stderr.Length); exit $r.ExitCode "
+            "} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 2 }")
+        command = [os.path.join(os.environ.get('SystemRoot', r'C:\Windows'),
+                                'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+                   '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand',
+                   base64.b64encode(source.encode('utf-16-le')).decode('ascii')]
+        return subprocess.call(command)
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     cap = commands.add_parser('capture')
@@ -814,11 +844,17 @@ def main():
     cmp.add_argument('--after', required=True)
     for command in (cap, cmp):
         command.add_argument('--output-dir', required=True)
+    pre = commands.add_parser('preflight')
+    pre.add_argument('--capture-dir', required=True)
     read = commands.add_parser('git-read')
     read.add_argument('--checkout', required=True)
     read.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
+        if args.command == 'preflight':
+            record, _ = read_record(args.capture_dir)
+            sys.stdout.buffer.write(canonical(preflight(record)) + b'\n')
+            return 0
         if args.command == 'git-read':
             arguments = args.arguments[1:] if args.arguments[:1] == ['--'] else args.arguments
             code, output = read_git(args.checkout, arguments)

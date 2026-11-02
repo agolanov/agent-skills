@@ -1,15 +1,19 @@
 # Checkout state and verification evidence
 
-Read this contract before capturing a suite, review, cross-check, retry or resume boundary. Resolve `state_helper` as the absolute `scripts/checkout-state.py` beside the owning installed independent-review `SKILL.md`. Python 3 and that helper are required; unavailable dependencies or impractical full hashing mean unavailable verification, with no porcelain-only fallback.
+Read this contract before capturing a suite, review, cross-check, retry or resume boundary. Resolve the owner beside the installed independent-review `SKILL.md`. Select by native OS before shell. On native Windows, including Git Bash, use the installed PowerShell executable with `-NoProfile -ExecutionPolicy Bypass -File ABS/scripts/checkout-state.ps1` through `Invoke-CheckoutStateCommand` below. POSIX uses `ABS/scripts/checkout-state`; MSYS/Cygwin callers receive exit 2 and the native Windows recipe. WSL is Linux. `checkout-state.py` remains a compatible Python CLI/module, not a universal prerequisite.
+
+On POSIX run `checkout-state resolve` once and retain its JSON `argv` vector, engine/version and host provenance outside snapshots. Use that exact vector throughout the phase; do not rediscover PATH or change engines between captures. Discovery probes installed Python features rather than declaring a new version floor. On macOS it classifies known Apple Python/Git launchers and probes `xcode-select -p` before executing them; missing developer tools never starts an installer. No proven no-Python Darwin engine is shipped yet: stock JXA returns unavailable until architecture-specific native bindings, layouts, integer JSON and CommonCrypto feasibility pass on that actual architecture. Missing runtime/API proof or impractical full hashing means unavailable verification and incomplete host portability. Use existing software; do not prescribe installing a runtime or fall back to porcelain-only checks.
+
+The vectors below use the retained POSIX engine array `state_command`; normal native Windows consumers use the typed function. Python examples remain Linux compatibility examples. Windows PowerShell 5.1/.NET Framework is the native baseline; managed policy or Constrained Language restrictions are unavailable capability. The process-only policy argument changes no user/machine setting. Engine provenance stays outside schema-3 records.
 
 ## Capture and compare
 
 Each invocation owns a **new, nonexistent** output directory outside the reviewed checkout. Create its parent beforehand. Resolve the absolute checkout, including the actual clone when used. Keep prompts, logs, snapshots, preserved unexpected content and differences outside every monitored tree.
 
 ```bash
-python3 "$state_helper" capture --checkout "$review_tree" --output-dir "$attempt_dir/before"
-python3 "$state_helper" capture --checkout "$review_tree" --output-dir "$attempt_dir/after"
-python3 "$state_helper" compare --before "$attempt_dir/before" --after "$attempt_dir/after" --output-dir "$attempt_dir/comparison"
+"${state_command[@]}" capture --checkout "$review_tree" --output-dir "$attempt_dir/before"
+"${state_command[@]}" capture --checkout "$review_tree" --output-dir "$attempt_dir/after"
+"${state_command[@]}" compare --before "$attempt_dir/before" --after "$attempt_dir/after" --output-dir "$attempt_dir/comparison"
 ```
 
 Run each command separately; retain its real exit and stderr, including when capture fails. Compare successful or diagnostic captures. Existing output directories are refused, including empty ones; a refused/crashed invocation owns no usable output. Never interpret leftover files as its result.
@@ -32,7 +36,9 @@ Retain errors even beside a proven change. Preserve available records and unexpe
 
 ## Direct-use preflight
 
-Use this preflight for direct review and every clean/path gate in delivery and task preparation, including continuations, child verification, integration, queue updates and follow-ups. Run the capture command above into a fresh external directory for the checkout being checked. Run this recipe as `python3 <recipe.py> "$state_helper" "$capture_dir"`, with recipe/output outside the checkout:
+Use this preflight for direct review and every clean/path gate in delivery and task preparation, including continuations, child verification, integration, queue updates and follow-ups. Run the capture command above into a fresh external directory for the checkout being checked. Normal consumers run the retained engine vector with `preflight --capture-dir ABS` (Windows: typed recipe below). It reads one existing complete capture and writes the same JSON object to stdout, exit 0; invalid/diagnostic evidence returns exit 2 and stderr. It never captures or performs live Git reads implicitly.
+
+The first block below is the Linux/Python compatibility recipe only, accepting `(checkout-state.py, capture_dir)`, with recipe/output outside the checkout:
 
 ```python
 import json
@@ -49,16 +55,57 @@ The result uses one complete snapshot: safe status, manually discovered untracke
 
 Retain capture, recipe result and real exits. Any failed capture, exception or nonzero recipe exit makes preflight unavailable: launch/integrate nothing and preserve the checkout. No plain status/diff fallback. The private status index clears assume-unchanged and clears skip-worktree for present paths; source flags remain unchanged and monitored. Missing skip-worktree paths remain normal sparse-checkout omissions. A clean gate requires `uncommitted: false`; a follow-ups-only gate requires every decoded `paths` entry to equal that follow-ups file; an **own-paths gate** takes the caller's set of owned repository-relative file paths and requires that no decoded `paths` entry equals an owned path, so changes to any other path pass. A direct-use true value takes the caller's existing commit-or-clone decision. False means no detected outer/staged changes within the disclosed limits, not a clean submodule. Re-capture immediately before each dependent action; an older result is not a later gate.
 
+Every dirty isolated gate carries the caller-side possible-cause hint `isolated-normalization-not-applied` beside the exact decoded paths and capture/preflight evidence. This is a possible cause, never a diagnosis of line-ending conversion. The helper's pure preflight JSON keeps its existing fields; callers attach the hint externally, with no live reads. It never refreshes a source index or rewrites source files, config or attributes.
+
+Only immediately after an already-authorized successful working-tree rewrite in that same checkout may its controller wait one fixed two-second settling interval from completion, then run the same operational Git once with `update-index -q --ignore-submodules --refresh`, with a separate ten-second deadline. Record its exit/diagnostics, stop dependent writes on failure/timeout, and capture/preflight afresh after success. This stat-only write uses the rewrite's authority, never the helper or a gate retry loop; no lock removal or automatic repeat. Already-authorized owned clones/worktrees use process-local `-c core.autocrlf=false -c core.eol=lf` at creation/detached checkout before the settling/refresh baseline. A real edit must remain dirty. An in-tree CRLF policy may still block the isolated gate; no attribute or persistent configuration change is authorized.
+
+Without rewrite authority, preserve the checkout and report the exact manual action the user may take with their operational Git: `git -C ABS update-index -q --ignore-submodules --refresh`, then retry the helper gate. Never execute it just because the gate is dirty or certify clean with configuration-enabled status. A status-only phase flip remains `checkout changed` for attribution and reconciliation.
+
 These read-only checks use generated Git configuration. Repository/global normalization filters, CRLF settings and external ignore files are not applied: their files may conservatively appear changed/untracked. Resolve such a result explicitly; never substitute a config-enabled status to certify cleanliness. Authorized commit/merge commands retain the workflow's separate write authority and operational trust requirements; this helper does not sandbox them.
+
+## Native Windows typed invocation
+
+Define this owner-local function in the native PowerShell command tool. Supply the recorded absolute PowerShell executable, absolute owner script, a `[string[]]` argument vector and all caller-protected checkout/gitdir/common-dir roots. It returns raw `Stdout`/`Stderr` byte arrays and `ExitCode`; retain them without text pipelines. Use `Engine.Utf8.GetString($result.Stdout)` only for JSON/text consumers, never for binary `git-read show` output. The `Add-Type` reads trusted installed source, not observed repository files.
+
+```powershell
+function Invoke-CheckoutStateCommand {
+    param(
+        [Parameter(Mandatory=$true)][string]$PowerShellExecutable,
+        [Parameter(Mandatory=$true)][string]$OwnerScript,
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$ArgumentVector,
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$ProtectedRoots
+    )
+    # Import trusted owner functions only; no argv is forwarded by dot-sourcing.
+    . $OwnerScript
+    Initialize-CheckoutStateEngine $OwnerScript $ProtectedRoots
+    $requestJson = ConvertTo-Json -InputObject ([string[]]$ArgumentVector) -Compress
+    [CheckoutState.Engine]::InvokeJson($PowerShellExecutable, $OwnerScript, $requestJson, $ProtectedRoots)
+}
+```
+
+Before Add-Type, the initializer rejects a nonprivate temp owner/ACL and reparse ancestry using managed checks, and assigns CodeDom a fresh private compilation directory. Known unsafe temp roots fail before compilation. After loading, the native layer repeats root checks with no-reparse handles. Initial compilation necessarily precedes native handle availability; its preliminary managed ancestry checks do not supply a native pinned-bootstrap proof. Record that limitation separately from protected request consumption. No existing root ACL is changed.\n\nThe function bootstraps an exclusive random current-user private directory directly under the validated native per-user temp root, outside the supplied protected roots. Its request file uses create-new/no-sharing semantics and inherits that private ACL. The child validates owner/ACL, every no-reparse ancestor and pinned file/directory identity before decoding strict UTF-8. Only exactly two process tokens, `--argv-file ABS_JSON`, select this envelope. The decoded complete array must contain strings; it is parsed once as ordinary argv without evaluation. Empty strings, quotes, one-element/zero-element arrays and `--` survive unchanged. Extra envelope tokens and malformed/non-string arrays return exit 2. A fixed vector starts the recorded PowerShell via `System.Diagnostics.Process` with verified MSVCRT quoting; only owned request material is removed after completion/errors. Normal callers invoke this typed function with an array, never forward arbitrary arguments with a bare call operator or shell-evaluated command string.
+
+```powershell
+# $protected is an exact array including checkout, gitdir and common-dir.
+$before = Invoke-CheckoutStateCommand $powershell $stateScript @('capture', '--checkout', $checkout, '--output-dir', $beforeDir) $protected
+$after = Invoke-CheckoutStateCommand $powershell $stateScript @('capture', '--checkout', $checkout, '--output-dir', $afterDir) $protected
+$comparison = Invoke-CheckoutStateCommand $powershell $stateScript @('compare', '--before', $beforeDir, '--after', $afterDir, '--output-dir', $comparisonDir) $protected
+$gate = Invoke-CheckoutStateCommand $powershell $stateScript @('preflight', '--capture-dir', $beforeDir) $protected
+$read = Invoke-CheckoutStateCommand $powershell $stateScript @('git-read', '--checkout', $checkout, '--', 'show', 'HEAD:README.md') $protected
+```
+
+Native absolute paths use their Windows filesystem spelling and identity, including drive/UNC containment and case aliases. Git-relative path keys retain exact UTF-8 bytes from native Git; they are neither lowercased nor Unicode-normalized. Invalid UTF-8 or names not representable safely on Windows produce unavailable evidence. Symlinks and junctions are opened as reparse entries; their literal substitute targets use UTF-8 base64 in schema-3 `target`, with unsupported tags unavailable. Administrative reparse traversal is refused. Volume serial and all 128 file-ID bits remain unsigned integer JSON tokens, never floating point. Ordinary checkouts need no symlink privilege or Developer Mode. Windows executable representation follows the recorded Git index mode because Windows has no POSIX executable bits. Captures preserve raw LF/CRLF bytes.
+
+Native macOS without an adequate installed Python remains unavailable until its actual-host feasibility gate passes. Do not claim JXA/Python interoperability without those native observations. On macOS with a verified Python engine, use the retained POSIX vector for the four commands above; its raw-byte schema and errors match Linux.
 
 ## Other read-only Git gates
 
 Delivery/preparation verification also reads commits, ancestry, branches, repository roots and artifact diffs. Use the same isolation for these reads, including inside copied child briefs and shell recipes:
 
 ```bash
-python3 "$state_helper" git-read --checkout "$directory" -- rev-parse --show-toplevel
-python3 "$state_helper" git-read --checkout "$review_tree" -- log --oneline "$base..$branch"
-python3 "$state_helper" git-read --checkout "$docs_tree" -- diff --quiet "$branch" HEAD -- "$artifact"
+"${state_command[@]}" git-read --checkout "$directory" -- rev-parse --show-toplevel
+"${state_command[@]}" git-read --checkout "$review_tree" -- log --oneline "$base..$branch"
+"${state_command[@]}" git-read --checkout "$docs_tree" -- diff --quiet "$branch" HEAD -- "$artifact"
 ```
 
 `git-read` finds the containing checkout by walking ancestors for a literal `.git` entry, without running Git during discovery. Commands run at that checkout's root: supply root-relative or absolute file paths, not paths relative to a child directory. Supported read commands are `rev-parse`, `log`, `show`, `diff`, `merge-base`, `check-ignore`, single-target `symbolic-ref`, `cat-file -e|-p|-t|-s <object>`, `check-ref-format --branch <name>`, and `worktree list --porcelain -z`. Worktree registration metadata is copied with no-follow reads; listing requires the main repository to use an ordinary `.git` directory (other layouts report unavailable). Diff/log/show force `--ignore-submodules=dirty --submodule=short`: caller overrides accept only ignore values `dirty`/`all` and format `short`, never negated or ambiguous forms. This suppresses submodule status processes and recursive submodule rendering while retaining ordinary gitlink OID differences. Diff helpers/textconv, output-file options and remerge/diff-merges modes that could generate objects are disabled; diff paths must remain inside the checkout under both lexical normalization and symlink resolution, including dash-prefixed operands after `--`; this also rejects implicit no-index escapes. Exit 0/1 retains the command's meaning (for example equal/different for `diff --quiet`, ignored/not ignored for `check-ignore`); errors/timeouts return 2 with a diagnostic and block the gate. `check-ref-format --branch` normalizes an invalid name to exit 1; setup failures remain exit 2. Retain actual output and exit; a failed lookup is not a missing ref or a clean comparison. Worktree diffs may resolve a gitlink HEAD as data; an inaccessible or blocking target yields unavailable under the ten-second Git timeout. They are extra reads, not literal-only phase observations. Required tree-to-tree comparisons and capture do not need those worktree HEAD reads. Cleanliness still uses capture/preflight, never `git-read diff` as a replacement. Explicit mutating actions use their existing authorized commands.
