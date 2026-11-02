@@ -340,6 +340,8 @@ try {
         $snapshot=[CheckoutState.Json]::Read([IO.File]::ReadAllText((Join-Path $jcap 'snapshot.json')))
         $key='path:' + [Convert]::ToBase64String($utf8.GetBytes('junction'))
         Assert ($snapshot['fields'][$key]['kind'] -eq 'symlink') 'Junction followed'
+        Assert ($snapshot['fields'][$key]['reparse_tag'].ToString() -eq '2684354563') 'Native reparse tag lost'
+        Assert ($snapshot['fields'][$key]['reparse_flags'].ToString() -eq '0' -and $snapshot['fields'][$key]['reparse_directory'] -eq $true) 'Native reparse flags/kind lost'
         Record 'windows-junction' 'pass' 'Literal reparse target; no target traversal'
     } catch { if (Test-Path $junction) { throw }; Record 'windows-junction' 'unavailable' $_.Exception.Message }
 

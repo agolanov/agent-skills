@@ -519,6 +519,15 @@ def validate_observation(value):
                 raise ValueError('literal digest mismatch')
     if kind == 'symlink':
         unb64(value['target'])
+        if 'reparse_tag' in value:
+            tag, flags = value['reparse_tag'], value['reparse_flags']
+            if (type(tag) is not int or tag not in (0xA000000C, 0xA0000003)
+                    or type(flags) is not int or flags not in (0, 1)
+                    or (tag == 0xA0000003 and flags != 0)
+                    or type(value['reparse_directory']) is not bool):
+                raise ValueError('invalid native reparse metadata')
+        elif 'reparse_flags' in value or 'reparse_directory' in value:
+            raise ValueError('partial native reparse metadata')
     if kind in {'fifo', 'socket', 'character', 'block', 'other'} and type(value.get('rdev')) is not int:
         raise ValueError('invalid device identity')
     if kind == 'repository-directory':

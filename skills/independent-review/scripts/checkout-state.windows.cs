@@ -297,7 +297,11 @@ namespace CheckoutState {
                 int offset=BitConverter.ToUInt16(b,8),size=BitConverter.ToUInt16(b,10),start=Tag==0xA000000C?20:16;
                 if(start+offset+size>len||size%2!=0)throw new IOException("invalid reparse target");
                 string target=new UnicodeEncoding(false,false,true).GetString(b,start+offset,size);
-                r=Engine.D("kind","symlink","target",Engine.B64(Engine.Utf8.GetBytes(target)));
+                uint linkFlags=Tag==0xA000000CU?BitConverter.ToUInt32(b,16):0U;
+                if(linkFlags>1)throw new IOException("unsupported symbolic-link flags");
+                r=Engine.D("kind","symlink","target",Engine.B64(Engine.Utf8.GetBytes(target)),
+                    "reparse_tag",new BigInteger(Tag),"reparse_flags",new BigInteger(linkFlags),
+                    "reparse_directory",(Flags&16)!=0);
             }
             else if((Flags&16)!=0)r=Engine.D("kind","directory");
             else if((Flags&0x40)!=0)throw new IOException("unsupported device metadata");
@@ -1037,7 +1041,16 @@ namespace CheckoutState {
                 if(!(d["sha256"] is string)||!System.Text.RegularExpressions.Regex.IsMatch((string)d["sha256"],"\\A[0-9a-f]{64}\\z")||!(d["executable"] is bool))throw new InvalidDataException("invalid file hash/mode");
                 if(d.ContainsKey("literal")&&Hash(Dec(d["literal"]))!=(string)d["sha256"])throw new InvalidDataException("literal digest mismatch");
             }
-            if(kind=="symlink")Dec(d["target"]);
+            if(kind=="symlink") {
+                Dec(d["target"]);
+                if(d.ContainsKey("reparse_tag")) {
+                    BigInteger tag=Integer(d["reparse_tag"]),flags=Integer(d["reparse_flags"]);
+                    if((tag!=2684354572L&&tag!=2684354563L)||flags<0||flags>1||
+                        (tag==2684354563L&&flags!=0)||!(d["reparse_directory"] is bool))
+                        throw new InvalidDataException("invalid native reparse metadata");
+                } else if(d.ContainsKey("reparse_flags")||d.ContainsKey("reparse_directory"))
+                    throw new InvalidDataException("partial native reparse metadata");
+            }
             if(new[] {
                 "fifo","socket","character","block","other"
             }
