@@ -546,6 +546,10 @@ namespace CheckoutState {
             e["GIT_ATTR_NOSYSTEM"]="1";
             e["MSYS2_ARG_CONV_EXCL"]="*";
             e["MSYS_NO_PATHCONV"]="1";
+            string temp=TempRoot();
+            e["TMPDIR"]=temp;
+            e["TEMP"]=temp;
+            e["TMP"]=temp;
             return e;
         }
         static string FindGit() {
@@ -604,15 +608,9 @@ namespace CheckoutState {
             foreach(string root in roots)if(Inside(p,root))throw new IOException("output/runtime must be outside checkout and administration: "+p);
         }
         static string TempRoot() {
-            string p=null;
-            foreach(string key in new[] {
-                "TMPDIR","TEMP","TMP"
-            }
-            ) {
-                p=Environment.GetEnvironmentVariable(key);
-                if(!String.IsNullOrEmpty(p))break;
-            }
-            return Canonical(String.IsNullOrEmpty(p)?System.IO.Path.GetTempPath():p);
+            // Use exactly the native facility checked before compilation and
+            // request bootstrap. POSIX TMPDIR must not redirect Windows reads.
+            return Canonical(System.IO.Path.GetTempPath());
         }
         static string SafeGitPath(string s) {
             if(String.IsNullOrEmpty(s)||s.StartsWith("/")||s.Contains("\\")||s.Contains(":"))throw new InvalidDataException("unsafe/unrepresentable native Git path");

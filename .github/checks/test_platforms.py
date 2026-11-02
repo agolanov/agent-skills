@@ -205,6 +205,32 @@ try {
         [IO.File]::AppendAllText($log,(ConvertTo-Json -InputObject @{argv=$vector;cwd=$PSScriptRoot;exit=$r.ExitCode;stdout=[Convert]::ToBase64String($r.Stdout);stderr=[Convert]::ToBase64String($r.Stderr)} -Depth 10 -Compress)+$lf,$utf8)
         return $r
     }
+
+    foreach ($base in @($root,(Join-Path $root '.git'))) {
+        $insideTemp=Join-Path $base 'private compiler temp'
+        [CheckoutState.Native]::MakePrivate($insideTemp)
+        $oldTemp=$env:TEMP; $oldTmp=$env:TMP
+        try {
+            $env:TEMP=$insideTemp; $env:TMP=$insideTemp
+            $out=Join-Path $PSScriptRoot ('compile-must-not-write-'+[Guid]::NewGuid().ToString('N'))
+            $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'capture','--checkout',$root,'--output-dir',$out)
+            Assert ($r.ExitCode -eq 2) 'Direct interface compiled inside protected checkout'
+            Assert ($utf8.GetString($r.Stderr).Contains('Add-Type was not started')) 'Refusal occurred after compilation'
+            Assert ([IO.Directory]::GetFileSystemEntries($insideTemp).Count -eq 0) 'Compiler temporary entries were written'
+            Assert (-not [IO.Directory]::Exists($out)) 'Refused direct capture published output'
+        } finally {
+            $env:TEMP=$oldTemp; $env:TMP=$oldTmp
+            [IO.Directory]::Delete($insideTemp)
+        }
+    }
+    $literal=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'git-read','--checkout',$root,'--','rev-parse','--sq-quote','--checkout',$env:TEMP)
+    Assert ($literal.ExitCode -eq 0) 'Downstream --checkout was treated as an owner option'
+    Assert ($utf8.GetString($literal.Stdout) -ceq (" '--checkout' '"+$env:TEMP+"'"+$lf)) 'Downstream --checkout argv changed'
+    $withoutSeparator=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'git-read','--checkout',$root,'rev-parse','--sq-quote','--checkout',$env:TEMP)
+    Assert ($withoutSeparator.ExitCode -eq 0 -and $utf8.GetString($withoutSeparator.Stdout) -ceq $utf8.GetString($literal.Stdout)) 'Optional separator changed command-operand ownership'
+    Record 'windows-precompile-containment' 'pass' 'Direct process TEMP under checkout/.git refused before Add-Type with zero generated entries; downstream -- remains data'
+    # Native helper/Git temporaries use validated GetTempPath, not POSIX redirection.
+    $env:TMPDIR=$root
     $script:counter=0
     function Capture([int]$want=0) {
         $script:counter++

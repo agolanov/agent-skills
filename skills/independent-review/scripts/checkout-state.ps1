@@ -25,6 +25,32 @@ function Initialize-CheckoutStateEngine {
         if ($parent -eq $at) { break }
         $at = $parent
     }
+    # Refuse a compiler root within any literal checkout/administration ancestry
+    # before native bindings exist. This also covers the strict argv-file path
+    # without reading or trusting its request bytes during startup.
+    $at = $temp
+    while ($at) {
+        if ([IO.Path]::GetFileName($at).Equals('.git', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Compiler temp is inside Git administration; Add-Type was not started.'
+        }
+        $entries = @{}
+        foreach ($name in @('.git', 'HEAD', 'objects', 'refs', 'config', 'commondir', 'gitdir')) {
+            try {
+                $null = [IO.File]::GetAttributes((Join-Path $at $name))
+                $entries[$name] = $true
+            } catch [IO.FileNotFoundException] {
+            } catch [IO.DirectoryNotFoundException] {
+            }
+        }
+        if ($entries['.git'] -or
+            ($entries['HEAD'] -and ($entries['objects'] -or $entries['commondir'] -or $entries['gitdir'])) -or
+            ($entries['objects'] -and $entries['refs'] -and $entries['config'])) {
+            throw 'Compiler temp is inside a literal checkout/administration; Add-Type was not started.'
+        }
+        $parent = [IO.Path]::GetDirectoryName($at)
+        if ($parent -eq $at) { break }
+        $at = $parent
+    }
     $acl = [IO.Directory]::GetAccessControl($temp)
     $user = [Security.Principal.WindowsIdentity]::GetCurrent().User
     if (-not $acl.GetOwner([Security.Principal.SecurityIdentifier]).Equals($user)) {
@@ -77,7 +103,16 @@ function Initialize-CheckoutStateEngine {
 if ($MyInvocation.InvocationName -eq '.') { return }
 $ErrorActionPreference = 'Stop'
 try {
-    Initialize-CheckoutStateEngine $PSCommandPath
+    $startupRoots = New-Object Collections.Generic.List[string]
+    if ($args.Count -ge 3 -and $args[0] -eq 'git-read' -and $args[1] -eq '--checkout') {
+        $startupRoots.Add($args[2])
+    } elseif ($args.Count -gt 0 -and $args[0] -eq 'capture') {
+        for ($index = 1; $index + 1 -lt $args.Count; $index += 2) {
+            if ($args[$index] -eq '--') { break }
+            if ($args[$index] -eq '--checkout') { $startupRoots.Add($args[$index + 1]) }
+        }
+    }
+    Initialize-CheckoutStateEngine $PSCommandPath $startupRoots.ToArray()
     [CheckoutState.Engine]::OwnerScript = $PSCommandPath
     exit [CheckoutState.Engine]::Dispatch([string[]]$args)
 } catch {
