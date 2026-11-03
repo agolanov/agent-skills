@@ -40,3 +40,5 @@ Plain terminals have no `peek/send/key/split/window_close`. At launch tell the u
 `wait` recognizes only the exact first `STATUS: done|blocked|failed` line, with exit 0; it does not interpret success. Timeout is 124; silent exit is 3, after the existing 120-second never-seen startup grace or an observed running agent's exit. Other failures remain errors. The caller owns the single reopen budget.
 
 Before stopping, compare every live recorded PID/start value. A mismatch or missing ownership preserves the process/session. Stop only the recorded agent and launcher; never kill an unverified descendant tree or a whole terminal. Close an independently owned tmux/herdr window only through its recorded IDs. Windows currently retains its terminal/herdr window and reports `window_close: false` separately. Confirm `alive` exit 1 before freeing a queue slot; surviving window appearance is separate from agent exit.
+
+Stopping a recorded PowerShell script wrapper and launcher does not prove that unrecorded descendants have exited.

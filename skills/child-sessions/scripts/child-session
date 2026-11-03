@@ -168,7 +168,14 @@ runtime_op() {
         for key in agent launcher; do
           value=$(record_field "$file" "${key}_pid"); state=$(record_field "$file" "${key}_start")
           now=$(process_identity "$value" || true)
-          [[ -z $now ]] || { [[ $now == "$state" ]] && kill -TERM "$value"; } || die 'owned stop failed; session preserved'
+          if [[ -n $now ]]; then
+            [[ $now == "$state" ]] || die 'PID/start mismatch; process preserved'
+            if ! kill -TERM "$value" 2>/dev/null; then
+              local observed=0
+              now=$(process_identity "$value") || observed=$?
+              (( observed == 1 )) || die 'owned stop failed; session preserved'
+            fi
+          fi
         done
       fi
       ;;
@@ -270,24 +277,31 @@ h_find() {
   [[ -n $H_PANE ]]
 }
 resolve() {
-  local found record scope actual panes
+  local found record scope actual panes pane window
+  PREFIX='' OWN_ABSENT=0
   found=$(runtime_op find "$1") || return $?
   PREFIX=${found%%$'\n'*}; record=${found#*$'\n'}
   W=$(record_field "$record" backend)
   if [[ $W == herdr ]]; then
     [[ $(record_field "$record" workspace) == "$WS" ]] || die 'owned herdr workspace mismatch'
     H_PANE=$(record_field "$record" pane); H_TAB=$(record_field "$record" window)
+    [[ -n $H_PANE && -n $H_TAB ]] || die 'owned herdr pane/tab identity unavailable'
     [[ $(record_field "$record" split) == true ]] && H_SPLIT=1 || H_SPLIT=0
     herdr tab list --workspace "$WS" >/dev/null 2>&1 || return 1
     panes=$(herdr pane list --workspace "$WS" 2>/dev/null) || return 1
-    actual=$(json_op pane "$panes" pane_id "$H_PANE" tab_id)
-    [[ $actual == "$H_TAB" ]] || return 1
+    actual=$(json_op pane "$panes" pane_id "$H_PANE" tab_id) || return 2
+    if [[ -z $actual ]]; then OWN_ABSENT=1; return 1; fi
+    [[ $actual == "$H_TAB" ]] || die 'owned herdr pane/tab mismatch'
   elif [[ $W == tmux ]]; then
     scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || return 1
     [[ $(record_field "$record" scope) == "$scope" ]] || die 'owned tmux socket/session mismatch'
     OWN_WINDOW=$(record_field "$record" window); OWN_PANE=$(record_field "$record" pane)
-    actual=$(tmux_call display-message -p -t "$OWN_PANE" '#{window_id}' 2>/dev/null) || return 1
-    [[ $actual == "$OWN_WINDOW" ]] || return 1
+    [[ -n $OWN_PANE && -n $OWN_WINDOW ]] || die 'owned tmux pane/window identity unavailable'
+    panes=$(tmux_call list-panes -s -t "=$S" -F '#{pane_id} #{window_id}' 2>/dev/null) || return 2
+    actual=''
+    while read -r pane window; do [[ $pane != "$OWN_PANE" ]] || actual=$window; done <<< "$panes"
+    if [[ -z $actual ]]; then OWN_ABSENT=1; return 1; fi
+    [[ $actual == "$OWN_WINDOW" ]] || die 'owned tmux pane/window mismatch'
   fi
 }
 require_window() { resolve "$1" || die "no window $1 (no proven owned record)"; }
@@ -505,14 +519,17 @@ process_identity() {
     [[ $1 =~ ^[0-9]+$ ]] || return 1
     stat=$(/bin/ps -p "$1" -o stat= -o lstart= 2>/dev/null) || return 1
     read -r process_state process_start <<< "$stat"
-    [[ -n $process_start && $process_state != Z* && $process_state != X* ]] || return 1
+    [[ -n $process_start ]] || return 2
+    [[ $process_state != Z* && $process_state != X* ]] || return 1
     printf '%s\n' "$process_start"; return
   fi
-  [[ $1 =~ ^[0-9]+$ && -r /proc/$1/stat ]] || return 1
-  { IFS= read -r stat < "/proc/$1/stat"; } 2>/dev/null || return 1
+  [[ $1 =~ ^[0-9]+$ && -d /proc ]] || return 2
+  [[ -d /proc/$1 ]] || return 1
+  [[ -r /proc/$1/stat ]] || return 2
+  { IFS= read -r stat < "/proc/$1/stat"; } 2>/dev/null || return 2
   stat=${stat##*) }
   read -r -a fields <<< "$stat"
-  (( ${#fields[@]} >= 20 )) || return 1
+  (( ${#fields[@]} >= 20 )) || return 2
   [[ ${fields[0]} != Z && ${fields[0]} != X ]] || return 1
   printf '%s\n' "${fields[19]}"
 }
@@ -594,7 +611,12 @@ cmd_close() {
   local prefix record result=0
   resolve "$1" || result=$?
   if (( result > 1 )); then return "$result"; fi
-  if (( result == 0 )); then
+  if (( result == 1 )); then
+    [[ -n $PREFIX ]] || return 0
+    (( OWN_ABSENT )) || die 'owned backend absence unavailable; session preserved'
+  fi
+  local window_absent=$OWN_ABSENT
+  if (( result == 0 || window_absent )); then
     prefix=$RUNTIME_DIR/$PREFIX
     record=$(runtime_op get "$PREFIX")
     # A running PID mismatch is a refusal, never permission to close its window.
@@ -608,7 +630,14 @@ cmd_close() {
       (( ++tries <= 50 )) || die 'owned processes still running after stop; window retained'
       sleep 0.2
     done
-    if [[ $W == herdr ]]; then
+    if [[ $W == tmux ]]; then
+      local view_id
+      view_id=$(record_field "$record" view)
+      [[ -z $view_id ]] || tmux_call kill-session -t "$view_id" 2>/dev/null || true
+    fi
+    if (( window_absent )); then
+      : # The exact backend pane is already absent; finalize after process checks.
+    elif [[ $W == herdr ]]; then
       if (( H_SPLIT )); then herdr pane close "$H_PANE" >/dev/null; else herdr tab close "$H_TAB" >/dev/null; fi
       tries=0
       while resolve "$1"; do
@@ -616,9 +645,6 @@ cmd_close() {
         sleep 0.2
       done
     elif [[ $W == tmux ]]; then
-      local view_id
-      view_id=$(record_field "$record" view)
-      [[ -z $view_id ]] || tmux_call kill-session -t "$view_id" 2>/dev/null || true
       # The stopped launcher can remove its last pane between the probe and
       # kill-window. A proven absent owned pane is already cleaned up.
       local close_error current_window

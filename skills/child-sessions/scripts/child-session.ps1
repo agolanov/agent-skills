@@ -29,6 +29,11 @@ function ConvertTo-ChildSessionNativeArgument {
     }
     return $quoted+('\' * ($slashes*2))+'"'
 }
+function ConvertTo-ChildSessionPowerShellLiteral {
+    param([AllowEmptyString()][string]$Value)
+    # The PowerShell tokenizer also recognizes typographic single quotes.
+    return "'"+[Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($Value)+"'"
+}
 function Start-ChildSessionProcess {
     param([string]$Executable,[string[]]$Vector,[string]$Cwd,[bool]$Capture=$false)
     $info=New-Object Diagnostics.ProcessStartInfo
@@ -69,9 +74,10 @@ function Read-ChildSessionRecord {
     if ($Name -cnotmatch '^[A-Za-z0-9_-]+$') { throw 'Window names must match [A-Za-z0-9_-]+' }
     $path=Join-Path $script:Runtime ($Name+'.json')
     if (-not [IO.File]::Exists($path)) { return $null }
-    $r=ConvertFrom-Json ([IO.File]::ReadAllText($path,$script:Utf8))
+    # Readers must permit the launcher's atomic replacement of this record.
+    $reader=[IO.StreamReader]::new([IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)),$script:Utf8)
+    try { $r=ConvertFrom-Json ($reader.ReadToEnd()) } finally { $reader.Dispose() }
     if ($r.name -cne $Name -or -not $r.launch_id -or $r.runtime -cne $script:Runtime) { throw 'Owned launch record mismatch.' }
-    if (-not [IO.Directory]::Exists($r.checkout)) { throw 'Recorded checkout unavailable.' }
     return $r
 }
 function Write-ChildSessionRecord {
@@ -205,9 +211,7 @@ function Start-ChildSession {
     Write-ChildSessionRecord $r
     # All caller strings are inside the owned JSON; wt parses only a fixed native
     # executable and base64 bootstrap. No arbitrary path reaches its ';' parser.
-    $q=$transport.Replace("'","''")
-    $owner=$script:ChildSessionOwner.Replace("'","''")
-    $bootstrap=". '$owner'; Invoke-ChildSessionLauncher '$q'"
+    $bootstrap='. '+(ConvertTo-ChildSessionPowerShellLiteral $script:ChildSessionOwner)+'; Invoke-ChildSessionLauncher '+(ConvertTo-ChildSessionPowerShellLiteral $transport)
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
     $power=(Get-Process -Id $PID).Path
     if ($backend -eq 'terminal') {
@@ -240,7 +244,7 @@ function Start-ChildSession {
             if ($seen.ExitCode -eq 0) { $ready=$true;break }
         }
         if (-not $ready) { throw 'Native herdr shell readiness unavailable; owned pane preserved.' }
-        $command="& '"+$power.Replace("'","''")+"' -NoProfile -ExecutionPolicy Bypass -EncodedCommand "+$encoded
+        $command='& '+(ConvertTo-ChildSessionPowerShellLiteral $power)+' -NoProfile -ExecutionPolicy Bypass -EncodedCommand '+$encoded
         $sent=Invoke-ChildSessionNative $script:Herdr @('pane','run',$r.pane,$command) $script:Runtime
         if ($sent.ExitCode -ne 0) { throw 'Native herdr owned launch failed.' }
     }
@@ -264,9 +268,8 @@ function Invoke-ChildSessionLauncher {
         Set-Location -LiteralPath $request.cwd
         $r.launcher=@{pid=$PID;start=(Get-ChildSessionProcessStart $PID)}
         if ($request.resolved.script) {
-            $scriptPath=$request.resolved.script.Replace("'","''")
             $cliJson=ConvertTo-Json -InputObject ([string[]]@($request.arguments)) -Compress
-            $code='$v=ConvertFrom-Json '''+$cliJson.Replace("'","''")+'''; & '''+$scriptPath+''' @v; if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }; if (-not $?) { exit 1 }'
+            $code='$v=ConvertFrom-Json '+(ConvertTo-ChildSessionPowerShellLiteral $cliJson)+'; & '+(ConvertTo-ChildSessionPowerShellLiteral $request.resolved.script)+' @v; if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }; if (-not $?) { exit 1 }'
             $process=Start-ChildSessionProcess $request.power @('-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand',[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))) $request.cwd
         } else {
             $vector=@($request.resolved.prefix)+@($request.arguments)

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -110,7 +111,7 @@ def posix_consumers():
     fake.chmod(0o700)
     prompt = fixture / 'prompt.md'; prompt.write_bytes(b'prompt \x00 caf\xc3\xa9\r\n')
     recipe = consumer_recipe('skills/independent-review/references/cli-reviewers.md', 'bash', 1)
-    for name, events, producer, extraction in [('valid', '{"type":"result","result":"VERDICT: CLEAN"}', 0, 0), ('failed-producer', '{"type":"result","result":"answer"}', 17, 0), ('bad-json', '{bad', 0, 1), ('missing-result', '{"type":"system"}', 0, 1)]:
+    for name, events, producer, extraction in [('valid', '{"type":"result","result":"VERDICT: CLEAN"}', 0, 0), ('failed-producer', '{"type":"result","result":"answer"}', 17, 0), ('bad-json', '{bad', 0, 1), ('missing-result', '{"type":"system"}', 0, 1), ('blank-result', '{"type":"result","result":" \\t\\r\\n"}', 17, 1)]:
         attempt=fixture / ('cli-'+name); attempt.mkdir()
         env=dict(os.environ, PATH=str(bin_dir)+os.pathsep+os.environ['PATH'], PROMPT_LOG=str(attempt/'prompt.raw'), EVENTS=events, PRODUCER_EXIT=str(producer), task_checkout=str(checkout), round_prompt=str(prompt), round_dir=str(attempt), review_model='cli-default', review_effort='cli-default')
         run(['bash', '-c', recipe], env=env)
@@ -191,8 +192,31 @@ def posix_child():
         import signal
         os.kill(process_id, signal.SIGKILL)
         call('close', 'stubborn')
+        del env['FIXTURE_IGNORE_TERM']
+        # The terminal fixture provides real owned processes; only herdr's
+        # reported pane metadata is synthetic for the disappearance case.
+        (bin_dir / 'python3').symlink_to(sys.executable)
+        herdr = bin_dir / 'herdr'
+        herdr.write_text('#!/bin/bash\ncase "$1 $2" in\n"tab list") printf \'{"result":{"tabs":[]}}\\n\' ;;\n"pane list") printf "%s\\n" "$FIXTURE_PANES" ;;\n*) exit 2 ;;\nesac\n')
+        herdr.chmod(0o700)
+        call('open', 'lostpane', checkout, brief)
+        lostpane = next(p for p in (fixture / 'runtime').glob('*.record') if b'name\0lostpane\0' in p.read_bytes())
+        with lostpane.open('ab') as out:
+            out.write(b'backend\0herdr\0workspace\0workspace-fixture\0pane\0pane-owned\0window\0tab-owned\0')
+        env.update(HERDR_WORKSPACE_ID='workspace-fixture', FIXTURE_PANES='{"result":{"panes":[{"pane_id":"pane-owned","tab_id":"tab-mistaken"}]}}')
+        call('close', 'lostpane', want=2)
+        env['FIXTURE_PANES'] = '{bad'
+        call('close', 'lostpane', want=2)
+        env['FIXTURE_PANES'] = '{"result":{"panes":[]}}'
+        call('alive', 'lostpane', want=1)
+        call('close', 'lostpane')
+        assert b'closed\0true\0' in lostpane.read_bytes(), 'absent herdr pane record not finalized'
+        assert b'lostpane ' not in call('list').stdout
+        call('open', 'lostpane', checkout, brief)
+        call('alive', 'lostpane')
+        call('close', 'lostpane')
     finally:
-        call('close', 'probe', want=None); call('close', 'fast', want=None); call('close', 'stubborn', want=None)
+        call('close', 'probe', want=None); call('close', 'fast', want=None); call('close', 'stubborn', want=None); call('close', 'lostpane', want=None)
     report('posix-child', 'pass', 'synthetic terminal with actual processes: literal argv, full environment/filter exceptions, capabilities, status, fast exit and PID/start refusal')
 
     # An unrelated v-NAME session must survive optional WSL view handling.
@@ -213,13 +237,33 @@ def posix_child():
             run([wrapper, 'has-session', '-t', '=v-viewchild'], env=env)
             call('open', 'freshview', checkout, brief)
             run([wrapper, 'has-session', '-t', '=v-freshview'], env=env)
+            call('open', 'vanished', checkout, brief)
+            vanished = next(p for p in (fixture / 'runtime').glob('*.record') if b'name\0vanished\0' in p.read_bytes())
+            fields = vanished.read_bytes().split(b'\0')[:-1]
+            data = dict(zip(fields[::2], fields[1::2]))
+            run([wrapper, 'kill-window', '-t', data[b'window'].decode()], env=env)
+            call('alive', 'vanished', want=1)
+            call('close', 'vanished')
+            assert b'closed\0true\0' in vanished.read_bytes(), 'absent owned window record not finalized'
+            run([wrapper, 'has-session', '-t', '=v-vanished'], env=env, want=1)
+            assert b'vanished ' not in call('list').stdout
+            call('open', 'vanished', checkout, brief)
+            reopened = next(p for p in (fixture / 'runtime').glob('*.record') if p != vanished and b'name\0vanished\0' in p.read_bytes())
+            original = reopened.read_bytes()
+            with reopened.open('ab') as out: out.write(b'window\0@mistaken\0')
+            call('close', 'vanished', want=2)
+            reopened.write_bytes(original)
+            call('alive', 'vanished')
+            call('close', 'vanished')
             call('close', 'freshview')
             run([wrapper, 'has-session', '-t', '=v-freshview'], env=env, want=1)
             run([wrapper, 'has-session', '-t', '=v-viewchild'], env=env)
         finally:
+            call('close', 'vanished', want=None)
+            call('close', 'freshview', want=None)
             run([wrapper, 'kill-server'], env=env, want=None)
             socket_temp.cleanup()
-        report('posix-tmux-view-ownership', 'pass', 'unrelated v-NAME retained; only newly owned exact view ID closed; synthetic wt transport')
+        report('posix-tmux-view-ownership', 'pass', 'unrelated v-NAME retained; only newly owned exact view ID closed; vanished owned window finalized/reopened; live backend mismatch refused; synthetic wt transport')
 
 
 WINDOWS = r'''
@@ -352,8 +396,9 @@ function Invoke-ChildSessionNative {
     }
     & $script:NativeInvoke $Executable $Vector $Cwd
 }
-$env:CHILD_SESSION_RUNTIME_DIR=Join-Path $Root 'runtime'
-$bin=Join-Path $Root 'bin';[IO.Directory]::CreateDirectory($bin)|Out-Null
+$quotedName=' O'+[char]0x2019+'Brien'+[char]0x2019+'s '+[char]0x2018+'quoted'+[char]0x201b
+$env:CHILD_SESSION_RUNTIME_DIR=Join-Path $Root ('runtime'+$quotedName)
+$bin=Join-Path $Root ('bin'+$quotedName);[IO.Directory]::CreateDirectory($bin)|Out-Null
 $env:PATH=$bin+';'+$env:PATH
 function Resolve-ChildSessionAgent { param([string]$Agent);return @{script=(Join-Path $bin 'claude.ps1')} }
 $env:FIXTURE_LOG=Join-Path $Root 'agent.json'
@@ -364,8 +409,8 @@ if ($env:FIXTURE_EXIT) { exit ([int]$env:FIXTURE_EXIT) }
 Start-Sleep -Seconds 90
 '@
 [IO.File]::WriteAllText((Join-Path $bin 'claude.ps1'),$agent,$script:Utf8)
-$brief=Join-Path $Root 'brief café $; quote.md';[IO.File]::WriteAllText($brief,'fixture')
-$model='literal " café $HOME; `false`'
+$brief=Join-Path $Root ('brief café $; O'+[char]0x2019+'Brien'+[char]0x2019+'s.md');[IO.File]::WriteAllText($brief,'fixture')
+$model='literal " café $HOME; `false`'+[char]0x2019+'; Write-Output INJECTED; '+[char]0x2018+[char]0x201b
 try {
     Assert ((Invoke-ChildSessionDispatch @('open','--model',$model,'probe',$checkout,$brief)) -eq 0) 'open failed'
     for ($n=0;$n -lt 100 -and -not [IO.File]::Exists($env:FIXTURE_LOG);$n++) { Start-Sleep -Milliseconds 50 }
@@ -374,6 +419,9 @@ try {
     Assert ($observed.config -ceq 'full environment' -and $observed.codex -ceq 'config $;' -and $observed.claude -ceq 'claude café' -and -not $observed.metadata) 'environment filtering/config failed'
     Assert ($observed.cwd -ceq $checkout) 'cwd changed'
     $record=Read-ChildSessionRecord 'probe';$caps=Get-ChildSessionCapabilities $record
+    $recordPath=Join-Path $env:CHILD_SESSION_RUNTIME_DIR 'probe.json'
+    $held=[IO.File]::Open($recordPath,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try { Assert ((Read-ChildSessionRecord 'probe').launch_id -ceq $record.launch_id) 'record read failed during replacement-compatible access' } finally { $held.Dispose() }
     Assert ($caps.close -and -not $caps.peek -and -not $caps.send -and -not $caps.window_close) 'terminal capabilities incorrect'
     Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 0) 'agent not alive'
     $refused=$false;try { $null=Invoke-ChildSessionDispatch @('send','probe','never guessed') } catch { $refused=$true };Assert $refused 'unsupported input accepted'
@@ -389,6 +437,23 @@ try {
     Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 0) 'refusal killed process'
     Assert ((Invoke-ChildSessionDispatch @('close','probe')) -eq 0) 'close failed'
     Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 1) 'closed agent alive'
+    $removedCheckout=Join-Path $Root 'removed checkout';[IO.Directory]::CreateDirectory($removedCheckout)|Out-Null
+    $env:FIXTURE_EXIT='23'
+    Assert ((Invoke-ChildSessionDispatch @('open','removed',$removedCheckout,$brief)) -eq 0) 'removed-checkout open failed'
+    # Windows locks a live process's cwd. Await this fixture's natural exit,
+    # then remove its checkout while the owned record still needs cleanup.
+    Assert ($script:FixtureLaunchers[$script:FixtureLaunchers.Count-1].WaitForExit(10000)) 'removed-checkout fixture did not exit'
+    Remove-Item Env:FIXTURE_EXIT
+    [IO.Directory]::Delete($removedCheckout)
+    Assert ((Invoke-ChildSessionDispatch @('alive','removed')) -eq 1) 'removed-checkout liveness failed'
+    $listed=& $script:NativeInvoke $power @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Owner,'list') $Root
+    Assert ($listed.ExitCode -eq 0 -and $script:Utf8.GetString($listed.Stdout).Contains('removed terminal')) 'list failed after checkout removal'
+    Assert ((Invoke-ChildSessionDispatch @('close','removed')) -eq 0) 'close failed after checkout removal'
+    Assert ((Invoke-ChildSessionDispatch @('alive','removed')) -eq 1) 'removed-checkout agent still alive'
+    $listed=& $script:NativeInvoke $power @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Owner,'list') $Root
+    Assert ($listed.ExitCode -eq 0 -and (-not $listed.Stdout -or -not $script:Utf8.GetString($listed.Stdout).Contains('removed terminal'))) 'closed removed-checkout record blocked list'
+    Assert ((Invoke-ChildSessionDispatch @('open','removed',$checkout,$brief)) -eq 0) 'same-name reuse failed after checkout removal'
+    Assert ((Invoke-ChildSessionDispatch @('close','removed')) -eq 0) 'reused session close failed'
     $env:FIXTURE_EXIT='23'
     Assert ((Invoke-ChildSessionDispatch @('open','fast',$checkout,$brief)) -eq 0) 'fast open failed'
     for ($n=0;$n -lt 100;$n++) { $r=Read-ChildSessionRecord 'fast';if ($r.phase -eq 'exited') { break };Start-Sleep -Milliseconds 50 }
@@ -405,7 +470,7 @@ try {
     for ($i=0;$i -lt $values.Count;$i++) { Assert ($decoded[$i] -ceq $values[$i]) 'native argv changed' }
     [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, capabilities, reviewer raw I/O/producer/extraction, byte freshness/CRLF/failure';terminal='synthetic transport; native processes'}))
 } finally {
-    foreach ($name in 'probe','fast') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
+    foreach ($name in 'probe','fast','removed') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
     foreach ($p in $script:FixtureLaunchers) {
         if (-not $p.HasExited) { $p.Kill();$p.WaitForExit() }
         $text=$p.StandardError.ReadToEnd();if ($text) { [Console]::Error.WriteLine($text) }
@@ -429,10 +494,14 @@ def windows():
     (staging / 'fixture.ps1').write_text(WINDOWS, encoding='utf-8-sig')
     (staging / 'git-recipe.ps1').write_text(recipe('powershell'), encoding='utf-8-sig')
     (staging / 'freshness-recipe.ps1').write_text(consumer_recipe('skills/refining-task-docs/references/review-mark.md', 'powershell'), encoding='utf-8-sig')
-    owner = native(ROOT / 'skills/child-sessions/scripts/child-session.ps1')
+    # Exercise helper/transport/script/brief literals containing PowerShell's
+    # typographic quote characters, using a disposable copy of the owner.
+    owner_copy = staging / 'owner O’Brien’s ‘quoted‛.ps1'
+    shutil.copy2(ROOT / 'skills/child-sessions/scripts/child-session.ps1', owner_copy)
+    owner = native(owner_copy)
     script = native(staging / 'fixture.ps1'); git_recipe = native(staging / 'git-recipe.ps1'); root = native(staging)
     # Only fixed, correctly single-quoted paths enter this controller bootstrap.
-    quote = lambda value: "'" + value.replace("'", "''") + "'"
+    quote = lambda value: "'" + ''.join(c * 2 if c in "'‘’‚‛" else c for c in value) + "'"
     code = '& ' + quote(script) + ' -Owner ' + quote(owner) + ' -GitRecipe ' + quote(git_recipe) + ' -Root ' + quote(root) + ' -ReviewerIO ' + quote(native(ROOT / 'skills/independent-review/scripts/reviewer-process.ps1')) + ' -FreshnessRecipe ' + quote(native(staging / 'freshness-recipe.ps1'))
     run([power, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded(code)])
     passed = json.loads((staging / 'passed.json').read_text(encoding='utf-8-sig'))
@@ -443,7 +512,7 @@ def windows():
     if legacy:
         # Useful 5.1 compatibility is narrower than the current 7.6.9 runtime:
         # parse/import the helper, its 5.1 native quoting and status dispatch.
-        compatibility = '. ' + quote(owner) + '; $env:CHILD_SESSION_RUNTIME_DIR=' + quote(root + '\\compatibility51') + '; $s=' + quote(root + '\\compatibility-status.md') + "; [IO.File]::WriteAllText($s,'STATUS: done'); if ((Invoke-ChildSessionDispatch @('wait','absent',$s,'0')) -ne 0) { exit 1 }; [Console]::Write($PSVersionTable.PSVersion.ToString())"
+        compatibility = '. ' + quote(owner) + '; $env:CHILD_SESSION_RUNTIME_DIR=' + quote(root + '\\compatibility51') + '; $s=' + quote(root + '\\compatibility-status.md') + "; [IO.File]::WriteAllText($s,'STATUS: done'); if ((Invoke-ChildSessionDispatch @('wait','absent',$s,'0')) -ne 0) { exit 1 }; $sample='O'+[char]0x2019+'Brien'+[char]0x2018+[char]0x201b+\"'\"; $actual=& ([scriptblock]::Create((ConvertTo-ChildSessionPowerShellLiteral $sample))); if ($actual -cne $sample) { exit 1 }; [Console]::Write($PSVersionTable.PSVersion.ToString())"
         result = run([legacy, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded(compatibility)])
         report('windows-5.1-compatibility', 'pass', result.stdout.decode(errors='replace'))
     else:
