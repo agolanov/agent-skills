@@ -1,38 +1,72 @@
 # Checkout state and verification evidence
 
-Read this contract before capturing a suite, review, cross-check, retry or resume boundary. Resolve `state_helper` as the absolute `scripts/checkout-state.py` beside the owning installed independent-review `SKILL.md`. Python 3 and that helper are required; unavailable dependencies or impractical full hashing mean unavailable verification, with no porcelain-only fallback.
+Use ordinary Git evidence at every suite, review, cross-check, retry, resume and clean/path gate. Local repositories and agents are trusted; these checks protect against accidental changes. They need Git and the installed shell, with no Python prerequisite. Keep evidence outside every checkout being checked.
 
-## Capture and compare
+## Record and compare Git evidence
 
-Each invocation owns a **new, nonexistent** output directory outside the reviewed checkout. Create its parent beforehand. Resolve the absolute checkout, including the actual clone when used. Keep prompts, logs, snapshots, preserved unexpected content and differences outside every monitored tree.
-
-```bash
-python3 "$state_helper" capture --checkout "$review_tree" --output-dir "$attempt_dir/before"
-python3 "$state_helper" capture --checkout "$review_tree" --output-dir "$attempt_dir/after"
-python3 "$state_helper" compare --before "$attempt_dir/before" --after "$attempt_dir/after" --output-dir "$attempt_dir/comparison"
-```
-
-Run each command separately; retain its real exit and stderr, including when capture fails. Compare successful or diagnostic captures. Existing output directories are refused, including empty ones; a refused/crashed invocation owns no usable output. Never interpret leftover files as its result.
-
-- `snapshot.json`: schema 3, base64 canonical checkout identity, `complete: true`, observed `fields`, empty `errors`, coverage `limits`.
-- `diagnostic.json`: same schema, `complete: false`, errors and individually observed fields. It cannot prove equality. Shared successful fields can prove a difference.
-- `result.json`: schema 3, `outcome: identical|changed|unavailable`, two input paths and SHA-256 identities (or unavailable-input reason), `differences` with field/before/after evidence, `errors`, and limits. Atomic publication prevents a partial record becoming evidence. Input bytes must still match the recorded identities.
-
-All JSON is UTF-8. Pathnames, symlink text, literal metadata and raw NUL status are base64; content hashes are raw-byte SHA-256. Compare payloads, not artifact paths or timestamps. Validate schema/completeness/encoding and the result's input identities; missing/malformed output, a signal/crash, stale output or exit/result mismatch means unavailable. Never infer a write from exit 1 alone:
+For each boundary record the absolute checkout, command, cwd, actual exit, stdout and stderr of all four commands:
 
 ```text
-capture exit == 0 AND valid complete snapshot -> usable snapshot
-compare exit == 0 AND result.outcome == "identical" -> identical monitored state
-compare exit == 1 AND result.outcome == "changed" + evidence -> checkout changed
-otherwise -> invalid: state verification unavailable (unless proven change
-was separately recorded); never infer writes from exit 1 alone.
+git -C CHECKOUT rev-parse HEAD
+git -C CHECKOUT status --porcelain=v1 -z --untracked-files=all
+git -C CHECKOUT diff --binary --no-ext-diff --no-textconv
+git -C CHECKOUT diff --cached --binary --no-ext-diff --no-textconv
 ```
 
-Retain errors even beside a proven change. Preserve available records and unexpected content/diff, identify its source using the caller's attribution rules and return `checkout changed` for adjudication. This helper neither restores nor commits, retries reviewers nor decides ownership. A failed read alone is never a write claim.
+Set `GIT_OPTIONAL_LOCKS=0` for these reads. Use a fresh external directory for each boundary. Preserve stdout bytes, including NULs and binary patches; do not pass them through a text pipeline or command substitution. Retain failed commands and diagnostics. A launch error or nonzero Git exit makes that boundary unavailable, never clean. Obtain all four successful results before starting the dependent action.
+
+At entry and continuation, verify `git -C CHECKOUT rev-parse --show-toplevel`, the actual branch (`symbolic-ref --quiet --short HEAD`, or the caller's expected detached state) and the recorded HEAD against the requested task identity. Record their outputs/exits too. Inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and `GIT_COMMON_DIR` can redirect these commands: diagnose them or clear them only in the current command process before checking. An unexpected checkout, branch, index override or HEAD blocks the dependent action until reconciled; `-C` alone does not establish identity.
+
+On POSIX, bind absolute `checkout` and fresh external `evidence` directories. Run in a command shell that saves failures before continuing (without `errexit`):
+
+```bash
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
+export GIT_OPTIONAL_LOCKS=0
+git -C "$checkout" rev-parse HEAD >"$evidence/head.stdout" 2>"$evidence/head.stderr"
+printf '%s\n' "$?" >"$evidence/head.exit"
+git -C "$checkout" status --porcelain=v1 -z --untracked-files=all >"$evidence/status.stdout" 2>"$evidence/status.stderr"
+printf '%s\n' "$?" >"$evidence/status.exit"
+git -C "$checkout" diff --binary --no-ext-diff --no-textconv >"$evidence/worktree-diff.stdout" 2>"$evidence/worktree-diff.stderr"
+printf '%s\n' "$?" >"$evidence/worktree-diff.exit"
+git -C "$checkout" diff --cached --binary --no-ext-diff --no-textconv >"$evidence/cached-diff.stdout" 2>"$evidence/cached-diff.stderr"
+printf '%s\n' "$?" >"$evidence/cached-diff.exit"
+```
+
+On native Windows, use the verified installed PowerShell executable. This recipe uses pwsh 7.6.9's byte-preserving direct native stdout redirection; run it in that shell, with absolute `checkout` and fresh external `evidence` directories. Resolve the executable first; a launch/redirection exception is unavailable evidence even if an old `$LASTEXITCODE` exists.
+
+```powershell
+$git = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
+foreach ($name in 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR') { Remove-Item -LiteralPath ('Env:' + $name) -ErrorAction SilentlyContinue }
+$env:GIT_OPTIONAL_LOCKS = '0'
+& $git -C $checkout rev-parse HEAD > "$evidence/head.stdout" 2> "$evidence/head.stderr"
+$LASTEXITCODE | Set-Content -LiteralPath "$evidence/head.exit" -Encoding ascii
+& $git -C $checkout status --porcelain=v1 -z --untracked-files=all > "$evidence/status.stdout" 2> "$evidence/status.stderr"
+$LASTEXITCODE | Set-Content -LiteralPath "$evidence/status.exit" -Encoding ascii
+& $git -C $checkout diff --binary --no-ext-diff --no-textconv > "$evidence/worktree-diff.stdout" 2> "$evidence/worktree-diff.stderr"
+$LASTEXITCODE | Set-Content -LiteralPath "$evidence/worktree-diff.exit" -Encoding ascii
+& $git -C $checkout diff --cached --binary --no-ext-diff --no-textconv > "$evidence/cached-diff.stdout" 2> "$evidence/cached-diff.stderr"
+$LASTEXITCODE | Set-Content -LiteralPath "$evidence/cached-diff.exit" -Encoding ascii
+```
+
+Record the commands/cwd alongside these files and inspect all exits before proceeding. For another installed shell, use its ordinary file/process APIs to preserve stdout bytes and record real exits. Keep any unsupported shell case explicit; do not install a runtime to satisfy this reference.
+
+Record before and after each phase, then compare corresponding stdout files as bytes, for example with `cmp` on POSIX or `fc.exe /b` on Windows. Retain each comparison's output and real exit: 0 is equal, 1 is different, and a comparison error is unavailable evidence. Any difference requires inspection and disposition, including a status-only difference. Report **unchanged recorded Git evidence**, not proof that all filesystem bytes were unchanged. In a parallel review use one shared before/after set; in clone mode record and compare both checkouts separately.
 
 ## Direct-use preflight
 
-Use this preflight for direct review and every clean/path gate in delivery and task preparation, including continuations, child verification, integration, queue updates and follow-ups. Run the capture command above into a fresh external directory for the checkout being checked. Run this recipe as `python3 <recipe.py> "$state_helper" "$capture_dir"`, with recipe/output outside the checkout:
+Use the four-command boundary immediately before each clean/path gate; an earlier result is not a later gate. Confirm the recorded HEAD is the required commit. A **clean gate** requires successful commands, empty status and empty worktree/cached diffs. A direct-review dirty result takes the caller's existing commit-or-clone decision. Preserve unrelated work.
+
+For path gates, parse the raw NUL-delimited porcelain v1 status, not its displayed lines. Each entry starts with two status columns and a space, followed by a repository-relative path; rename/copy entries have a second NUL-delimited path. Include both rename/copy paths. Compare exact paths with the caller's file set, preserving case, spaces and other literal characters; substring matching is insufficient. If the status cannot be parsed faithfully or conflicts with the diffs, stop that gate and inspect the evidence.
+
+- A **follow-ups-only gate** requires every affected path to equal the one follow-ups file.
+- An **own-paths gate** requires no affected path to equal any caller-owned file; unrelated dirty paths pass that gate.
+- Stage and commit only explicitly task-owned paths. A path gate grants no write, merge or push authority.
+
+**OPTIONAL COMPATIBILITY:** the retained `scripts/checkout-state.py` is the unchanged legacy Python helper. Existing callers/tests may explicitly use its capture/compare/module interfaces on a compatible installed runtime. It is not the default gate, a native Windows requirement or a fallback that turns failed Git evidence into clean evidence. Legacy records retain their own schema and limits; keep their evidence separate from ordinary Git outputs.
+
+The first Python recipe below preserves the legacy `(checkout-state.py, capture_dir)` interface. It reads an existing successful legacy capture; recipe and output stay outside the checkout:
 
 ```python
 import json
@@ -45,60 +79,39 @@ record, _ = state['read_record'](sys.argv[2])
 print(json.dumps(state['preflight'](record)))
 ```
 
-The result uses one complete snapshot: safe status, manually discovered untracked entries and the index-only comparison to its recorded HEAD. It includes staged gitlink additions, removals, conflicts and OID/mode changes without reading submodule contents. A gitlink location replaced by a file, link, special entry or missing path makes the gate dirty; an empty uninitialized directory remains normal. `paths` is the sorted base64 list of affected paths; status renames contribute both paths. Decode bytes and compare exact repository-relative paths for allowlists (such as a follow-ups-only commit); substring or line-based matching is insufficient.
-
-Retain capture, recipe result and real exits. Any failed capture, exception or nonzero recipe exit makes preflight unavailable: launch/integrate nothing and preserve the checkout. No plain status/diff fallback. The private status index clears assume-unchanged and clears skip-worktree for present paths; source flags remain unchanged and monitored. Missing skip-worktree paths remain normal sparse-checkout omissions. A clean gate requires `uncommitted: false`; a follow-ups-only gate requires every decoded `paths` entry to equal that follow-ups file; an **own-paths gate** takes the caller's set of owned repository-relative file paths and requires that no decoded `paths` entry equals an owned path, so changes to any other path pass. A direct-use true value takes the caller's existing commit-or-clone decision. False means no detected outer/staged changes within the disclosed limits, not a clean submodule. Re-capture immediately before each dependent action; an older result is not a later gate.
-
-These read-only checks use generated Git configuration. Repository/global normalization filters, CRLF settings and external ignore files are not applied: their files may conservatively appear changed/untracked. Resolve such a result explicitly; never substitute a config-enabled status to certify cleanliness. Authorized commit/merge commands retain the workflow's separate write authority and operational trust requirements; this helper does not sandbox them.
+For this optional recipe, retain the capture/recipe exits and errors; an exception, diagnostic capture or nonzero exit is unavailable. The result's `uncommitted` boolean and base64 `paths` retain their legacy meanings. Decode paths and use the exact-path gate rules above. Legacy successful evidence does not expand the ordinary Git guarantee.
 
 ## Other read-only Git gates
 
-Delivery/preparation verification also reads commits, ancestry, branches, repository roots and artifact diffs. Use the same isolation for these reads, including inside copied child briefs and shell recipes:
+Use ordinary Git for branch, ancestry, root, commit and artifact checks too, with `GIT_OPTIONAL_LOCKS=0`, literal argument arrays/quoting and actual exits. Examples:
 
 ```bash
-python3 "$state_helper" git-read --checkout "$directory" -- rev-parse --show-toplevel
-python3 "$state_helper" git-read --checkout "$review_tree" -- log --oneline "$base..$branch"
-python3 "$state_helper" git-read --checkout "$docs_tree" -- diff --quiet "$branch" HEAD -- "$artifact"
+GIT_OPTIONAL_LOCKS=0 git -C "$directory" rev-parse --show-toplevel
+GIT_OPTIONAL_LOCKS=0 git -C "$review_tree" log --oneline "$base..$branch"
+GIT_OPTIONAL_LOCKS=0 git -C "$docs_tree" diff --no-ext-diff --no-textconv --quiet "$branch" HEAD -- "$artifact"
 ```
 
-`git-read` finds the containing checkout by walking ancestors for a literal `.git` entry, without running Git during discovery. Commands run at that checkout's root: supply root-relative or absolute file paths, not paths relative to a child directory. Supported read commands are `rev-parse`, `log`, `show`, `diff`, `merge-base`, `check-ignore`, single-target `symbolic-ref`, `cat-file -e|-p|-t|-s <object>`, `check-ref-format --branch <name>`, and `worktree list --porcelain -z`. Worktree registration metadata is copied with no-follow reads; listing requires the main repository to use an ordinary `.git` directory (other layouts report unavailable). Diff/log/show force `--ignore-submodules=dirty --submodule=short`: caller overrides accept only ignore values `dirty`/`all` and format `short`, never negated or ambiguous forms. This suppresses submodule status processes and recursive submodule rendering while retaining ordinary gitlink OID differences. Diff helpers/textconv, output-file options and remerge/diff-merges modes that could generate objects are disabled; diff paths must remain inside the checkout under both lexical normalization and symlink resolution, including dash-prefixed operands after `--`; this also rejects implicit no-index escapes. Exit 0/1 retains the command's meaning (for example equal/different for `diff --quiet`, ignored/not ignored for `check-ignore`); errors/timeouts return 2 with a diagnostic and block the gate. `check-ref-format --branch` normalizes an invalid name to exit 1; setup failures remain exit 2. Retain actual output and exit; a failed lookup is not a missing ref or a clean comparison. Worktree diffs may resolve a gitlink HEAD as data; an inaccessible or blocking target yields unavailable under the ten-second Git timeout. They are extra reads, not literal-only phase observations. Required tree-to-tree comparisons and capture do not need those worktree HEAD reads. Cleanliness still uses capture/preflight, never `git-read diff` as a replacement. Explicit mutating actions use their existing authorized commands.
+For a comparison such as `diff --quiet`, exit 0 means equal and 1 means different; an error is neither. For lookups, distinguish a documented absence result from a command/setup failure. Retain stderr and stop dependent actions when required evidence is unavailable. There is no mandatory wrapper, private-index capture or normalization/stat-refresh ceremony. Explicit mutating actions keep their existing authority.
 
-## Monitored surfaces and limits
+## Evidence limits
 
-Capture observes HEAD, every index path/stage/mode/OID and observation flag, safe NUL status, selected outer administration identity, every tracked path and every nonignored untracked leaf recursively. Regular files use no-follow raw-byte hashing and executable bits, links literal targets, stable missing tracked paths deletion markers, directory replacements their kind. Worktree `.gitignore` and ordinary common-dir `info/exclude` rules apply only to untracked discovery; tracked ignored files and `.gitignore` stay covered. Nonignored FIFO/socket/device entries retain kind and device identity without reading streams. Empty untracked directories need not appear.
+These are ordinary trusted-local checks, not an atomic snapshot or adversarial filesystem proof. They can miss ignored files, changes to already-untracked file contents, assume-unchanged/skip-worktree paths, bytes hidden by Git normalization/filters, nested repository/submodule contents and transient writes restored before the next boundary. The ordinary repository configuration applies. A clean outer result does not certify clean submodules. No result authorizes writes to those surfaces.
 
-Only directories without tracked descendants use the nested-untracked boundary; directories containing tracked descendants retain the same literal `.git` metadata record and still expose their nonignored untracked descendants when that entry is present. Nested untracked repositories are directory records with literal `.git` file/link content or ordinary `.git/HEAD` text, including unborn symbolic HEAD and explicit missing metadata. The literal reader resolves neither pointer targets nor symbolic refs and executes no Git commands/configuration/filters there. A tracked file or link already replaced by such a directory also retains its literal metadata record; without tracked descendants its nested content remains unmonitored. Nested content and branch-tip changes with unchanged literal metadata are unmonitored.
-
-Gitlinks retain every index path/stage/mode/OID and observation flag plus no-follow `location` evidence. Outer status uses `--ignore-submodules=all` and a deduplicated literal exclusion pathspec for every mode-160000 path across all index stages. Index/gitlink changes remain detected separately. The private index is frozen for each inventory. Status disables untracked traversal; the no-follow walker supplies those entries. Tracked files replaced by directories are excluded from native status and reported as deletions.
-
-A submodule record contains `location` and boolean `metadata_present`, meaning literal `.git` presence only, not usable initialization. A replaced link/file/special/missing gitlink or parent stops traversal at that component and retains its content/kind, with presence false and no metadata fields. An actual directory adds `metadata`, the literal `.git` observation; missing `.git` is explicit and presence is false even if `.git/modules` remains. Gitfiles retain raw text, links only their link text, and special entries their kind/device. Malformed, dangling and legitimately relocated pointers are observations, never instructions to open another repository.
-
-Only an ordinary embedded `.git` directory adds `embedded_head`, a literal `.git/HEAD` observation. Symbolic, unborn and detached HEAD text is not a resolved commit; links are retained without traversal, a missing HEAD is explicit, and a FIFO is recorded without reading its stream. During capture, no Git runs in a submodule or resolves its gitfile/link/ref/common-dir targets or configuration. The separate `git-read` worktree-diff boundary is stated above; it never supplies phase equality evidence. Unreadable or observably racing metadata makes capture unavailable.
-
-Submodule content, clean-to-dirty and dirty-to-dirty transitions, nonignored untracked content and internal ref/index/config changes are not monitored. Resolved HEAD or branch-tip changes leaving the recorded literal metadata unchanged are unmonitored, including absorbed submodules with unchanged pointer text. Embedded literal HEAD edits are detected; ref-tip changes behind unchanged symbolic HEAD are not. Identical monitored evidence never establishes that a submodule is clean or internally unchanged.
-
-Two inventories/content passes detect observable races; an enumerated untracked path disappearing, failed Git/hash/read, unreadable metadata or changing content/kind makes capture unavailable. All inherited `GIT_*` overrides and global/system Git configuration are disabled, pathspecs are literal (filenames cannot act as Git patterns), and optional locks are disabled. This is a phase-boundary comparison, not a lock or atomic snapshot: transient restored writes and undetectable concurrency remain outside its guarantee. Full hashing deliberately costs work proportional to all tracked and discovered untracked bytes, including binaries and LFS worktree data; do not omit clean/flagged files to save time.
-
-Every result/state line carries: **ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored; submodule resolved HEAD and dirty state not monitored**.
-
-Outer `.git` location identity, gitfile text, resolved administration directory identity and common-dir pointer/identity are monitored. The temporary root (`TMPDIR`, `TEMP`, `TMP`, otherwise `/tmp`) must exist, allow private directory creation and resolve outside the checkout and source administration; an invalid configured root is unavailable rather than falling back to another root, and an unsafe choice fails before temporary files are created. Each inventory uses a private temporary Git directory with copied HEAD, refs, packed refs and index, generated non-executing configuration and explicit object storage. Copied index/shared-index timestamps are preserved, including after private flag updates, so Git retains its racy-clean content checks. Source config is parsed without includes only to recognize object format and supported extensions. No Git runs in the source administration context. Administrative files are bounded ordinary no-follow reads; unsafe metadata makes capture unavailable. Every Git subprocess has a ten-second timeout. Objects/alternates remain data inputs, never configuration, and inaccessible or blocking object storage makes verification unavailable.
-
-Ordinary and linked worktrees, packed refs, SHA-1/SHA-256 and split indexes are supported. Reftable/unknown extensions, symlinked administrative components and unsupported index formats fail unavailable. Worktree-specific configuration, includes, filters, fsmonitor, external attributes/ignore files and global/system settings are not executed or applied. Git's default external ignore/attribute files are explicitly disabled, including system attributes; the source-config parser cannot discover a parent repository above its temporary directory. This may conservatively report dirt for repositories relying on normalization or external ignores. Administrative contents other than the explicitly observed identity/HEAD/index and literal nested metadata, plus external dependencies/environment, remain outside change detection. These limits never authorize checkout writes.
-
+Carry these limits in state/suite/review records. A finding verdict, result validity and verification coverage are separate decisions. Disclose any additional known gap rather than claiming that Git output equality proved raw-byte equality.
 
 ## Phase recovery and resume
 
-Capture before a phase and after it, then compare. For two parallel reviewers, use one pre-phase capture and one post-phase capture after both finish; both attempts reference that comparison. In clone mode monitor **both** the reviewed clone and original checkout throughout suite/review/cross-check/retry/resume, retaining separate records and naming which tree changed or is unavailable.
+Keep the successful before evidence until a phase is resolved. Clone mode tracks both the reviewed clone and original checkout, naming which changed or is unavailable.
 
-- Failed **pre-phase** capture: launch nothing and spend no attempt. Resolve the error and obtain a baseline for this pending phase. Do not compare against an earlier completed phase or attribute an authorized fix commit to an earlier reviewer.
-- Failed **post-phase** capture: validate and record every other reviewer condition, return unavailable absent proved difference, and spend the existing invalid-attempt budget. For a shared failure each reviewer retains its own completion/coverage/settings result and budget; no new loop retry is added. A suite-phase failure blocks before reviewers, spending none of their attempts.
-- Recovery: retain that interrupted phase's last successful pre-phase snapshot. Before retry, suite rerun, evidence reuse or a replacement baseline, compare the **next successful** capture to that saved snapshot. Equality permits continuation; a difference returns `checkout changed` under the original phase attribution. Persistent unavailability blocks. An unavailable capture is neither reusable suite evidence nor proof of restoration.
-- Same-HEAD resume, both `scratch` and `invalidating`: require successful equality to the pre-interruption monitored state before applying the answer; otherwise return `checkout changed` again with the answer unapplied. Only then apply the caller's established reuse/spend rules.
-- Authorized reconciliation at a new HEAD: require a new target and an explicit reconciled baseline with no unexplained residual changes; void prior results and refresh suite/review on that commit. Preserve spent attempts. Do not demand equality to old committed content. An unresolved failed post-phase capture still requires its recovery comparison/adjudication before accepting a new baseline.
+- Failed **before** evidence: launch nothing and spend no attempt. Resolve the error and obtain the pending phase's baseline; do not attribute a later authorized commit to an earlier reviewer.
+- Failed **after** evidence: record every other completion/settings/coverage condition. Absent a proven difference, return `invalid: state verification unavailable: <error>`. A review spends its existing invalid-attempt budget; a suite failure blocks before reviewers and spends none. Parallel attempts retain separate validity and budgets.
+- Before retry, rerun, reuse or a replacement baseline, compare the next successful four-command results to the interrupted phase's saved before results. Unchanged evidence permits continuation; a difference returns `checkout changed` for the original phase's adjudication. Persistent unavailability blocks.
+- Same-HEAD resume, both `scratch` and `invalidating`, requires unchanged recorded evidence against the pre-interruption baseline before applying the answer and existing reuse/spend rules. Keep the answer unapplied while changes remain unexplained.
+- Authorized new-HEAD reconciliation requires an explicit reconciled baseline, a new target and no unexplained residual changes. Resolve an interrupted phase first; preserve old evidence and spent attempts. Refresh suite/review evidence for the new commit.
 
-Schema-1/2 or mixed-schema captures are incompatible and yield unavailable, not equality or a write solely from incompatibility. An interrupted phase with an incompatible retained baseline cannot silently reuse it or replace it with a schema-3 baseline; report unavailable and require explicit reconciliation under the caller's authority.
+A demonstrated difference returns `checkout changed` even beside errors. Preserve outputs, available unexpected content and diffs externally, identify their source and let the caller adjudicate. A read failure alone is not a write claim. Never reset or fold unexpected writes into commits automatically.
 
-Caller-approved commits and fully reconciled states establish new phase baselines. Preserve unrelated work and old evidence; never automatically reset it.
+An interrupted legacy-helper phase keeps its original evidence method until it is resolved or explicitly reconciled by its caller; ordinary Git outputs cannot silently certify equality with a legacy capture. New phases use the ordinary Git boundary by default.
 
 ## Resolve checks and bind suite evidence
 
@@ -106,7 +119,11 @@ At entry resolve exact ordered complete-suite commands and targeted checks, thei
 
 Forward the resolved set to every prompt; reviewers do not rediscover commands. A single final-pass reviewer (direct use included) independently executes the exact complete-suite commands in the reviewed tree. Round 1 adds security focus, not that independent suite rerun. Dual reviewers inherit the session/caller suite and may run targeted reproductions, never concurrent complete suites.
 
-Each suite evidence record contains ordered commands, cwd, exits, reviewed commit, absolute checkout, successful before/after snapshots and comparison, known dependency/environment changes and coverage limits. Reuse requires the **same commit and checkout**, successfully compared monitored state from the run through reuse, and no known environment/dependency change. Failed/unavailable captures prevent reuse. For a completed suite phase on unchanged HEAD, after either caller answer (`scratch` or `invalidating`), successful restoration equality to its pre-suite snapshot supplies the required state proof: retain the original changed comparison and the restoration comparison, then reuse the recorded run on the same commit/checkout and advance to review without rerunning that writing suite. The suite has no reviewer attempts to spend under either answer; this preserves its existing same-HEAD resume semantics. Keep the actual suite exits/coverage, and all other reuse conditions still apply. New-HEAD reconciliation requires fresh suite evidence. A commit after a suite run requires another run on committed HEAD, even for generated-only changes; tree equivalence is insufficient. Keep the loop's pre-commit suite gate as well. Suite writes require caller adjudication and restoration or a task commit before review; a new commit always needs new evidence. Failed post-commit required checks block review/completion without authorizing amend, squash or unreviewed corrective commits.
+Each suite evidence record contains ordered commands, cwd, exits, reviewed commit, absolute checkout, successful before/after Git outputs and their comparison, known dependency/environment changes and evidence limits. Reuse requires the **same commit and checkout**, unchanged recorded Git evidence from the run through reuse, and no known environment/dependency change. Failed/unavailable boundary checks prevent reuse.
+
+For a completed suite phase on unchanged HEAD, after either caller answer (`scratch` or `invalidating`), successful restoration comparison to the before-suite outputs supplies the required evidence: retain the original changed comparison and the restoration comparison, then reuse the recorded run on the same commit/checkout and advance to review without rerunning that writing suite. The suite has no reviewer attempts to spend under either answer. Keep actual suite exits/coverage and all other reuse conditions. New-HEAD reconciliation requires fresh suite evidence. A commit after a suite run requires another run on committed HEAD, even for generated-only changes; tree equivalence is insufficient. Keep the loop's pre-commit suite gate too.
+
+Suite writes require caller adjudication and restoration or a task commit before review. Failed post-commit required checks block review/completion without authorizing amend, squash or unreviewed corrective commits.
 
 ## Verification marker
 

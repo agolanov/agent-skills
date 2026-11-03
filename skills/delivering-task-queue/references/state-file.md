@@ -2,7 +2,7 @@
 
 ## Names
 
-- `<runtime>` is `${XDG_RUNTIME_DIR:-/tmp}/child-sessions`, outside Git.
+- `<runtime>` is the resolved installed child helper's successful `runtime-dir` output, outside Git.
 - `<queue-slug>`: for a list, the first input document's stem as given plus `-list` (`2026-10-29-alpha-list`); for a directory, its basename plus `-dir` (`2026-10-29-b1-dir`).
 
 ## State file

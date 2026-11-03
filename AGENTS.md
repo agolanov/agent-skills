@@ -25,6 +25,10 @@ docs/superpowers/plans/       # implementation plans (YYYY-MM-DD-<slug>.md)
 - **Frontmatter:** `name` (matching the directory) and `description` are required, and stay under 1024 characters combined. Descriptions are third-person and say when to use the skill, not how it works internally. Mark work-in-progress skills with `metadata.internal: true`.
 - **README:** the skills table lists every skill; one still under development is tagged `*(in development)*` until its tests pass.
 
+## Runtime portability
+
+Published executable instructions use installed Git, agent CLIs and the native shell. Use the independent-review checkout-state reference's ordinary Git evidence and exact path gates; Python is optional legacy compatibility, not a universal prerequisite. Use child-sessions' installed platform entrypoint, `runtime-dir` and per-launch `capabilities`; unsupported terminal controls use brief/status files and direct user attention. Record actual runtime/producer exits and unverified platform coverage. Do not install runtimes or alter profiles/persistent configuration as a fallback.
+
 ## Developing a skill
 
 Every spec has a `## Verification` section in free form: what the change could break, the check that covers each risk, and how to run it. The spec's author chooses the checks from the change's risk and asks the user no separate question about them. The section is frozen once the spec is approved, like the rest of the spec.
