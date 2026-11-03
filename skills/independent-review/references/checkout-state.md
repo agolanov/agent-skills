@@ -38,7 +38,7 @@ On native Windows, use the verified installed PowerShell executable. This recipe
 $git = (Get-Command git -CommandType Application -ErrorAction Stop).Source
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-foreach ($name in 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR') { [Environment]::SetEnvironmentVariable($name, $null, 'Process') }
+foreach ($name in 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR') { Remove-Item -LiteralPath ('Env:' + $name) -ErrorAction SilentlyContinue }
 $env:GIT_OPTIONAL_LOCKS = '0'
 & $git -C $checkout rev-parse HEAD > "$evidence/head.stdout" 2> "$evidence/head.stderr"
 $LASTEXITCODE | Set-Content -LiteralPath "$evidence/head.exit" -Encoding ascii

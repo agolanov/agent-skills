@@ -1,467 +1,325 @@
 #!/usr/bin/env python3
-"""Stdlib-only external harness; production adapters never call its interpreter."""
+"""Focused disposable smoke. Python is the external test harness only."""
 import base64
 import json
 import os
 from pathlib import Path
-import platform
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / 'skills/independent-review/scripts'
-EVIDENCE = Path(os.environ.get('NATIVE_SMOKE_ARTIFACTS') or tempfile.mkdtemp(prefix='native-platforms-'))
-EVIDENCE.mkdir(parents=True, exist_ok=True)
+ARTIFACTS = Path(os.environ.get('NATIVE_SMOKE_ARTIFACTS') or tempfile.mkdtemp(prefix='skill-platform-smoke-'))
+ARTIFACTS.mkdir(parents=True, exist_ok=True)
 RESULTS = []
 
 
 def run(argv, *, cwd=None, env=None, want=0):
-    if env is None and str(argv[0]) == 'git':
-        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-        env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_GLOBAL=os.devnull)
-    result = subprocess.run([str(x) for x in argv], cwd=cwd, env=env,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
-    with (EVIDENCE / 'commands.jsonl').open('a', encoding='utf-8') as out:
-        out.write(json.dumps(dict(argv=[str(x) for x in argv], cwd=str(cwd or Path.cwd()),
-                                  exit=result.returncode, stdout=base64.b64encode(result.stdout).decode(),
-                                  stderr=base64.b64encode(result.stderr).decode())) + '\n')
-    if want is not None and result.returncode != want:
-        raise AssertionError(f'{argv}: exit {result.returncode}, expected {want}\n{result.stderr.decode(errors="replace")}')
+    result = subprocess.run([str(v) for v in argv], cwd=cwd, env=env, capture_output=True, timeout=90)
+    with (ARTIFACTS / 'commands.jsonl').open('a') as out:
+        out.write(json.dumps(dict(argv=list(map(str, argv)), cwd=str(cwd or Path.cwd()), exit=result.returncode,
+                                 stdout=base64.b64encode(result.stdout).decode(), stderr=base64.b64encode(result.stderr).decode())) + '\n')
+    if want is not None:
+        assert result.returncode == want, (argv, result.returncode, result.stdout, result.stderr)
     return result
 
 
-def record(name, status, detail=''):
-    row = dict(name=name, status=status, detail=detail)
+def report(name, result, detail):
+    row = dict(name=name, result=result, detail=detail)
     RESULTS.append(row)
     print(json.dumps(row), flush=True)
 
 
-def posix_state():
-    # Break caught: dispatcher executes an Apple launcher despite missing developer tools.
-    script = '. "$1"; classify_discovery_candidate "$2" "$3" "$4"'
-    dispatcher = SCRIPTS / 'checkout-state'
-    for candidate, shims, clt, expected in [
-            ('/fake/Apple Python', '/fake/Apple Python:/fake/Apple Git', 'unavailable', 2),
-            ('/fake/standalone', '/fake/Apple Python', 'unavailable', 0),
-            ('/fake/Apple Git', '/fake/Apple Git', 'available', 0)]:
-        run(['/bin/sh', '-c', script, 'classifier', dispatcher, candidate, shims, clt], want=expected)
-    engine = json.loads(run([dispatcher, 'resolve']).stdout)['argv']
-    record('posix-engine', 'pass', repr(engine))
-    root = EVIDENCE / 'POSIX project & café $;'
+def recipe(language):
+    text = (ROOT / 'skills/independent-review/references/checkout-state.md').read_text()
+    return text.split('```' + language + '\n', 1)[1].split('```', 1)[0]
+
+
+def posix_git():
+    root = ARTIFACTS / 'ordinary Git café $;'
     root.mkdir()
     run(['git', 'init', '-q', root])
-    (root / 'raw.txt').write_bytes(b'alpha\n')
-    (root / 'tracked').mkdir()
-    (root / 'tracked/leaf.txt').write_bytes(b'leaf\n')
-    (root / 'café & $;.txt').write_bytes(b'bytes\x00\xff\n')
+    (root / 'tracked').write_bytes(b'before\n')
     run(['git', '-C', root, 'add', '--all'])
-    run(['git', '-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'fixture: native state'])
-    time.sleep(2)
-    run(['git', '-C', root, 'update-index', '-q', '--ignore-submodules', '--refresh'])
-    source_index = (root / '.git/index').read_bytes()
-    source_config = (root / '.git/config').read_bytes()
-    count = 0
-
-    def state(args, want=0):
-        result = run(engine + [str(a) for a in args], want=want)
-        if args[0] == 'preflight' and result.returncode == 0:
-            gate = json.loads(result.stdout)
-            if gate['uncommitted']:
-                with (EVIDENCE / 'gate-hints.jsonl').open('a', encoding='utf-8') as hints:
-                    hints.write(json.dumps(dict(capture=str(args[2]), paths=gate['paths'],
-                                                possible_cause='isolated-normalization-not-applied')) + '\n')
-        return result
-
-    def capture(want=0):
-        nonlocal count
-        count += 1
-        out = EVIDENCE / f'posix-capture-{count}'
-        state(['capture', '--checkout', root, '--output-dir', out], want)
-        return out
-
-    first, second = capture(), capture()
-    gate = json.loads(state(['preflight', '--capture-dir', first]).stdout)
-    assert gate['uncommitted'] is False
-    state(['compare', '--before', first, '--after', second, '--output-dir', EVIDENCE / 'posix-identical'])
-    state(['capture', '--checkout', root, '--output-dir', first], 2)
-    state(['capture', '--checkout', root, '--output-dir', root / 'unsafe'], 2)
-    (root / 'raw.txt').write_bytes(b'bravo\n')
-    edited = capture()
-    state(['compare', '--before', first, '--after', edited, '--output-dir', EVIDENCE / 'posix-same-size'], 1)
-    (root / 'raw.txt').write_bytes(b'alpha\r\n')
-    crlf = capture()
-    state(['compare', '--before', first, '--after', crlf, '--output-dir', EVIDENCE / 'posix-raw-crlf'], 1)
-    (root / 'untracked café &.txt').write_bytes(b'untracked')
-    gate = json.loads(state(['preflight', '--capture-dir', capture()]).stdout)
-    paths = {base64.b64decode(p).decode() for p in gate['paths']}
-    assert paths == {'raw.txt', 'untracked café &.txt'}
-    assert (root / '.git/index').read_bytes() == source_index
-    assert (root / '.git/config').read_bytes() == source_config
-    state(['git-read', '--checkout', root, '--', 'rev-parse', '--verify', 'HEAD'])
-    state(['git-read', '--checkout', root, '--', 'show', 'HEAD:raw.txt'])
-    for command in [['status'], ['diff', '--no-index', root, EVIDENCE], ['diff', '--', '../escape'], ['symbolic-ref', '--delete', 'HEAD']]:
-        state(['git-read', '--checkout', root, '--'] + command, 2)
-    run(['git', '-C', root, 'add', '--all'])
-    staged = json.loads(state(['preflight', '--capture-dir', capture()]).stdout)
-    assert staged['uncommitted'] and base64.b64decode(staged['staged'])
-    linked = EVIDENCE / 'POSIX linked café'
-    run(['git', '-C', root, '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'worktree', 'add', '--detach', linked, 'HEAD'])
-    state(['capture', '--checkout', linked, '--output-dir', EVIDENCE / 'posix-linked'])
-    state(['capture', '--checkout', linked, '--output-dir', EVIDENCE / 'posix-linked-same'])
-    state(['compare', '--before', EVIDENCE / 'posix-linked', '--after', EVIDENCE / 'posix-linked-same', '--output-dir', EVIDENCE / 'posix-linked-identical'])
-    (linked / 'raw.txt').write_bytes(b'bravo\n')
-    state(['capture', '--checkout', linked, '--output-dir', EVIDENCE / 'posix-linked-edit'])
-    state(['compare', '--before', EVIDENCE / 'posix-linked', '--after', EVIDENCE / 'posix-linked-edit', '--output-dir', EVIDENCE / 'posix-linked-changed'], 1)
-    malformed = EVIDENCE / 'posix-malformed'
-    malformed.mkdir()
-    (malformed / 'snapshot.json').write_text('{bad', encoding='utf-8')
-    state(['preflight', '--capture-dir', malformed], 2)
-    state(['compare', '--before', first, '--after', malformed, '--output-dir', EVIDENCE / 'posix-unavailable'], 2)
-    # Converted source with forced racy metadata stays conservative; no helper refresh.
-    converted = EVIDENCE / 'POSIX converted'
-    run(['git', '-c', 'core.autocrlf=true', 'clone', '-q', root, converted])
-    raw = converted / 'raw.txt'
-    raw.write_bytes(b'alpha\r\n')
-    index = converted / '.git/index'
-    stamp = raw.stat().st_mtime_ns
-    os.utime(index, ns=(stamp, stamp))
-    original = index.read_bytes()
-    state(['capture', '--checkout', converted, '--output-dir', EVIDENCE / 'posix-racy'])
-    racy = json.loads(state(['preflight', '--capture-dir', EVIDENCE / 'posix-racy']).stdout)
-    assert racy['uncommitted'] and base64.b64encode(b'raw.txt').decode() in racy['paths']
-    assert index.read_bytes() == original
-    record('posix-converted-racy', 'pass', 'dirty isolated gate; possible cause isolated-normalization-not-applied; exact capture posix-racy; no source refresh')
-    record('posix-state', 'pass', 'ordinary/linked, raw edits, index/config preservation, schema and allowed/refused Git reads')
-    if platform.system() == 'Darwin':
-        run(['/usr/bin/osascript', '-l', 'JavaScript', SCRIPTS / 'checkout-state.jxa.js', 'resolve'], want=2)
-    record('darwin-jxa-feasibility', 'unavailable', 'No architecture-specific actual-host binding/layout/hash/integer proof; native no-Python engine incomplete.')
-    record('darwin-python-native-interoperability', 'unavailable', 'Blocked by native feasibility gate.')
+    run(['git', '-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'fixture'])
+    def capture(name, checkout=root):
+        evidence = ARTIFACTS / name
+        evidence.mkdir()
+        env = dict(os.environ, checkout=str(checkout), evidence=str(evidence))
+        run(['bash', '-c', recipe('bash')], env=env)
+        return evidence
+    first = capture('posix-before')
+    assert all((first / (name + '.exit')).read_text().strip() == '0' for name in ('head', 'status', 'worktree-diff', 'cached-diff'))
+    assert not (first / 'status.stdout').read_bytes()
+    same = capture('posix-same')
+    for name in ('head', 'status', 'worktree-diff', 'cached-diff'):
+        run(['cmp', first / (name + '.stdout'), same / (name + '.stdout')])
+    (root / 'tracked').write_bytes(b'after\n')
+    (root / 'untracked $;.txt').write_bytes(b'untracked')
+    dirty = capture('posix-dirty')
+    assert b' M tracked\0' in (dirty / 'status.stdout').read_bytes()
+    assert b'?? untracked $;.txt\0' in (dirty / 'status.stdout').read_bytes()
+    run(['cmp', first / 'status.stdout', dirty / 'status.stdout'], want=1)
+    run(['git', '-C', root, 'add', '--', 'tracked'])
+    staged = capture('posix-staged')
+    assert (staged / 'cached-diff.stdout').read_bytes()
+    missing = capture('posix-failed', root / 'missing')
+    assert all((missing / (name + '.exit')).read_text().strip() != '0' for name in ('head', 'status', 'worktree-diff', 'cached-diff'))
+    report('posix-ordinary-git', 'pass', 'documented recipe: byte outputs, unchanged/dirty/staged comparisons and real failed-command exits')
 
 
-WINDOWS_FIXTURE = r'''
-$ErrorActionPreference = 'Stop'
-$utf8 = New-Object Text.UTF8Encoding($false, $true)
-$lf = [string][char]10
-$crlf = [string][char]13 + [char]10
-$report = Join-Path $PSScriptRoot 'windows-results.json'
-$log = Join-Path $PSScriptRoot 'windows-commands.jsonl'
-$rows = New-Object Collections.Generic.List[object]
-function Record([string]$name, [string]$status, [string]$detail) { $rows.Add(@{name=$name;status=$status;detail=$detail}) }
-function Assert($condition, [string]$message) { if (-not $condition) { throw $message } }
-$power = (Get-Process -Id $PID).Path
-$git = (Get-Command git.exe -ErrorAction Stop).Source
-$env:PATH = [Environment]::SystemDirectory + ';' + (Split-Path $power) + ';' + (Split-Path $git)
-$env:MSYS2_ARG_CONV_EXCL = '*'
-$env:MSYS_NO_PATHCONV = '1'
-$stateScript = Join-Path $PSScriptRoot 'state\checkout-state.ps1'
-$source = Join-Path $PSScriptRoot 'state\checkout-state.windows.cs'
-try {
-    foreach ($tool in @('python','python3','py','jq','tmux')) { Assert ($null -eq (Get-Command $tool -ErrorAction SilentlyContinue)) ('Optional tool discoverable: ' + $tool) }
-    . (Join-Path $PSScriptRoot 'consumer-recipe.ps1')
-    . $stateScript
-    $defaultTemp=[IO.Path]::GetTempPath()
-    try { Initialize-CheckoutStateEngine $stateScript; Record 'windows-default-temp' 'observed' 'Private native per-user temp ACL' } catch { Record 'windows-default-temp' 'unavailable' ('Default temp rejected before Add-Type, no ACL change: '+$_.Exception.Message) }
-    $env:TEMP=$PSScriptRoot; $env:TMP=$PSScriptRoot
-    Initialize-CheckoutStateEngine $stateScript
-    $privateTemp=Join-Path $PSScriptRoot 'private temp'
-    [CheckoutState.Native]::MakePrivate($privateTemp)
-    $env:TEMP=$privateTemp; $env:TMP=$privateTemp
-    function GitWrite([string[]]$vector) {
-        $environment=New-Object 'Collections.Generic.Dictionary[string,string]' ([StringComparer]::OrdinalIgnoreCase)
-        foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
-            if (-not $entry.Key.StartsWith('GIT_',[StringComparison]::OrdinalIgnoreCase)) { $environment[$entry.Key]=$entry.Value }
-        }
-        $environment['GIT_CONFIG_NOSYSTEM']='1'; $environment['GIT_CONFIG_SYSTEM']='NUL'; $environment['GIT_CONFIG_GLOBAL']='NUL'
-        $r = [CheckoutState.Engine]::Run($git, $vector, $PSScriptRoot, $environment, $null, 10000)
-        [IO.File]::AppendAllText($log, (ConvertTo-Json -InputObject @{argv=$vector;launch_executable=$r.Executable;launch_argv=$r.Arguments;cwd=$PSScriptRoot;exit=$r.ExitCode;stdout=[Convert]::ToBase64String($r.Stdout);stderr=[Convert]::ToBase64String($r.Stderr)} -Depth 10 -Compress) + $lf, $utf8)
-        Assert ($r.ExitCode -eq 0) ('Fixture mutation failed: ' + $utf8.GetString($r.Stderr))
-    }
-    $root = Join-Path $PSScriptRoot 'project & café $;'
-    [IO.Directory]::CreateDirectory($root) | Out-Null
-    GitWrite @('init','-q',$root)
-    [IO.File]::WriteAllBytes((Join-Path $root 'raw.txt'), $utf8.GetBytes('alpha'+$lf))
-    [IO.Directory]::CreateDirectory((Join-Path $root 'tracked')) | Out-Null
-    [IO.File]::WriteAllBytes((Join-Path $root 'tracked\leaf.txt'),$utf8.GetBytes('leaf'+$lf))
-    [IO.File]::WriteAllBytes((Join-Path $root 'café & $;.txt'), [byte[]]@(0,255,10))
-    GitWrite @('-C',$root,'add','--all')
-    GitWrite @('-C',$root,'-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','-qm','fixture: native state')
-    Start-Sleep -Seconds 2
-    GitWrite @('-C',$root,'update-index','-q','--ignore-submodules','--refresh')
-    $script:protected = [string[]]@($root,(Join-Path $root '.git'))
-    $index = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root '.git\index')))
-    $config = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root '.git\config')))
-    function State([string[]]$vector, [int]$want=0) {
-        $r = Invoke-CheckoutStateCommand $power $stateScript $vector $script:protected
-        [IO.File]::AppendAllText($log, (ConvertTo-Json -InputObject @{argv=$vector;launch_executable=$r.Executable;launch_argv=$r.Arguments;cwd=$PSScriptRoot;exit=$r.ExitCode;stdout=[Convert]::ToBase64String($r.Stdout);stderr=[Convert]::ToBase64String($r.Stderr)} -Depth 10 -Compress) + $lf, $utf8)
-        Assert ($r.ExitCode -eq $want) ('State exit ' + $r.ExitCode + ' expected ' + $want + ': ' + $utf8.GetString($r.Stderr))
-        return $r
-    }
+def posix_child():
+    fixture = ARTIFACTS / 'posix-child'; fixture.mkdir()
+    bin_dir = fixture / 'bin'; bin_dir.mkdir()
+    terminal = bin_dir / 'xterm'
+    terminal.write_text('#!/bin/bash\nif [[ $1 == -help ]]; then echo "-e command"; exit; fi\nshift\nexec "$@"\n')
+    terminal.chmod(0o700)
+    for command in ('bash', 'mkdir', 'grep', 'cksum', 'sleep', 'cat', 'head', 'rm', 'sed'):
+        (bin_dir / command).symlink_to(shutil.which(command))
+    cli = bin_dir / 'claude'
+    cli.write_text('#!/bin/bash\nprintf "%s\\0" "$@" > "$FIXTURE_LOG"\nprintf "%s\\0" "$CODEX_HOME" "$CLAUDE_CONFIG_DIR" "$ORDINARY_CONFIG" "${CLAUDECODE-absent}" > "$FIXTURE_LOG.env"\nif [[ ${FIXTURE_EXIT-} ]]; then exit "$FIXTURE_EXIT"; fi\nif [[ ${FIXTURE_IGNORE_TERM-} ]]; then trap "" TERM; while true; do read -t 1 || true; done; fi\nexec sleep 90\n')
+    cli.chmod(0o700)
+    checkout = fixture / 'checkout café $;'; checkout.mkdir()
+    brief = fixture / 'brief café $; ".md'; brief.write_text('fixture')
+    env = {k:v for k,v in os.environ.items() if not k.startswith(('CHILD_SESSION_', 'HERDR_', 'CLAUDE', 'CODEX_'))}
+    env.update(PATH=str(bin_dir), CHILD_SESSION_BACKEND='terminal', CHILD_SESSION_RUNTIME_DIR=str(fixture / 'runtime'),
+               HERDR_PANE_ID='stale-parent', FIXTURE_LOG=str(fixture / 'args'), CODEX_HOME='config $;', CLAUDE_CONFIG_DIR='claude café', CLAUDECODE='parent', ORDINARY_CONFIG='full environment')
+    child = ROOT / 'skills/child-sessions/scripts/child-session'
+    def call(*args, want=0): return run([child, *args], env=env, want=want)
+    call('runtime-dir')
+    model = 'literal " café $HOME; `false`'
+    try:
+        call('open', '--split', 'right', '--model', model, 'probe', checkout, brief)
+        for _ in range(100):
+            if (fixture / 'args').exists(): break
+            time.sleep(.05)
+        argv = (fixture / 'args').read_bytes().split(b'\0')[:-1]
+        assert argv == [b'--permission-mode', b'bypassPermissions', b'--model', model.encode(), ('Read the brief at ' + str(brief) + ' completely and carry it out.').encode()]
+        assert (fixture / 'args.env').read_bytes().split(b'\0')[:-1] == [b'config $;', 'claude café'.encode(), b'full environment', b'absent']
+        caps = json.loads(call('capabilities', 'probe').stdout)
+        assert caps['backend'] == 'terminal' and caps['close'] and not caps['peek'] and not caps['send'] and not caps['window_close']
+        call('alive', 'probe'); call('send', 'probe', 'never guessed', want=2)
+        status = fixture / 'status.md'
+        call('wait', 'probe', status, '0', want=124)
+        status.write_text('STATUS: done garbage\n')
+        call('wait', 'probe', status, '1', want=124)
+        status.write_text('STATUS: blocked\nQuestions\n')
+        assert call('wait', 'probe', status, '0').stdout == b'STATUS: blocked\n'
+        record = next((fixture / 'runtime').glob('*.record'))
+        original = record.read_bytes()
+        with record.open('ab') as out: out.write(b'agent_start\0mistaken\0')
+        call('close', 'probe', want=2)
+        record.write_bytes(original)
+        call('alive', 'probe')
+        call('close', 'probe'); call('alive', 'probe', want=1)
+        env['FIXTURE_EXIT'] = '23'
+        call('open', 'fast', checkout, brief)
+        for _ in range(100):
+            if call('alive', 'fast', want=None).returncode == 1: break
+            time.sleep(.05)
+        else: raise AssertionError('fast agent remained alive')
+        record = next(p for p in (fixture / 'runtime').glob('*.record') if b'name\0fast\0' in p.read_bytes())
+        assert b'exit_code\x0023\x00' in record.read_bytes()
+        call('close', 'fast')
+        del env['FIXTURE_EXIT']
+        env['FIXTURE_IGNORE_TERM'] = '1'
+        call('open', 'stubborn', checkout, brief)
+        stubborn = next(p for p in (fixture / 'runtime').glob('*.record') if b'name\0stubborn\0' in p.read_bytes())
+        fields = stubborn.read_bytes().split(b'\0')[:-1]
+        data = dict(zip(fields[::2], fields[1::2]))
+        call('close', 'stubborn', want=2)
+        # The launcher may be gone, but the separately recorded agent still
+        # must be observed before declaring stop/closing its owned window.
+        process_id = int(data[b'agent_pid'])
+        current = Path('/proc') / str(process_id) / 'stat'
+        actual_start = current.read_text().rsplit(') ', 1)[1].split()[19].encode()
+        assert actual_start == data[b'agent_start']
+        import signal
+        os.kill(process_id, signal.SIGKILL)
+        call('close', 'stubborn')
+    finally:
+        call('close', 'probe', want=None); call('close', 'fast', want=None); call('close', 'stubborn', want=None)
+    report('posix-child', 'pass', 'synthetic terminal with actual processes: literal argv, full environment/filter exceptions, capabilities, status, fast exit and PID/start refusal')
 
-    function Direct([string[]]$vector) {
-        $r=[CheckoutState.Engine]::Run($power,$vector,$PSScriptRoot,$null,$null,30000)
-        [IO.File]::AppendAllText($log,(ConvertTo-Json -InputObject @{argv=$vector;cwd=$PSScriptRoot;exit=$r.ExitCode;stdout=[Convert]::ToBase64String($r.Stdout);stderr=[Convert]::ToBase64String($r.Stderr)} -Depth 10 -Compress)+$lf,$utf8)
-        return $r
-    }
-
-    foreach ($base in @($root,(Join-Path $root '.git'))) {
-        $insideTemp=Join-Path $base 'private compiler temp'
-        [CheckoutState.Native]::MakePrivate($insideTemp)
-        $oldTemp=$env:TEMP; $oldTmp=$env:TMP
-        try {
-            $env:TEMP=$insideTemp; $env:TMP=$insideTemp
-            $out=Join-Path $PSScriptRoot ('compile-must-not-write-'+[Guid]::NewGuid().ToString('N'))
-            $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'capture','--checkout',$root,'--output-dir',$out)
-            Assert ($r.ExitCode -eq 2) 'Direct interface compiled inside protected checkout'
-            Assert ($utf8.GetString($r.Stderr).Contains('Add-Type was not started')) 'Refusal occurred after compilation'
-            Assert ([IO.Directory]::GetFileSystemEntries($insideTemp).Count -eq 0) 'Compiler temporary entries were written'
-            Assert (-not [IO.Directory]::Exists($out)) 'Refused direct capture published output'
-        } finally {
-            $env:TEMP=$oldTemp; $env:TMP=$oldTmp
-            [IO.Directory]::Delete($insideTemp)
-        }
-    }
-    $literal=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'git-read','--checkout',$root,'--','rev-parse','--sq-quote','--checkout',$env:TEMP)
-    Assert ($literal.ExitCode -eq 0) 'Downstream --checkout was treated as an owner option'
-    Assert ($utf8.GetString($literal.Stdout) -ceq (" '--checkout' '"+$env:TEMP+"'"+$lf)) 'Downstream --checkout argv changed'
-    $withoutSeparator=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'git-read','--checkout',$root,'rev-parse','--sq-quote','--checkout',$env:TEMP)
-    Assert ($withoutSeparator.ExitCode -eq 0 -and $utf8.GetString($withoutSeparator.Stdout) -ceq $utf8.GetString($literal.Stdout)) 'Optional separator changed command-operand ownership'
-    Record 'windows-precompile-containment' 'pass' 'Direct process TEMP under checkout/.git refused before Add-Type with zero generated entries; downstream -- remains data'
-    # Native helper/Git temporaries use validated GetTempPath, not POSIX redirection.
-    $env:TMPDIR=$root
-    $script:counter=0
-    function Capture([int]$want=0) {
-        $script:counter++
-        $out=Join-Path $PSScriptRoot ('capture-' + $script:counter)
-        $null=State @('capture','--checkout',$root,'--output-dir',$out) $want
-        return $out
-    }
-    $first=Capture
-    $second=Capture
-    $gate=ConvertFrom-Json ($utf8.GetString((State @('preflight','--capture-dir',$first)).Stdout))
-    Assert ($gate.uncommitted -eq $false) 'Ordinary native checkout is dirty'
-    $null=State @('compare','--before',$first,'--after',$second,'--output-dir',(Join-Path $PSScriptRoot 'identical'))
-    $null=State @('capture','--checkout',$root,'--output-dir',$first) 2
-    $null=State @('capture','--checkout',$root,'--output-dir',(Join-Path $root 'unsafe')) 2
-    $null=State @('capture','--checkout',$root,'--output-dir',(Join-Path $root '.git\unsafe')) 2
-    $null=State @('capture','--checkout',$root,'--output-dir',(Join-Path ($root.ToUpperInvariant()) 'case-alias-unsafe')) 2
-    [IO.File]::WriteAllBytes((Join-Path $root 'raw.txt'),$utf8.GetBytes('bravo'+$lf))
-    $edited=Capture
-    $null=State @('compare','--before',$first,'--after',$edited,'--output-dir',(Join-Path $PSScriptRoot 'same-size')) 1
-    [IO.File]::WriteAllBytes((Join-Path $root 'raw.txt'),$utf8.GetBytes('alpha'+$crlf))
-    $crlfCapture=Capture
-    $null=State @('compare','--before',$first,'--after',$crlfCapture,'--output-dir',(Join-Path $PSScriptRoot 'raw-crlf')) 1
-    [IO.File]::WriteAllBytes((Join-Path $root 'untracked café &.txt'),$utf8.GetBytes('new'))
-    $dirty=Capture
-    $gate=ConvertFrom-Json ($utf8.GetString((State @('preflight','--capture-dir',$dirty)).Stdout))
-    $paths=@($gate.paths | ForEach-Object { $utf8.GetString([Convert]::FromBase64String($_)) })
-    Assert ($gate.uncommitted -and $paths.Count -eq 2 -and $paths -contains 'raw.txt' -and $paths -contains 'untracked café &.txt') 'Exact Unicode own-path inventory lost'
-    Assert ($index -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root '.git\index')))) 'Source index changed'
-    Assert ($config -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root '.git\config')))) 'Source config changed'
-    $null=State @('git-read','--checkout',$root,'--','rev-parse','--verify','HEAD')
-    $show=State @('git-read','--checkout',$root,'--','show','HEAD:raw.txt')
-    Assert ($utf8.GetString($show.Stdout) -ceq ('alpha'+$lf)) 'git-read raw bytes changed'
-    foreach ($command in @(@('status'),@('diff','--no-index',$root,$PSScriptRoot),@('diff','--','..\escape'),@('symbolic-ref','--delete','HEAD'),@('diff','--ignore-submodules=none'))) {
-        $null=State (@('git-read','--checkout',$root,'--') + $command) 2
-    }
-    foreach ($literal in @('', 'literal " quote', '--', 'café & $;%()')) {
-        $null=State @('git-read','--checkout',$root,'--','check-ref-format','--branch',$literal) 1
-    }
-
-    foreach ($literal in @('', 'literal " quote', '--', 'café & $;%()')) {
-        $quoted=State @('git-read','--checkout',$root,'--','rev-parse','--sq-quote',$literal)
-        Assert ($utf8.GetString($quoted.Stdout) -ceq (" '"+$literal+"'"+$lf)) 'Actual git-read argv changed'
-    }
-    $null=State @() 2
-    $null=State @('resolve')
-    GitWrite @('-C',$root,'add','--all')
-    $staged=Capture
-    $gate=ConvertFrom-Json ($utf8.GetString((State @('preflight','--capture-dir',$staged)).Stdout))
-    Assert ($gate.uncommitted -and [Convert]::FromBase64String($gate.staged).Length -gt 0) 'Staged change missing'
-    $linked=Join-Path $PSScriptRoot 'linked café $;'
-    GitWrite @('-C',$root,'-c','core.autocrlf=false','-c','core.eol=lf','worktree','add','--detach',$linked,'HEAD')
-    $script:protected=[string[]]@($root,(Join-Path $root '.git'),$linked)
-    $null=State @('capture','--checkout',$linked,'--output-dir',(Join-Path $PSScriptRoot 'linked-capture'))
-    $linkedFirst=Join-Path $PSScriptRoot 'linked-capture'
-    $linkedSecond=Join-Path $PSScriptRoot 'linked-second'
-    $null=State @('capture','--checkout',$linked,'--output-dir',$linkedSecond)
-    $null=State @('compare','--before',$linkedFirst,'--after',$linkedSecond,'--output-dir',(Join-Path $PSScriptRoot 'linked-identical'))
-    [IO.File]::WriteAllBytes((Join-Path $linked 'raw.txt'),$utf8.GetBytes('bravo'+$lf))
-    $linkedEdit=Join-Path $PSScriptRoot 'linked-edit'
-    $null=State @('capture','--checkout',$linked,'--output-dir',$linkedEdit)
-    $null=State @('compare','--before',$linkedFirst,'--after',$linkedEdit,'--output-dir',(Join-Path $PSScriptRoot 'linked-changed')) 1
-    $null=State @('git-read','--checkout',$linked,'--','worktree','list','--porcelain','-z')
-
-    $null=State @('git-read','--checkout',$root,'--','diff','--','\\invalid-native-server\share\escape') 2
-    $null=State @('preflight','--capture-dir','C:drive-relative') 2
-    [IO.Directory]::Delete((Join-Path $root 'tracked'),$true)
-    [IO.File]::WriteAllBytes((Join-Path $root 'tracked'),$utf8.GetBytes('blocked'))
-    $blocked=Capture
-    $blockedSnapshot=[CheckoutState.Json]::Read([IO.File]::ReadAllText((Join-Path $blocked 'snapshot.json')))
-    $blockedKey='path:'+[Convert]::ToBase64String($utf8.GetBytes('tracked/leaf.txt'))
-    Assert ($blockedSnapshot['fields'][$blockedKey]['at'] -ceq [Convert]::ToBase64String($utf8.GetBytes('tracked'))) 'Blocked parent was traversed'
-    Assert ($blockedSnapshot['fields'][$blockedKey]['kind'] -ceq 'file') 'Blocked parent content missing'
-    [IO.File]::Delete((Join-Path $root 'tracked'))
-    [IO.Directory]::CreateDirectory((Join-Path $root 'tracked')) | Out-Null
-    [IO.File]::WriteAllBytes((Join-Path $root 'tracked\leaf.txt'),$utf8.GetBytes('leaf'+$lf))
-    $malformed=Join-Path $PSScriptRoot 'malformed'
-    [IO.Directory]::CreateDirectory($malformed) | Out-Null
-    [IO.File]::WriteAllText((Join-Path $malformed 'snapshot.json'),'{bad',$utf8)
-    $null=State @('preflight','--capture-dir',$malformed) 2
-    $null=State @('compare','--before',$first,'--after',$malformed,'--output-dir',(Join-Path $PSScriptRoot 'unavailable')) 2
-    $wide='{"file":340282366920938463463374607431768211455,"volume":18446744073709551615}'
-    Assert ([CheckoutState.Json]::Write([CheckoutState.Json]::Read($wide)) -ceq $wide) 'Lossless unsigned 128-bit JSON failed'
-    $request=Join-Path ([IO.Path]::GetTempPath()) ('checkout-state-request-' + [Guid]::NewGuid().ToString('N'))
-    [CheckoutState.Native]::MakePrivate($request)
-    try {
-        $requestFile=Join-Path $request 'argv.json'
-        foreach ($badJson in @('{}','[1]','["resolve",]','["resolve"] trailing')) {
-            [IO.File]::WriteAllText($requestFile,$badJson,$utf8)
-            $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'--argv-file',$requestFile)
-            Assert ($r.ExitCode -eq 2) 'Malformed envelope accepted'
-        }
-        [IO.File]::WriteAllText($requestFile,'["resolve"]',$utf8)
-        $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'--argv-file',$requestFile,'extra')
-        Assert ($r.ExitCode -eq 2) 'Extra envelope tokens accepted'
-
-        $alias=Join-Path ([IO.Path]::GetTempPath()) ('checkout-state-request-'+[Guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Junction -Path $alias -Target $request -ErrorAction Stop | Out-Null
-        try {
-            $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'--argv-file',(Join-Path $alias 'argv.json'))
-            Assert ($r.ExitCode -eq 2) 'Reparse request ancestor accepted'
-        } finally { [IO.Directory]::Delete($alias) }
-        $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'--argv-file',(Join-Path $PSScriptRoot 'outside-temp.json'))
-        Assert ($r.ExitCode -eq 2) 'Unsafe envelope root accepted'
-        $acl=[IO.File]::GetAccessControl($requestFile)
-        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Write','Allow')))
-        [IO.File]::SetAccessControl($requestFile,$acl)
-        $r=Direct @('-NoProfile','-ExecutionPolicy','Bypass','-File',$stateScript,'--argv-file',$requestFile)
-        Assert ($r.ExitCode -eq 2) 'Foreign writable request accepted'
-    } finally { [IO.Directory]::Delete($request,$true) }
-
-    $converted=Join-Path $PSScriptRoot 'converted café'
-    GitWrite @('-c','core.autocrlf=true','clone','-q',$root,$converted)
-    $convertedRaw=Join-Path $converted 'raw.txt'
-    [IO.File]::WriteAllBytes($convertedRaw,$utf8.GetBytes('alpha'+$crlf))
-    $convertedIndex=Join-Path $converted '.git\index'
-    [IO.File]::SetLastWriteTimeUtc($convertedIndex,[IO.File]::GetLastWriteTimeUtc($convertedRaw))
-    $racyIndex=[Convert]::ToBase64String([IO.File]::ReadAllBytes($convertedIndex))
-    $racyCapture=Join-Path $PSScriptRoot 'converted-racy'
-    $null=State @('capture','--checkout',$converted,'--output-dir',$racyCapture)
-    $racy=ConvertFrom-Json ($utf8.GetString((State @('preflight','--capture-dir',$racyCapture)).Stdout))
-    Assert ($racy.uncommitted -and $racy.paths -contains [Convert]::ToBase64String($utf8.GetBytes('raw.txt'))) 'Converted racy state incorrectly clean'
-    Assert ($racyIndex -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes($convertedIndex))) 'Read-only gate refreshed source index'
-    Record 'windows-converted-racy' 'pass' ('Dirty gate; possible cause isolated-normalization-not-applied; exact capture '+$racyCapture+'; no source refresh')
-    Record 'windows-state' 'pass' ('Native NTFS, PowerShell ' + $PSVersionTable.PSVersion + ', Git ' + $git)
-    Record 'windows-source-preservation' 'pass' 'Source index/config byte-identical'
-    Record 'windows-envelope' 'pass' 'Exact typed recipe; zero/one arrays, literal argv, malformed/extra tokens, unsafe ACL'
-    $target=Join-Path $PSScriptRoot 'junction target'
-    [IO.Directory]::CreateDirectory($target) | Out-Null
-    $junction=Join-Path $root 'junction'
-    try {
-        New-Item -ItemType Junction -Path $junction -Target $target -ErrorAction Stop | Out-Null
-        $jcap=Capture
-        $snapshot=[CheckoutState.Json]::Read([IO.File]::ReadAllText((Join-Path $jcap 'snapshot.json')))
-        $key='path:' + [Convert]::ToBase64String($utf8.GetBytes('junction'))
-        Assert ($snapshot['fields'][$key]['kind'] -eq 'symlink') 'Junction followed'
-        Assert ($snapshot['fields'][$key]['reparse_tag'].ToString() -eq '2684354563') 'Native reparse tag lost'
-        Assert ($snapshot['fields'][$key]['reparse_flags'].ToString() -eq '0' -and $snapshot['fields'][$key]['reparse_directory'] -eq $true) 'Native reparse flags/kind lost'
-        Record 'windows-junction' 'pass' 'Literal reparse target; no target traversal'
-    } catch { if (Test-Path $junction) { throw }; Record 'windows-junction' 'unavailable' $_.Exception.Message }
+    # An unrelated v-NAME session must survive optional WSL view handling.
+    tmux = shutil.which('tmux')
+    if tmux:
+        wrapper = bin_dir / 'tmux'
+        wrapper.write_text('#!/bin/bash\nexec ' + tmux + ' -f /dev/null "$@"\n')
+        wrapper.chmod(0o700)
+        (bin_dir / 'wt.exe').write_text('#!/bin/bash\nexit 0\n')
+        (bin_dir / 'wt.exe').chmod(0o700)
+        socket_temp = tempfile.TemporaryDirectory(prefix='skills-tmux-')
+        env.update(CHILD_SESSION_BACKEND='tmux', CHILD_SESSION_TMUX_SESSION='owned-fixture', CHILD_SESSION_TAB='1', TMUX_TMPDIR=socket_temp.name)
+        env.pop('FIXTURE_IGNORE_TERM', None)
+        try:
+            run([wrapper, 'new-session', '-d', '-s', 'v-viewchild', 'exec sleep 90'], env=env)
+            call('open', 'viewchild', checkout, brief)
+            call('close', 'viewchild')
+            run([wrapper, 'has-session', '-t', '=v-viewchild'], env=env)
+            call('open', 'freshview', checkout, brief)
+            run([wrapper, 'has-session', '-t', '=v-freshview'], env=env)
+            call('close', 'freshview')
+            run([wrapper, 'has-session', '-t', '=v-freshview'], env=env, want=1)
+            run([wrapper, 'has-session', '-t', '=v-viewchild'], env=env)
+        finally:
+            run([wrapper, 'kill-server'], env=env, want=None)
+            socket_temp.cleanup()
+        report('posix-tmux-view-ownership', 'pass', 'unrelated v-NAME retained; only newly owned exact view ID closed; synthetic wt transport')
 
 
-    $pin=[CheckoutState.Native]::Open((Join-Path $root '.git'),$true,$false,$true)
-    try {
-        $moved=$false
-        try { [IO.Directory]::Move((Join-Path $root '.git'),(Join-Path $root '.git-moved')); $moved=$true } catch [IO.IOException] {}
-        if ($moved) { [IO.Directory]::Move((Join-Path $root '.git-moved'),(Join-Path $root '.git')) }
-        Assert (-not $moved) 'Administrative directory was replaceable while pinned'
-    } finally { $pin.Dispose() }
-    Record 'windows-administrative-pinning' 'pass' 'Real native directory rename refused while protected handle is held'
-    $refs=Join-Path $root '.git\refs'
-    $saved=Join-Path $PSScriptRoot 'saved refs'
-    [IO.Directory]::Move($refs,$saved)
-    try {
-        New-Item -ItemType Junction -Path $refs -Target $saved -ErrorAction Stop | Out-Null
-        $unavailable=Capture 2
-        $diag=ConvertFrom-Json ([IO.File]::ReadAllText((Join-Path $unavailable 'diagnostic.json')))
-        Assert ($diag.complete -eq $false -and $diag.errors.Count -gt 0) 'Administrative reparse accepted'
-        Record 'windows-administrative-reparse' 'pass' 'Unavailable diagnostic; protected ancestors are not followed'
-    } finally {
-        if (Test-Path $refs) { [IO.Directory]::Delete($refs) }
-        [IO.Directory]::Move($saved,$refs)
-    }
-    Record 'windows-cross-drive' 'unavailable' 'No second owned writable native volume fixture'
-    Record 'windows-refs-dev-drive' 'unavailable' 'No ReFS/Dev Drive fixture; full-width codec covered separately'
-    Record 'windows-python-native-interoperability' 'unavailable' 'No verified native Windows Python'
-} catch {
-    Record 'windows-state' 'fail' ($_ | Out-String)
-    [IO.File]::WriteAllText($report,(ConvertTo-Json -InputObject @($rows.ToArray()) -Depth 20),$utf8)
-    [Console]::Error.WriteLine(($_ | Out-String))
-    exit 1
+WINDOWS = r'''
+param([string]$Owner,[string]$GitRecipe,[string]$Root)
+$ErrorActionPreference='Stop'
+$PSNativeCommandUseErrorActionPreference=$false
+. $Owner
+$power=(Get-Process -Id $PID).Path
+function Assert($condition,$message) { if (-not $condition) { throw $message } }
+function Capture-Git($Label,$CheckoutPath) {
+    $checkout=$CheckoutPath;$evidence=Join-Path $Root $Label;[IO.Directory]::CreateDirectory($evidence)|Out-Null
+    . $GitRecipe
+    return $evidence
 }
-[IO.File]::WriteAllText($report,(ConvertTo-Json -InputObject @($rows.ToArray()) -Depth 20),$utf8)
-exit 0
+$checkout=Join-Path $Root 'Git café $;';[IO.Directory]::CreateDirectory($checkout)|Out-Null
+& git init -q $checkout;if ($LASTEXITCODE) { throw 'git init failed' }
+[IO.File]::WriteAllText((Join-Path $checkout 'tracked'),"before`n")
+& git -C $checkout add --all
+& git -C $checkout -c user.name=Fixture -c user.email=fixture@example.test commit -qm fixture
+if ($LASTEXITCODE) { throw 'fixture commit failed' }
+$first=Capture-Git 'before' $checkout;$same=Capture-Git 'same' $checkout
+foreach ($name in 'head','status','worktree-diff','cached-diff') {
+    Assert ((Get-Content -LiteralPath "$first/$name.exit") -eq '0') 'Git capture failed'
+    & fc.exe /b (Join-Path $first ($name+'.stdout')) (Join-Path $same ($name+'.stdout')) > $null
+    Assert ($LASTEXITCODE -eq 0) 'unchanged Git bytes differ'
+}
+[IO.File]::WriteAllText((Join-Path $checkout 'tracked'),"after`n")
+$dirty=Capture-Git 'dirty' $checkout
+Assert ([IO.File]::ReadAllBytes("$dirty/status.stdout") -contains 0) 'NUL status lost'
+Assert ((Get-Item -LiteralPath "$dirty/worktree-diff.stdout").Length -gt 0) 'dirty diff missing'
+& git -C $checkout add -- tracked
+$staged=Capture-Git 'staged' $checkout
+Assert ((Get-Item -LiteralPath "$staged/cached-diff.stdout").Length -gt 0) 'staged diff missing'
+$bad=Capture-Git 'failed' (Join-Path $Root 'missing')
+foreach ($name in 'head','status','worktree-diff','cached-diff') { Assert ((Get-Content -LiteralPath "$bad/$name.exit") -ne '0') 'Git failure became clean' }
+
+# This fake replaces only the terminal transport. All launched shells/processes,
+# literal argv, file/state APIs and ownership checks are actual native Windows.
+$script:NativeInvoke=${function:Invoke-ChildSessionNative}
+$script:FixtureLaunchers=New-Object 'Collections.Generic.List[Diagnostics.Process]'
+function Get-ChildSessionBackend { $script:Terminal='fixture-terminal';return 'terminal' }
+function Invoke-ChildSessionNative {
+    param([string]$Executable,[string[]]$Vector,[string]$Cwd)
+    if ($Executable -eq 'fixture-terminal') {
+        $p=Start-ChildSessionProcess $Vector[1] ([string[]]$Vector[2..($Vector.Count-1)]) $Cwd $true
+        $script:FixtureLaunchers.Add($p)
+        return [pscustomobject]@{Stdout=[byte[]]@();Stderr=[byte[]]@();ExitCode=0}
+    }
+    & $script:NativeInvoke $Executable $Vector $Cwd
+}
+$env:CHILD_SESSION_RUNTIME_DIR=Join-Path $Root 'runtime'
+$bin=Join-Path $Root 'bin';[IO.Directory]::CreateDirectory($bin)|Out-Null
+$env:PATH=$bin+';'+$env:PATH
+function Resolve-ChildSessionAgent { param([string]$Agent);return @{script=(Join-Path $bin 'claude.ps1')} }
+$env:FIXTURE_LOG=Join-Path $Root 'agent.json'
+$env:CODEX_HOME='config $;';$env:CLAUDE_CONFIG_DIR='claude café';$env:CLAUDECODE='parent';$env:ORDINARY_CONFIG='full environment'
+$agent=@'
+[IO.File]::WriteAllText($env:FIXTURE_LOG,(ConvertTo-Json -InputObject @{argv=@($args);cwd=$PWD.Path;config=$env:ORDINARY_CONFIG;codex=$env:CODEX_HOME;claude=$env:CLAUDE_CONFIG_DIR;metadata=$env:CLAUDECODE} -Depth 8))
+if ($env:FIXTURE_EXIT) { exit ([int]$env:FIXTURE_EXIT) }
+Start-Sleep -Seconds 90
+'@
+[IO.File]::WriteAllText((Join-Path $bin 'claude.ps1'),$agent,$script:Utf8)
+$brief=Join-Path $Root 'brief café $; quote.md';[IO.File]::WriteAllText($brief,'fixture')
+$model='literal " café $HOME; `false`'
+try {
+    Assert ((Invoke-ChildSessionDispatch @('open','--model',$model,'probe',$checkout,$brief)) -eq 0) 'open failed'
+    for ($n=0;$n -lt 100 -and -not [IO.File]::Exists($env:FIXTURE_LOG);$n++) { Start-Sleep -Milliseconds 50 }
+    $observed=ConvertFrom-Json ([IO.File]::ReadAllText($env:FIXTURE_LOG))
+    Assert ($observed.argv.Count -eq 5 -and $observed.argv[3] -ceq $model -and $observed.argv[4] -ceq ('Read the brief at '+$brief+' completely and carry it out.')) 'literal CLI argv changed'
+    Assert ($observed.config -ceq 'full environment' -and $observed.codex -ceq 'config $;' -and $observed.claude -ceq 'claude café' -and -not $observed.metadata) 'environment filtering/config failed'
+    Assert ($observed.cwd -ceq $checkout) 'cwd changed'
+    $record=Read-ChildSessionRecord 'probe';$caps=Get-ChildSessionCapabilities $record
+    Assert ($caps.close -and -not $caps.peek -and -not $caps.send -and -not $caps.window_close) 'terminal capabilities incorrect'
+    Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 0) 'agent not alive'
+    $refused=$false;try { $null=Invoke-ChildSessionDispatch @('send','probe','never guessed') } catch { $refused=$true };Assert $refused 'unsupported input accepted'
+    $status=Join-Path $Root 'status.md'
+    Assert ((Invoke-ChildSessionDispatch @('wait','probe',$status,'0')) -eq 124) 'timeout changed'
+    [IO.File]::WriteAllText($status,'STATUS: done garbage')
+    Assert ((Invoke-ChildSessionDispatch @('wait','probe',$status,'0')) -eq 124) 'malformed status accepted'
+    [IO.File]::WriteAllText($status,"STATUS: blocked`r`nQuestions")
+    Assert ((Invoke-ChildSessionDispatch @('wait','probe',$status,'0')) -eq 0) 'CRLF status rejected'
+    $original=$record.agent.start;$record.agent.start='mistaken';Write-ChildSessionRecord $record
+    $refused=$false;try { $null=Invoke-ChildSessionDispatch @('close','probe') } catch { $refused=$true };Assert $refused 'mistaken PID/start was stopped'
+    $record.agent.start=$original;Write-ChildSessionRecord $record
+    Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 0) 'refusal killed process'
+    Assert ((Invoke-ChildSessionDispatch @('close','probe')) -eq 0) 'close failed'
+    Assert ((Invoke-ChildSessionDispatch @('alive','probe')) -eq 1) 'closed agent alive'
+    $env:FIXTURE_EXIT='23'
+    Assert ((Invoke-ChildSessionDispatch @('open','fast',$checkout,$brief)) -eq 0) 'fast open failed'
+    for ($n=0;$n -lt 100;$n++) { $r=Read-ChildSessionRecord 'fast';if ($r.phase -eq 'exited') { break };Start-Sleep -Milliseconds 50 }
+    Assert ($r.phase -eq 'exited' -and $r.exit_code -eq 23) 'real exit lost'
+    $null=Invoke-ChildSessionDispatch @('close','fast')
+    # Ordinary native argv also preserves empty strings, quotes, backslashes and newlines.
+    $receiver=Join-Path $Root 'receiver.ps1'
+    [IO.File]::WriteAllText($receiver,'[Console]::Write((ConvertTo-Json -InputObject @($args) -Compress));exit 17',$script:Utf8)
+    $values=[string[]]@('','quote " slash\','café $; --',"line`nbreak")
+    $result=& $script:NativeInvoke $power (@('-NoProfile','-ExecutionPolicy','Bypass','-File',$receiver)+$values) $Root
+    Assert ($result.ExitCode -eq 17) 'native producer exit lost'
+    $decoded=@(ConvertFrom-Json ($script:Utf8.GetString($result.Stdout)))
+    Assert ($decoded.Count -eq $values.Count) 'argv count changed'
+    for ($i=0;$i -lt $values.Count;$i++) { Assert ($decoded[$i] -ceq $values[$i]) 'native argv changed' }
+    [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, capabilities';terminal='synthetic transport; native processes'}))
+} finally {
+    foreach ($name in 'probe','fast') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
+    foreach ($p in $script:FixtureLaunchers) {
+        if (-not $p.HasExited) { $p.Kill();$p.WaitForExit() }
+        $text=$p.StandardError.ReadToEnd();if ($text) { [Console]::Error.WriteLine($text) }
+        $p.Dispose()
+    }
+}
 '''
 
 
-def windows_state():
+def windows():
+    power = shutil.which('pwsh.exe')
+    if not power:
+        report('windows-pwsh', 'unavailable', 'installed native pwsh not reachable; no installation')
+        return
+    def encoded(text): return base64.b64encode(text.encode('utf-16-le')).decode()
+    temp = run([power, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded('[Console]::Write([IO.Path]::GetTempPath())')]).stdout.decode().strip()
     interop = os.name != 'nt'
-    powershell = shutil.which('powershell.exe')
-    if not powershell:
-        record('windows-native', 'unavailable', 'No accessible installed native PowerShell.')
-        return
-    if interop and not shutil.which('wslpath'):
-        record('windows-native', 'unavailable', 'Cannot resolve native fixture paths safely.')
-        return
-    code = r'''$p=Join-Path ([IO.Path]::GetTempPath()) ('checkout-native-'+[Guid]::NewGuid().ToString('N')); $s=New-Object Security.AccessControl.DirectorySecurity; $u=[Security.Principal.WindowsIdentity]::GetCurrent().User; $s.SetOwner($u); $s.SetAccessRuleProtection($true,$false); $s.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($u,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))); if ([IO.Directory]::Exists($p)) { throw 'Fixture path already exists' }; [IO.Directory]::CreateDirectory($p,$s) | Out-Null; [Console]::Write($p)'''
-    native_temp = run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand',
-                       base64.b64encode(code.encode('utf-16-le')).decode()]).stdout.decode('utf-8').strip()
-    temp = Path(run(['wslpath', '-u', native_temp]).stdout.decode().strip()) if interop else Path(native_temp)
-    staging = temp
-    (staging / 'state').mkdir()
-    for name in ['checkout-state.ps1', 'checkout-state.windows.cs']:
-        shutil.copy2(SCRIPTS / name, staging / 'state' / name)
-    doc = (ROOT / 'skills/independent-review/references/checkout-state.md').read_text(encoding='utf-8')
-    section = doc.split('## Native Windows typed invocation', 1)[1]
-    fence = chr(96) * 3
-    recipe = section.split(fence + 'powershell\n', 1)[1].split(fence, 1)[0]
-    (staging / 'consumer-recipe.ps1').write_text(recipe, encoding='utf-8-sig')
-    (staging / 'fixture.ps1').write_text(WINDOWS_FIXTURE, encoding='utf-8-sig')
-    native_script = str(staging / 'fixture.ps1')
-    native_power = powershell
-    if interop:
-        native_script = run(['wslpath', '-w', native_script]).stdout.decode().strip()
-        native_power = run(['wslpath', '-w', powershell]).stdout.decode().strip()
-    fixed = "$env:PSExecutionPolicyPreference='Restricted'; & '" + native_power.replace("'", "''") + "' -NoProfile -ExecutionPolicy Bypass -File '" + native_script.replace("'", "''") + "'; exit $LASTEXITCODE"
-    result = run([powershell, '-NoProfile', '-EncodedCommand',
-                  base64.b64encode(fixed.encode('utf-16-le')).decode()], want=None)
-    for name in ['windows-results.json', 'windows-commands.jsonl', 'windows-gate-hints.jsonl']:
-        if (staging / name).exists():
-            shutil.copy2(staging / name, EVIDENCE / name)
-    record('windows-controller', 'observed', ('WSL interop controller; native NTFS/PowerShell processes; ' if interop else 'Native Windows controller; ') + str(staging))
-    if (EVIDENCE / 'windows-results.json').exists():
-        for row in json.loads((EVIDENCE / 'windows-results.json').read_text(encoding='utf-8-sig')):
-            record(row['name'], row['status'], row['detail'])
-    if result.returncode:
-        raise AssertionError('Native Windows fixture failed: ' + result.stderr.decode(errors='replace'))
-
-
-def main():
-    print('Evidence: ' + str(EVIDENCE), flush=True)
-    try:
-        if os.name != 'nt':
-            posix_state()
-        windows_state()
-    except Exception as exc:
-        record('suite', 'fail', str(exc))
-        return 1
-    finally:
-        (EVIDENCE / 'results.json').write_text(json.dumps(RESULTS, indent=2), encoding='utf-8')
-    return 0
+    staging = Path(run(['wslpath', '-u', temp]).stdout.decode().strip()) if interop else Path(temp)
+    staging = Path(tempfile.mkdtemp(prefix='skills-focused-', dir=staging))
+    def native(path): return run(['wslpath', '-w', path]).stdout.decode().strip() if interop else str(path)
+    (staging / 'fixture.ps1').write_text(WINDOWS, encoding='utf-8-sig')
+    (staging / 'git-recipe.ps1').write_text(recipe('powershell'), encoding='utf-8-sig')
+    owner = native(ROOT / 'skills/child-sessions/scripts/child-session.ps1')
+    script = native(staging / 'fixture.ps1'); git_recipe = native(staging / 'git-recipe.ps1'); root = native(staging)
+    # Only fixed, correctly single-quoted paths enter this controller bootstrap.
+    quote = lambda value: "'" + value.replace("'", "''") + "'"
+    code = '& ' + quote(script) + ' -Owner ' + quote(owner) + ' -GitRecipe ' + quote(git_recipe) + ' -Root ' + quote(root)
+    run([power, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded(code)])
+    passed = json.loads((staging / 'passed.json').read_text(encoding='utf-8-sig'))
+    shutil.copy2(staging / 'passed.json', ARTIFACTS / 'windows-passed.json')
+    (ARTIFACTS / 'windows-staging.txt').write_text(str(staging))
+    report('windows-pwsh', 'pass', passed)
+    legacy = shutil.which('powershell.exe')
+    if legacy:
+        # Useful 5.1 compatibility is narrower than the current 7.6.9 runtime:
+        # parse/import the helper, its 5.1 native quoting and status dispatch.
+        compatibility = '. ' + quote(owner) + '; $env:CHILD_SESSION_RUNTIME_DIR=' + quote(root + '\\compatibility51') + '; $s=' + quote(root + '\\compatibility-status.md') + "; [IO.File]::WriteAllText($s,'STATUS: done'); if ((Invoke-ChildSessionDispatch @('wait','absent',$s,'0')) -ne 0) { exit 1 }; [Console]::Write($PSVersionTable.PSVersion.ToString())"
+        result = run([legacy, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded(compatibility)])
+        report('windows-5.1-compatibility', 'pass', result.stdout.decode(errors='replace'))
+    else:
+        report('windows-5.1-compatibility', 'unavailable', 'legacy shell not reachable')
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        if os.name == 'posix':
+            posix_git(); posix_child()
+        windows()
+        report('macos', 'unverified', 'no native macOS host; stock Bash/ps/Terminal path audited only')
+    finally:
+        (ARTIFACTS / 'results.json').write_text(json.dumps(RESULTS, indent=2))
+        print('Artifacts: ' + str(ARTIFACTS), flush=True)
