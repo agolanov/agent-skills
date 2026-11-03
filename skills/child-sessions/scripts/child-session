@@ -113,15 +113,17 @@ scope_matches() {
   [[ $recorded == *::* && $recorded == "${current%:*:*}::${current##*:}" ]]
 }
 # A recorded scope is gone when its server no longer runs, or no longer has
-# that session ID under the recorded server PID. Only scopes with a session
-# ID qualify: a legacy socket::PID record cannot prove its session is gone.
+# that session ID under the recorded server PID. A legacy socket::PID scope
+# can prove only the loss of its whole server.
 tmux_scope_gone() {
   local recorded=$1 socket rest sid pid output
+  local -a target=()
   pid=${recorded##*:}; rest=${recorded%:*}; sid=${rest##*:}; socket=${rest%:*}
-  [[ $pid =~ ^[0-9]+$ && $sid =~ ^\$[0-9]+$ && $socket == /* ]] || return 1
+  [[ $pid =~ ^[0-9]+$ && ( -z $sid || $sid =~ ^\$[0-9]+$ ) && $socket == /* ]] || return 1
   [[ -e $socket ]] || return 0
-  if output=$(tmux_call -S "$socket" display-message -p -t "$sid" '#{session_id}:#{pid}' 2>&1); then
-    [[ $output != "$sid:$pid" ]]
+  [[ -z $sid ]] || target=(-t "$sid")
+  if output=$(tmux_call -S "$socket" display-message -p ${target[@]+"${target[@]}"} '#{session_id}:#{pid}' 2>&1); then
+    if [[ -z $sid ]]; then [[ ${output##*:} != "$pid" ]]; else [[ $output != "$sid:$pid" ]]; fi
   else
     case $output in
       *"can't find session"*|*'no server running'*|*'Connection refused'*|*'No such file or directory'*) return 0 ;;
