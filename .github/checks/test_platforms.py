@@ -296,6 +296,13 @@ $PSNativeCommandUseErrorActionPreference=$false
 . $Owner
 $power=(Get-Process -Id $PID).Path
 function Assert($condition,$message) { if (-not $condition) { throw $message } }
+# Native control callers need one result even when both captured streams are empty.
+$nativeResults=@(Invoke-ChildSessionNative $power @('-NoProfile','-Command','exit 17') $Root)
+Assert ($nativeResults.Count -eq 1) 'native call emitted extra pipeline results'
+$nativeResult=$nativeResults[0]
+Assert ($nativeResult.Stdout -is [byte[]] -and $nativeResult.Stdout.Length -eq 0) 'native empty stdout is not a byte array'
+Assert ($nativeResult.Stderr -is [byte[]] -and $nativeResult.Stderr.Length -eq 0) 'native empty stderr is not a byte array'
+Assert ($nativeResult.ExitCode -eq 17) 'native producer exit changed'
 function Capture-Git($Label,$CheckoutPath) {
     $checkout=$CheckoutPath;$evidence=Join-Path $Root $Label;[IO.Directory]::CreateDirectory($evidence)|Out-Null
     . $GitRecipe

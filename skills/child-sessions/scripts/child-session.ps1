@@ -52,7 +52,7 @@ function Invoke-ChildSessionNative {
     try {
         $outTask=$p.StandardOutput.BaseStream.CopyToAsync($stdout)
         $errTask=$p.StandardError.BaseStream.CopyToAsync($stderr)
-        $p.WaitForExit(); $outTask.GetAwaiter().GetResult(); $errTask.GetAwaiter().GetResult()
+        $p.WaitForExit(); [void]$outTask.GetAwaiter().GetResult(); [void]$errTask.GetAwaiter().GetResult()
         return [pscustomobject]@{Stdout=$stdout.ToArray();Stderr=$stderr.ToArray();ExitCode=$p.ExitCode}
     } finally { $p.Dispose();$stdout.Dispose();$stderr.Dispose() }
 }
