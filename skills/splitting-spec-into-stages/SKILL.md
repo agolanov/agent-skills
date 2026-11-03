@@ -1,0 +1,75 @@
+---
+name: splitting-spec-into-stages
+description: Splits one large design spec without plans into ordered stages by appending a `## Stages` section, written in a visible child agent session where the user answers its questions. Use when a large unstaged spec should be split into stages before planning, or when `delivering-spec-stages` needs a spec split.
+---
+
+# Splitting Spec Into Stages
+
+For each clean/path gate and continuation below and in child briefs, use the four ordinary Git commands and identity checks in [checkout state](../independent-review/references/checkout-state.md#direct-use-preflight), with process-local `GIT_OPTIONAL_LOCKS=0`, actual exits and raw output files. These are own-paths gates over the spec in the repository holding it; unrelated staged or unstaged paths pass and stay untouched. A repository not holding the spec owns no path. A clean gate requires successful commands and empty status and diffs; path gates parse NUL-delimited status and compare exact repository-relative paths, including both rename paths. Failed or unavailable Git evidence stops the dependent action. Use ordinary Git for other read-only checks, retaining real exits. Evidence has the reference's ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits. Stage/commit only owned paths; write, merge and push authority stays explicit.
+
+
+`splitting-spec-into-stages <spec> [--agent claude|codex] [--model M|cli-default] [--effort E|cli-default]`
+
+One spec per run. The child writes the spec's `## Stages` section and talks to the user in its own window; the user answers its questions there, never through the root. The root classifies the spec, opens one window in the project checkout, waits, verifies Git/status facts and reports the stages. It writes no document, mark or commit, never edits a child status, and invokes no other task skill: the user chooses what runs next.
+
+## Input
+
+The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Docs repository = `git -C <project>/docs/superpowers rev-parse --show-toplevel` when that directory exists, else the project checkout. Resolve the input; read a given file completely. Classify it by the first rule that matches; every stop happens before any window:
+
+1. **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`). Refuse, naming it: "a plan, not a spec; only a design spec is split into stages".
+2. **Spec**: named `*-design.md` or lying in a `specs/` directory. Run the spec checks below.
+3. **Anything else** (a brief, another file, a task text, a missing path): refuse, naming it: "not a spec; only a design spec is split into stages".
+
+Spec checks, in order:
+
+1. The spec lies in the docs repository; `<rel>` is its path relative to that repository. A spec outside it stops, naming both.
+2. Locate the installed `planning-task-docs/references/stages-section.md` (the sibling [stages-section.md](../planning-task-docs/references/stages-section.md#recipes)) by absolute path. Missing: stop, naming `planning-task-docs` for the user to install. The brief's `Stage convention:` line names this path.
+3. Run `stages_parse` from that file's Recipes on the spec, then follow its exit:
+   - Exit 1 with stderr exactly `no "## Stages"`: the spec is unstaged; a `## Stages` line inside a fenced code block is no heading. Continue.
+   - Exit 2: stop, reporting the stages evidence unavailable with the stderr reason.
+   - Any other exit (0, or exit 1 naming a broken section): the spec has a `## Stages` heading. Refuse: "already staged; edit the section by hand or run `delivering-spec-stages`".
+4. Find its plans in the sibling `plans/` directory, with no question: the naming pair (`specs/YYYY-MM-DD-<slug>-design.md` with `plans/YYYY-MM-DD-<slug>.md`), and every plan whose `**Spec:**` header (path relative to the project checkout) names this spec, with or without a `**Stage:**` line. Any found: refuse, naming each plan: "already planned; splitting a spec whose work has started is a hand job".
+5. `git -C <docs repository> cat-file -e HEAD:<rel>` exits 0: the spec is tracked at the docs repository's HEAD. Any other exit stops: "commit the spec first".
+
+## Preflight
+
+1. Resolve applicable project rules. Run the own-paths gate on the docs repository over the spec, `<rel>`. A hit stops, naming the path. Record the full HEAD of the docs repository and the spec's SHA-256.
+2. Select `--agent`, otherwise identify the root's own system from session identity as `auto-cross-refine` does; unknown identity requires clarification. Never infer the agent from executable availability, environment, directory names or model.
+3. Resolve the splitter's settings per [launch settings](../independent-review/references/launch-settings.md#precedence) for the selected agent: `--model`/`--effort` are explicit values, `cli-default` is a per-field [opt-out](../independent-review/references/launch-settings.md#cli-defaults-opt-out), and every other field takes the splitter role default. An unresolved or unsupported pair stops before any window.
+4. Locate the installed `child-sessions/SKILL.md`; read it, its `references/brief-writing.md` and `references/status-file.md`. Resolve its installed platform entrypoint by absolute path (Bash `scripts/child-session`; native Windows `scripts/child-session.ps1` through the installed PowerShell vector in its platform reference). Its command/status contract governs every call. Set `<runtime>` from its successful `runtime-dir` output, outside Git. The child needs no superpowers skill: its brief names the stage convention by absolute path.
+5. `<spec-stem>` is the spec's [Spec stem](references/stages-section.md#parsing-rules), its file stem without `-design` (`specs/2026-11-03-plain-design.md` → `2026-11-03-plain`), with every character outside `[A-Za-z0-9_-]` replaced by `-`. Window `split-<spec-stem>`, brief `<runtime>/split-<spec-stem>-brief.md`, status `<runtime>/split-<spec-stem>-status.md`, recorded file `<runtime>/split-<spec-stem>-recorded.md`. A live window of that name (`alive split-<spec-stem>` returns 0) is refused, naming it. Leftover runtime files of that name from an earlier run (brief, status, recorded file, and their archived `-blocked-<n>` and `-rejected-<n>` copies) are renamed to `<file>-old-<n>`, `n` the smallest unused number; no earlier file remains at the brief, status or recorded path.
+6. Last, copy the spec's working file byte for byte to the recorded file (an ordinary file copy, never `git show`, whose blob can differ from the working file) and check that the copy's SHA-256 equals the one recorded in step 1. A difference stops: the spec changed during Preflight.
+
+## Brief
+
+Fill [splitter-brief.md](references/splitter-brief.md) with absolute resolved paths, following child-sessions' brief checklist, and write it to the brief path. Its `Stage convention:` line is the absolute path located in Input.
+
+Before acting on a launch, retain `capabilities <name>` and check its checkout/launch identity. Every `peek`, `send` and `key` below is conditional on that supported capability. With plain-terminal controls unavailable, tell the user once at launch that questions/dialogs need direct attention in that window, then continue through brief/status files; report dialog counts as not observable. A known `blocked` question still follows the status contract, with its answer entered directly by the user when `send` is unavailable. A timeout alone supplies no question or approval. Check `alive` before any supported input; never reopen a live agent to inject text. Reopen a proven dead launch at most once under the shared budget below. `close` stops only proven owned processes; unavailable window closure leaves a reported retained window, whose shell alone is not a live agent.
+
+## Open and wait
+
+1. Append the `Opened:` line of the [child settings check](../independent-review/references/launch-settings.md#child-settings-check) to the brief, then call `open --agent <agent> [--model M] [--effort E] --split right split-<spec-stem> <project checkout> <brief>`, quoting paths, passing the brief's recorded Launch settings as `--model` and `--effort` and omitting a field that is `cli-default`. The user answers the child's questions in its window, so it asks for a pane right of the root; when `open` prints a fallback note (a tab or a tmux window instead), tell the user where the window opened. The child works in the project checkout: no worktree, no branch of its own. Tell the user that the run owns the spec: leave it to the child while the window is open; any other file stays theirs to change and commit.
+2. Follow child-sessions' foreground loop: `wait split-<spec-stem> <status> 240` on Codex, `540` on Claude. A Codex tool yield is not a timeout: poll the same returned foreground session in intervals of at most 60 seconds until it exits. Questions to the user can take long: keep waiting. At the first `wait` return after each `open`, run the early [child settings check](../independent-review/references/launch-settings.md#child-settings-check) for that opening and keep the matched record path; only a mismatch stops the loop for the user's continue-or-stop question.
+3. On exit `0`, read the exact first status line. `done` proceeds to Verify. `blocked` shows Questions, options and recommendation, obtains the user's answer, archives the status to `<file>-blocked-<n>`, sends one line or an absolute answer-file instruction, then waits for a fresh status. `failed` shows the failure and stops, keeping the window and status; the report says the spec was not split and lists any commits the status names.
+4. Exit `3`: `peek split-<spec-stem> 40`, show diagnostics, append “Continue from the current state of the checkout: read git log and record the ordinary Git evidence and verify checkout/branch/HEAD first. Uncommitted changes on your owned paths are your earlier session's work: inspect them and continue from them.” to the brief, close the stale window if present, append a new `Opened:` line and reopen once with the brief's recorded Launch settings; never re-resolve them. A second silent exit stops, keeping the window and status. Exit `124`: `peek split-<spec-stem> 40`; wait again for work in progress, or handle a dialog per child-sessions Dialogs. Other errors stop with artifacts preserved.
+5. Before every `send` (a `blocked` answer here, a mismatch line in Verify), run `alive split-<spec-stem>`: a dead agent leaves a shell that would run the text. Dead: `close split-<spec-stem>`, append the continuation line of step 4 and then the line you meant to send to the brief, append a new `Opened:` line, and `open` again with the brief's recorded Launch settings, never re-resolved; this is the run's one reopen, shared with step 4. When that reopen was already used, stop and report, keeping the window and runtime files.
+
+## Verify
+
+On `done`, all of these must hold:
+
+1. Full status format with `## Artifacts`, listing exactly the spec, by its absolute path.
+2. Commits lists the child's own commits in the docs repository: each is in `<recorded HEAD>..HEAD` and changes only the spec (`git show --name-only --format= --no-renames <sha>`, relative to the docs repository). Every other commit of that range is the user's parallel work and leaves the spec unchanged; one that changes it stops Verify and goes to the user, naming the commit, never back to the child.
+3. A fresh own-paths gate on the docs repository over the spec passes: the split is not left uncommitted.
+4. The recorded file's SHA-256 still equals the recorded one. A difference is unavailable evidence: stop, keeping the window and status.
+5. [prefix-check.md](references/prefix-check.md) returns 0, with `file` the spec and `recorded` the recorded file: the section was appended and at most a trailing `Review:` mark removed, nothing else changed.
+6. `stages_parse` returns 0 on the spec.
+7. The `## Stages` section holds a line starting `**Coverage:** ` after its last stage heading, as the Coverage rule of the [display copy](references/stages-section.md#parsing-rules) requires of a section this skill wrote.
+8. No line of the spec matches `^Review: (clean|clean except disputed), `.
+9. The final [child settings check](../independent-review/references/launch-settings.md#child-settings-check) over every opening's record matches, or the user accepted its result.
+
+Exit 2 of either recipe is unavailable evidence too: stop, keeping the window and status. A settings mismatch or `settings unverified: <reason>` never goes back to the child: show expected and observed values and the record paths, and ask the user to accept the result with the observed settings or stop with everything preserved. A user commit changing the spec goes to the user per Verify 2. Any other mismatch goes back to the child once: archive the status to `<file>-rejected-<n>`, `n` the smallest unused number, `send` one line naming the mismatch and asking for a fresh report at the same path, wait and verify again. A repeated mismatch goes to the user, with window and status kept.
+
+## Report
+
+Report the spec path, its stages as `stages_parse` lists them (number and name, each with the first sentence of its `**Scope:**`), the repository and commits that hold the split, every stage the child reported larger than the guideline with its reason (its Checks lines), and every Out of scope line. When Verify 3's preflight listed paths other than the spec, add `unrelated uncommitted changes left untouched: <count>`, without listing them. Add one settings line: role `splitter`, effective model and effort, source of each, the settings check outcome, and the record paths or the user's acceptance. After a verified `done`, `close split-<spec-stem>` and remove the recorded file; otherwise the window, status and recorded file stay for the user. Nothing is reviewed, planned or executed here: the next step is `refining-task-docs <spec>`.
