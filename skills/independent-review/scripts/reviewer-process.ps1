@@ -87,10 +87,11 @@ function Export-ClaudeReviewAnswer {
                 }
             }
         )
-        if ($results.Count -ne 1 -or $results[0].result -isnot [string] -or [string]::IsNullOrWhiteSpace($results[0].result)) {
-            throw 'Expected exactly one nonempty Claude result event.'
+        $result = $results | Select-Object -Last 1
+        if (-not $result -or $result.is_error -eq $true -or $result.result -isnot [string] -or [string]::IsNullOrWhiteSpace($result.result)) {
+            throw 'Expected a nonempty, non-error final Claude result event.'
         }
-        [IO.File]::WriteAllText((Join-Path $OutputDirectory 'answer.md'), $results[0].result, $utf8)
+        [IO.File]::WriteAllText((Join-Path $OutputDirectory 'answer.md'), $result.result, $utf8)
         [IO.File]::WriteAllText((Join-Path $OutputDirectory 'extraction.exit'), "0`n")
         return 0
     } catch {

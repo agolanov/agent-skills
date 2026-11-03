@@ -47,11 +47,11 @@ printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
 # Run after the producer finishes. Use an already installed parser; install none.
 if command -v jq >/dev/null 2>&1; then
   extraction_exit=0
-  jq -er -s 'map(select(.type == "result")) | if length == 1 and (.[0].result | type == "string" and test("\\S")) then .[0].result else error("missing/ambiguous result") end' \
+  jq -er -s 'map(select(.type == "result")) | last | if .is_error != true and (.result | type == "string" and test("\\S")) then .result else error("missing/invalid final result") end' \
     "$round_dir/events.jsonl" > "$round_dir/answer.md" 2> "$round_dir/extraction-error.txt" || extraction_exit=$?
 elif command -v node >/dev/null 2>&1; then
   extraction_exit=0
-  node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(x=>x.trim()).map(JSON.parse).filter(x=>x.type==="result");if(rows.length!==1||typeof rows[0].result!=="string"||!rows[0].result.trim())throw Error("missing/ambiguous result");process.stdout.write(rows[0].result);' \
+  node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(x=>x.trim()).map(JSON.parse).filter(x=>x.type==="result");const result=rows[rows.length-1];if(!result||result.is_error===true||typeof result.result!=="string"||!result.result.trim())throw Error("missing/invalid final result");process.stdout.write(result.result);' \
     "$round_dir/events.jsonl" > "$round_dir/answer.md" 2> "$round_dir/extraction-error.txt" || extraction_exit=$?
 else
   extraction_exit=127
@@ -59,6 +59,8 @@ else
 fi
 printf '%s\n' "$extraction_exit" > "$round_dir/extraction.exit"
 ```
+
+After the producer completes, use the last result event: background notifications can start further turns. A malformed stream, missing/blank final result or final error is invalid; never fall back to an earlier CLEAN. See [Claude Code background tasks and streaming](https://code.claude.com/docs/en/headless#stream-responses).
 
 Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
@@ -90,7 +92,7 @@ $review_exit = $result.ProducerExit
 $extraction_exit = Export-ClaudeReviewAnswer -OutputDirectory $round_dir
 ```
 
-Keep producer exit, launch/I/O errors and extraction exit separate. A missing executable or launch exception has no producer success; a JSON/result error cannot overwrite `producer.exit`. Extraction success never rescues a nonzero producer exit or a Claude error-result event. Validate runtime settings and the report only after inspecting all these records. For parallel calls, each job returns its producer result; extract after both producers complete.
+Keep producer exit, launch/I/O errors and extraction exit separate. A missing executable or launch exception has no producer success; a JSON/result error cannot overwrite `producer.exit`. Extraction success never rescues a nonzero producer exit or a final Claude error-result event. Validate runtime settings and the report only after inspecting all these records. For parallel calls, each job returns its producer result; extract after both producers complete.
 
 ## Result handling
 

@@ -111,15 +111,38 @@ def posix_consumers():
     fake.chmod(0o700)
     prompt = fixture / 'prompt.md'; prompt.write_bytes(b'prompt \x00 caf\xc3\xa9\r\n')
     recipe = consumer_recipe('skills/independent-review/references/cli-reviewers.md', 'bash', 1)
-    for name, events, producer, extraction in [('valid', '{"type":"result","result":"VERDICT: CLEAN"}', 0, 0), ('failed-producer', '{"type":"result","result":"answer"}', 17, 0), ('bad-json', '{bad', 0, 1), ('missing-result', '{"type":"system"}', 0, 1), ('blank-result', '{"type":"result","result":" \\t\\r\\n"}', 17, 1)]:
-        attempt=fixture / ('cli-'+name); attempt.mkdir()
-        env=dict(os.environ, PATH=str(bin_dir)+os.pathsep+os.environ['PATH'], PROMPT_LOG=str(attempt/'prompt.raw'), EVENTS=events, PRODUCER_EXIT=str(producer), task_checkout=str(checkout), round_prompt=str(prompt), round_dir=str(attempt), review_model='cli-default', review_effort='cli-default')
-        run(['bash', '-c', recipe], env=env)
-        assert (attempt/'prompt.raw').read_bytes() == prompt.read_bytes()
-        assert int((attempt/'producer.exit').read_text()) == producer
-        actual=int((attempt/'extraction.exit').read_text())
-        assert actual == 0 if extraction == 0 else actual != 0
-        assert (attempt/'stderr.log').read_bytes() == b'stderr'
+    clean = '{"type":"result","subtype":"success","is_error":false,"result":"VERDICT: CLEAN"}'
+    progress = clean + '\n{"type":"user","message":{"role":"user","content":"<task-notification>Monitor update</task-notification>"}}\n'
+    cases = [
+        ('valid', clean, 0, 'VERDICT: CLEAN'),
+        ('failed-producer', '{"type":"result","result":"answer"}', 17, 'answer'),
+        ('bad-json', '{bad', 0, None),
+        ('missing-result', '{"type":"system"}', 0, None),
+        ('blank-result', '{"type":"result","result":" \\t\\r\\n"}', 17, None),
+        ('progress-changes', progress + '{"type":"result","subtype":"success","is_error":false,"result":"VERDICT: CHANGES\\nF7: final review"}', 0, 'VERDICT: CHANGES\nF7: final review'),
+        ('final-error', progress + '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Review failed"}', 0, None),
+        ('final-blank', progress + '{"type":"result","result":" \\t\\r\\n"}', 17, None),
+        ('final-malformed', progress + '{bad', 0, None),
+    ]
+    for parser in ('jq', 'node'):
+        executable = shutil.which(parser)
+        if not executable:
+            report('posix-extraction-' + parser, 'unavailable', 'installed parser not reachable; no installation')
+            continue
+        parser_bin = fixture / ('bin-' + parser); parser_bin.mkdir()
+        for command, target in [('claude', fake), ('cat', shutil.which('cat')), (parser, executable)]:
+            (parser_bin / command).symlink_to(target)
+        for name, events, producer, answer in cases:
+            attempt=fixture / ('cli-'+parser+'-'+name); attempt.mkdir()
+            env=dict(os.environ, PATH=str(parser_bin), PROMPT_LOG=str(attempt/'prompt.raw'), EVENTS=events, PRODUCER_EXIT=str(producer), task_checkout=str(checkout), round_prompt=str(prompt), round_dir=str(attempt), review_model='cli-default', review_effort='cli-default')
+            run([shutil.which('bash'), '-c', recipe], env=env)
+            assert (attempt/'prompt.raw').read_bytes() == prompt.read_bytes()
+            assert int((attempt/'producer.exit').read_text()) == producer
+            actual=int((attempt/'extraction.exit').read_text())
+            assert (actual == 0) == (answer is not None), (parser, name, actual)
+            if answer is not None:
+                assert (attempt/'answer.md').read_text().rstrip('\n') == answer
+            assert (attempt/'stderr.log').read_bytes() == b'stderr'
     report('posix-consumers', 'pass', 'documented no-Python freshness and CLI recipes: byte preservation, uniform CRLF, changes/missing revision, failed show, raw prompt/stdout/stderr and separate producer/extraction exits; synthetic CLI only')
 
 
@@ -369,17 +392,29 @@ $attempt=Join-Path $Root 'npm-attempt'
 $r=Invoke-ReviewerProcess -Executable $shim -Checkout $checkout -PromptPath $prompt -OutputDirectory $attempt
 Assert ($r.ProducerExit -eq 19 -and -not $r.IOFailure) 'npm producer exit lost'
 Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $attempt 'answer.md'))) -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes($prompt))) 'npm text shim changed prompt bytes'
+$eventsReceiver=Join-Path $Root 'claude-events.ps1'
+[IO.File]::WriteAllText($eventsReceiver,'[Console]::Write($env:REVIEW_EVENTS); exit ([int]$env:REVIEW_PRODUCER_EXIT)',$utf8)
+$clean='{"type":"result","subtype":"success","is_error":false,"result":"VERDICT: CLEAN"}'
+$progress=$clean+[Environment]::NewLine+'{"type":"user","message":{"role":"user","content":"<task-notification>Monitor update</task-notification>"}}'+[Environment]::NewLine
 foreach ($case in @(
-    @{name='ok';events='{"type":"result","result":"VERDICT: CLEAN"}';expected=0},
+    @{name='ok';events=$clean;expected=0;answer='VERDICT: CLEAN';producer=0},
     @{name='malformed';events='{bad';expected=1},
     @{name='absent';events='{"type":"system"}';expected=1},
-    @{name='multiple';events="{`"type`":`"result`",`"result`":`"a`"}`n{`"type`":`"result`",`"result`":`"b`"}";expected=1}
+    @{name='multiple';events=('{"type":"result","result":"a"}'+[Environment]::NewLine+'{"type":"result","result":"b"}');expected=0;answer='b'},
+    @{name='progress-changes';events=($progress+'{"type":"result","subtype":"success","is_error":false,"result":"VERDICT: CHANGES\nF7: final review"}');expected=0;answer=('VERDICT: CHANGES'+[char]10+'F7: final review');producer=0},
+    @{name='final-error';events=($progress+'{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Review failed"}');expected=1;producer=0},
+    @{name='final-blank';events=($progress+'{"type":"result","result":" \t\r\n"}');expected=1},
+    @{name='final-malformed';events=($progress+'{bad');expected=1;producer=0}
 )) {
     $attempt=Join-Path $Root ('extract-'+$case.name);[IO.Directory]::CreateDirectory($attempt)|Out-Null
-    [IO.File]::WriteAllText((Join-Path $attempt 'events.jsonl'),$case.events,$utf8)
-    [IO.File]::WriteAllText((Join-Path $attempt 'producer.exit'),'17')
+    $env:REVIEW_EVENTS=$case.events
+    $producer=if ($case.ContainsKey('producer')) { $case.producer } else { 17 }
+    $env:REVIEW_PRODUCER_EXIT=[string]$producer
+    $r=Invoke-ReviewerProcess -Executable $eventsReceiver -Checkout $checkout -PromptPath $prompt -OutputDirectory $attempt -OutputName events.jsonl
+    Assert ($r.ProducerExit -eq $producer -and -not $r.IOFailure) 'events producer exit/I/O lost'
     Assert ((Export-ClaudeReviewAnswer -OutputDirectory $attempt) -eq $case.expected) ('native extraction '+$case.name)
-    Assert ((Get-Content -LiteralPath (Join-Path $attempt 'producer.exit')) -eq '17') 'extraction overwrote producer exit'
+    if ($case.expected -eq 0) { Assert ([IO.File]::ReadAllText((Join-Path $attempt 'answer.md')) -ceq $case.answer) ('native final text '+$case.name) }
+    Assert ((Get-Content -LiteralPath (Join-Path $attempt 'producer.exit')) -eq [string]$producer) 'extraction overwrote producer exit'
 }
 
 # This fake replaces only the terminal transport. All launched shells/processes,
