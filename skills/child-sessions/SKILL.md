@@ -79,7 +79,7 @@ Stop proven owned processes with `close "$name"` when supported (report a retain
 
 ## Other operations and environment
 
-`send <name> <text>` types one line and Enter; multiline content belongs in a file. `send <name> ""` sends a bare Enter. `key <name> <key>` sends one key without Enter: `Escape`, `Up`, `Down` or one digit `0`–`9`. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 for a running agent, 1 otherwise; a surviving shell window does not prove liveness. `runtime-dir` resolves private storage; `capabilities <name>` returns the recorded operation booleans and launch identity. `list` lists validated owned sessions and checkouts. After the calling task has completed its checks, `close <name>` stops only proven owned processes and closes an independently owned window when supported; it does not remove the checkout or branch.
+`send <name> <text>` types one line and Enter; multiline content belongs in a file. `send <name> ""` sends a bare Enter. `key <name> <key>` sends one key without Enter: `Escape`, `Up`, `Down` or one digit `0`–`9`. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 while the recorded agent runs, even after its window is gone, 1 otherwise; a surviving shell window does not prove liveness, and `send`/`key` refuse input once the agent's launcher is gone. `runtime-dir` resolves private storage; `capabilities <name>` returns the recorded operation booleans and launch identity. `list` lists validated owned sessions and checkouts. After the calling task has completed its checks, `close <name>` stops only proven owned processes and closes an independently owned window when supported; it does not remove the checkout or branch.
 
 | Variable | Meaning |
 |---|---|

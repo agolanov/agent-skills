@@ -47,7 +47,7 @@ printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
 # Run after the producer finishes. Use an already installed parser; install none.
 if command -v jq >/dev/null 2>&1; then
   extraction_exit=0
-  jq -er -s 'map(select(.type == "result")) | last | if .is_error != true and (.result | type == "string" and test("\\S")) then .result else error("missing/invalid final result") end' \
+  jq -ej -s 'map(select(.type == "result")) | last | if .is_error != true and (.result | type == "string" and test("\\S")) then .result else error("missing/invalid final result") end' \
     "$round_dir/events.jsonl" > "$round_dir/answer.md" 2> "$round_dir/extraction-error.txt" || extraction_exit=$?
 elif command -v node >/dev/null 2>&1; then
   extraction_exit=0

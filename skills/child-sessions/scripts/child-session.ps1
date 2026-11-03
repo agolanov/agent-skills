@@ -14,8 +14,47 @@ function Stop-ChildSessionProcess {
     # Recheck on the actual Process object immediately before stopping it.
     $p=Get-Process -Id ([int]$Identity.pid) -ErrorAction Stop
     if ($p.StartTime.ToUniversalTime().Ticks.ToString() -cne $Identity.start) { throw 'PID/start mismatch; process preserved.' }
-    $p.Kill(); $p.WaitForExit(10000) | Out-Null
+    try { $p.Kill() } catch { $p.Refresh(); if (-not $p.HasExited) { throw } }
+    $p.WaitForExit(10000) | Out-Null
     if (-not $p.HasExited) { throw 'Owned process still running; session preserved.' }
+}
+function Get-ChildSessionDescendants {
+    param($Identity)
+    # Parent links come from one snapshot. A descendant must have started after
+    # its parent and before the snapshot (or before the recorded exit of a
+    # parent that is gone), so a reused PID never joins the tree.
+    $snapshot=[DateTime]::UtcNow.Ticks
+    $children=@{}
+    foreach ($p in @(Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId -ErrorAction Stop)) {
+        $parent=[int]$p.ParentProcessId;$id=[int]$p.ProcessId
+        if ($id -eq $parent) { continue }
+        if (-not $children.ContainsKey($parent)) { $children[$parent]=New-Object Collections.Generic.List[int] }
+        $children[$parent].Add($id)
+    }
+    $now=Get-ChildSessionProcessStart ([int]$Identity.pid)
+    if ($now -and $now -cne $Identity.start) { throw 'PID/start mismatch; process preserved.' }
+    if ($now) { $limit=$snapshot } elseif ($Identity.exit) { $limit=[long]$Identity.exit } else { return @() }
+    $found=New-Object Collections.Generic.List[object]
+    $queue=New-Object Collections.Generic.Queue[object]
+    $queue.Enqueue(@{pid=[int]$Identity.pid;start=[long]$Identity.start;limit=$limit})
+    while ($queue.Count) {
+        $node=$queue.Dequeue()
+        if (-not $children.ContainsKey($node.pid)) { continue }
+        foreach ($id in $children[$node.pid]) {
+            $start=Get-ChildSessionProcessStart $id
+            if (-not $start -or [long]$start -lt $node.start -or [long]$start -gt $node.limit) { continue }
+            $found.Add(@{pid=$id;start=$start})
+            $queue.Enqueue(@{pid=$id;start=[long]$start;limit=$snapshot})
+        }
+    }
+    return $found.ToArray()
+}
+function Stop-ChildSessionTree {
+    param($Identity)
+    # Stop the recorded process, then each verified descendant it left behind.
+    $tree=@(Get-ChildSessionDescendants $Identity)
+    Stop-ChildSessionProcess $Identity
+    foreach ($id in $tree) { Stop-ChildSessionProcess $id }
 }
 function ConvertTo-ChildSessionNativeArgument {
     param([AllowEmptyString()][string]$Value)
@@ -89,10 +128,12 @@ function Write-ChildSessionRecord {
     else { [IO.File]::Move($temp,$path) }
 }
 function Test-ChildSessionAlive {
-    param($Record)
+    param($Record,[switch]$Control)
     if (-not $Record -or $Record.closed -or $Record.phase -eq 'exited') { return $false }
     if ($Record.phase -ne 'running') { return $false }
-    foreach ($id in @($Record.launcher,$Record.agent)) {
+    # The agent may outlive its launcher; input also needs the launcher.
+    $ids=@($Record.agent);if ($Control) { $ids+=$Record.launcher }
+    foreach ($id in $ids) {
         if (-not $id -or -not $id.start -or (Get-ChildSessionProcessStart ([int]$id.pid)) -cne $id.start) { return $false }
     }
     return $true
@@ -276,7 +317,7 @@ function Invoke-ChildSessionLauncher {
             $process=Start-ChildSessionProcess $request.resolved.executable ([string[]]$vector) $request.cwd
         }
         $r.agent=@{pid=$process.Id;start=(Get-ChildSessionProcessStart $process.Id)};$r.phase='running';Write-ChildSessionRecord $r
-        $process.WaitForExit();$r.phase='exited';$r.exit_code=$process.ExitCode;Write-ChildSessionRecord $r
+        $process.WaitForExit();$r.agent.exit=$process.ExitTime.ToUniversalTime().Ticks.ToString();$r.phase='exited';$r.exit_code=$process.ExitCode;Write-ChildSessionRecord $r
         exit $process.ExitCode
     } catch { [Console]::Error.WriteLine('child-session launcher: '+($_ | Out-String)); exit 2 }
 }
@@ -327,7 +368,10 @@ function Invoke-ChildSessionDispatch {
                 $now=Get-ChildSessionProcessStart ([int]$id.pid)
                 if ($now -and $now -cne $id.start) { throw 'PID/start mismatch; process preserved.' }
             }
-            foreach ($id in @($r.agent,$r.launcher)) { Stop-ChildSessionProcess $id }
+            foreach ($id in @($r.agent,$r.launcher)) { Stop-ChildSessionTree $id }
+            } elseif ($r.agent -and $r.agent.exit) {
+                # Descendants of a script-wrapped agent can outlive its exit.
+                foreach ($id in @(Get-ChildSessionDescendants $r.agent)) { Stop-ChildSessionProcess $id }
             }
             for ($n=0;$n -lt 50;$n++) { if (-not (Test-ChildSessionAlive $r)) { break };Start-Sleep -Milliseconds 200 }
             if (Test-ChildSessionAlive $r) { throw 'Owned agent still alive; window retained.' }
@@ -336,7 +380,7 @@ function Invoke-ChildSessionDispatch {
             [Console]::Error.WriteLine('child-session: owned processes stopped; window_close: false (terminal window retained)');return 0
         }
         default {
-            if ($command -cne 'peek' -and -not (Test-ChildSessionAlive $r)) { throw 'Owned agent is not running; input refused.' }
+            if ($command -cne 'peek' -and -not (Test-ChildSessionAlive $r -Control)) { throw 'Owned agent or its launcher is not running; input refused.' }
             Assert-ChildSessionPane $r
             $vector=@('pane')
             if ($command -ceq 'send') { if ($rest[1] -ne '') { $sent=Invoke-ChildSessionNative $script:Herdr @('pane','send-text',$r.pane,$rest[1]) $script:Runtime;if ($sent.ExitCode -ne 0) { throw 'send-text failed' };Start-Sleep -Milliseconds 300 };$vector=@('pane','send-keys',$r.pane,'enter') }

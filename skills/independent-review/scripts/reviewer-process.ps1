@@ -60,7 +60,7 @@ function Invoke-ReviewerProcess {
         finally { $process.StandardInput.Close() }
         $process.WaitForExit()
         foreach ($task in @($outTask, $errTask)) {
-            try { $task.GetAwaiter().GetResult() }
+            try { $null=$task.GetAwaiter().GetResult() }
             catch { $ioFailure += 'output: ' + $_.Exception.Message }
         }
         $producerExit = $process.ExitCode

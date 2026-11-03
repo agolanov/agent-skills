@@ -94,12 +94,46 @@ json_string() {
   value=${value//$'\n'/\\n}; value=${value//$'\r'/\\r}; value=${value//$'\t'/\\t}
   printf '\"%s\"' "$value"
 }
+# A recorded tmux scope (socket:session ID:server PID; tmux 3.4 leaves the
+# session ID empty for an =name target) is gone when its server no longer runs
+# under the recorded PID, or no longer has the recorded session.
+tmux_scope_gone() {
+  local recorded=$1 socket rest sid pid output
+  local -a target=()
+  pid=${recorded##*:}; rest=${recorded%:*}; sid=${rest##*:}; socket=${rest%:*}
+  [[ $pid =~ ^[0-9]+$ && ( -z $sid || $sid =~ ^\$[0-9]+$ ) && $socket == /* ]] || return 1
+  [[ -e $socket ]] || return 0
+  [[ -z $sid ]] || target=(-t "$sid")
+  if output=$(tmux_call -S "$socket" display-message -p ${target[@]+"${target[@]}"} '#{pid}' 2>&1); then
+    [[ $output != "$pid" ]]
+  else
+    case $output in
+      *"can't find session"*|*'no server running'*|*'Connection refused'*|*'No such file or directory'*) return 0 ;;
+      *) return 1 ;;
+    esac
+  fi
+}
+record_survives() {
+  local file=$1 key pid start
+  [[ $(record_field "$file" phase) == running ]] || return 1
+  for key in agent launcher; do
+    pid=$(record_field "$file" "${key}_pid"); start=$(record_field "$file" "${key}_start")
+    [[ -z $start || $(process_identity "$pid" || true) != "$start" ]] || return 0
+  done
+  return 1
+}
 record_matches_scope() {
-  local file=$1 backend scope
+  local file=$1 backend scope recorded
   backend=$(record_field "$file" backend)
   if [[ $backend == tmux ]]; then
-    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || return 1
-    [[ $(record_field "$file" scope) == "$scope" ]]
+    recorded=$(record_field "$file" scope)
+    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || scope=''
+    [[ -z $scope || $recorded != "$scope" ]] || return 0
+    # A launch whose own tmux session is gone stays visible under its session
+    # name while a recorded process survives, so that agent is still reported,
+    # refused and closable. Without survivors the stale record stays hidden.
+    [[ -n $(record_field "$file" session) && $(record_field "$file" session) == "$S" ]] &&
+      tmux_scope_gone "$recorded" && record_survives "$file"
   elif [[ $backend == herdr ]]; then
     [[ $(record_field "$file" workspace) == "$WS" ]]
   else [[ $backend == terminal ]]; fi
@@ -112,7 +146,7 @@ runtime_op() {
       prefix=$1; name=$2; backend=$3; cwd=$4; scope=$5
       file=$RUNTIME_DIR/$prefix.record
       (set -o noclobber; : > "$file") || die 'launch record already exists'
-      record_append "$file" name "$name" backend "$backend" checkout "$cwd" launch_id "$prefix-$RANDOM-$RANDOM" scope "$scope" workspace "$WS" window '' pane '' split false closed false phase starting exit_code ''
+      record_append "$file" name "$name" backend "$backend" checkout "$cwd" launch_id "$prefix-$RANDOM-$RANDOM" scope "$scope" session "$S" workspace "$WS" window '' pane '' split false closed false phase starting exit_code ''
       ;;
     get) file=$RUNTIME_DIR/$1.record; [[ -f $file ]] || return 1; printf '%s' "$file" ;;
     started) file=$RUNTIME_DIR/$1.record; record_append "$file" launcher_pid "$2" launcher_start "$(process_identity "$2" || true)" agent_pid "$3" agent_start "$(process_identity "$3" || true)" phase running ;;
@@ -146,15 +180,19 @@ runtime_op() {
       done
       return "$still_running"
       ;;
-    alive|stop)
+    alive|control|stop)
       file=$RUNTIME_DIR/$1.record
       [[ -f $file ]] || return 1
       state=$(record_field "$file" phase)
-      if [[ $state == exited || $(record_field "$file" closed) == true ]]; then [[ $op != alive ]]; return; fi
-      [[ $state == running ]] || { [[ $op == alive ]] && return 1; die 'startup identities inconclusive; session preserved'; }
+      if [[ $state == exited || $(record_field "$file" closed) == true ]]; then [[ $op == stop ]]; return; fi
+      [[ $state == running ]] || { [[ $op != stop ]] && return 1; die 'startup identities inconclusive; session preserved'; }
       lp=$(record_field "$file" launcher_pid); ls=$(record_field "$file" launcher_start)
       ap=$(record_field "$file" agent_pid); ast=$(record_field "$file" agent_start)
       if [[ $op == alive ]]; then
+        # The agent may outlive its launcher, pane or tmux server after a hangup.
+        [[ -n $ast && $(process_identity "$ap" || true) == "$ast" ]]
+      elif [[ $op == control ]]; then
+        # Input is safe only while the launcher still holds the pane foreground.
         [[ -n $ls && -n $ast && $(process_identity "$lp" || true) == "$ls" && $(process_identity "$ap" || true) == "$ast" ]]
       else
         # Validate both identities before any signal. Missing/exited processes
@@ -278,7 +316,7 @@ h_find() {
 }
 resolve() {
   local found record scope actual panes pane window
-  PREFIX='' OWN_ABSENT=0
+  PREFIX='' OWN_ABSENT=0 OWN_ORPHAN=0
   found=$(runtime_op find "$1") || return $?
   PREFIX=${found%%$'\n'*}; record=${found#*$'\n'}
   W=$(record_field "$record" backend)
@@ -293,8 +331,13 @@ resolve() {
     if [[ -z $actual ]]; then OWN_ABSENT=1; return 1; fi
     [[ $actual == "$H_TAB" ]] || die 'owned herdr pane/tab mismatch'
   elif [[ $W == tmux ]]; then
-    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || return 1
-    [[ $(record_field "$record" scope) == "$scope" ]] || die 'owned tmux socket/session mismatch'
+    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || scope=''
+    if [[ -z $scope || $(record_field "$record" scope) != "$scope" ]]; then
+      # find returns a foreign scope only when that session is gone.
+      [[ $(record_field "$record" session) == "$S" ]] && tmux_scope_gone "$(record_field "$record" scope)" ||
+        die 'owned tmux socket/session mismatch'
+      OWN_ABSENT=1 OWN_ORPHAN=1; return 1
+    fi
     OWN_WINDOW=$(record_field "$record" window); OWN_PANE=$(record_field "$record" pane)
     [[ -n $OWN_PANE && -n $OWN_WINDOW ]] || die 'owned tmux pane/window identity unavailable'
     panes=$(tmux_call list-panes -s -t "=$S" -F '#{pane_id} #{window_id}' 2>/dev/null) || return 2
@@ -562,10 +605,10 @@ terminal_open() {
 }
 cmd_alive() {
   local result=0
-  resolve "$1" || { result=$?; return "$result"; }
-  if [[ $W == tmux ]]; then
-    [[ $(tmux_call display-message -p -t "$OWN_PANE" '#{pane_dead}') == 0 ]] || return 1
-  fi
+  resolve "$1" || result=$?
+  # A vanished pane or tmux session does not end an agent that ignored the hangup.
+  if (( result == 1 && OWN_ABSENT )); then result=0; fi
+  (( result == 0 )) || return "$result"
   runtime_op alive "$PREFIX"
 }
 cmd_wait() {
@@ -630,7 +673,8 @@ cmd_close() {
       (( ++tries <= 50 )) || die 'owned processes still running after stop; window retained'
       sleep 0.2
     done
-    if [[ $W == tmux ]]; then
+    # An orphaned record's view ID belongs to its lost tmux server.
+    if [[ $W == tmux ]] && (( ! OWN_ORPHAN )); then
       local view_id
       view_id=$(record_field "$record" view)
       [[ -z $view_id ]] || tmux_call kill-session -t "$view_id" 2>/dev/null || true
@@ -662,7 +706,7 @@ cmd_close() {
 require_control() {
   require_window "$1"
   [[ $W != terminal ]] || die "$2 unavailable for plain terminal; use the visible window directly"
-  if [[ $2 != peek ]]; then runtime_op alive "$PREFIX" || die 'owned agent is not running; input refused'; fi
+  if [[ $2 != peek ]]; then runtime_op control "$PREFIX" || die 'owned agent or its launcher is not running; input refused'; fi
 }
 cmd_peek() {
   require_control "$1" peek

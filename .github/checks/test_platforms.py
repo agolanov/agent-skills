@@ -141,7 +141,7 @@ def posix_consumers():
             actual=int((attempt/'extraction.exit').read_text())
             assert (actual == 0) == (answer is not None), (parser, name, actual)
             if answer is not None:
-                assert (attempt/'answer.md').read_text().rstrip('\n') == answer
+                assert (attempt/'answer.md').read_bytes() == answer.encode(), (parser, name)
             assert (attempt/'stderr.log').read_bytes() == b'stderr'
     report('posix-consumers', 'pass', 'documented no-Python freshness and CLI recipes: byte preservation, uniform CRLF, changes/missing revision, failed show, raw prompt/stdout/stderr and separate producer/extraction exits; synthetic CLI only')
 
@@ -231,8 +231,10 @@ def posix_child():
         env['FIXTURE_PANES'] = '{bad'
         call('close', 'lostpane', want=2)
         env['FIXTURE_PANES'] = '{"result":{"panes":[]}}'
-        call('alive', 'lostpane', want=1)
+        # The recorded agent still runs without its pane: alive until close.
+        call('alive', 'lostpane')
         call('close', 'lostpane')
+        call('alive', 'lostpane', want=1)
         assert b'closed\0true\0' in lostpane.read_bytes(), 'absent herdr pane record not finalized'
         assert b'lostpane ' not in call('list').stdout
         call('open', 'lostpane', checkout, brief)
@@ -380,6 +382,7 @@ $prompt=Join-Path $Root 'prompt raw.md';[IO.File]::WriteAllBytes($prompt,[byte[]
 $attempt=Join-Path $Root 'reviewer-attempt'
 $values=[string[]]@('','quote " slash\','café $; --',"line`nbreak")
 $r=Invoke-ReviewerProcess -Executable $receiver -Vector $values -Checkout $checkout -PromptPath $prompt -OutputDirectory $attempt
+Assert (@($r).Count -eq 1) 'reviewer helper returned extra pipeline values'
 Assert ($r.ProducerExit -eq 17 -and -not $r.IOFailure) 'reviewer producer exit/I/O lost'
 Assert ((Get-Content -LiteralPath (Join-Path $attempt 'producer.exit')) -eq '17') 'saved producer exit wrong'
 Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $attempt 'answer.md'))) -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes($prompt))) 'reviewer prompt/stdout bytes changed'
@@ -447,6 +450,10 @@ $env:FIXTURE_LOG=Join-Path $Root 'agent.json'
 $env:CODEX_HOME='config $;';$env:CLAUDE_CONFIG_DIR='claude café';$env:CLAUDECODE='parent';$env:ORDINARY_CONFIG='full environment'
 $agent=@'
 [IO.File]::WriteAllText($env:FIXTURE_LOG,(ConvertTo-Json -InputObject @{argv=@($args);cwd=$PWD.Path;config=$env:ORDINARY_CONFIG;codex=$env:CODEX_HOME;claude=$env:CLAUDE_CONFIG_DIR;metadata=$env:CLAUDECODE} -Depth 8))
+if ($env:FIXTURE_DESCENDANT) {
+    $d=Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-Command','Start-Sleep -Seconds 90') -NoNewWindow -PassThru
+    [IO.File]::WriteAllText($env:FIXTURE_DESCENDANT+'.tmp',[string]$d.Id);[IO.File]::Move($env:FIXTURE_DESCENDANT+'.tmp',$env:FIXTURE_DESCENDANT)
+}
 if ($env:FIXTURE_EXIT) { exit ([int]$env:FIXTURE_EXIT) }
 Start-Sleep -Seconds 90
 '@
@@ -501,6 +508,17 @@ try {
     for ($n=0;$n -lt 100;$n++) { $r=Read-ChildSessionRecord 'fast';if ($r.phase -eq 'exited') { break };Start-Sleep -Milliseconds 50 }
     Assert ($r.phase -eq 'exited' -and $r.exit_code -eq 23) 'real exit lost'
     $null=Invoke-ChildSessionDispatch @('close','fast')
+    Remove-Item Env:FIXTURE_EXIT
+    # Closing a script-wrapped agent also stops its verified descendant tree.
+    $descendantFile=Join-Path $Root 'descendant.pid';$env:FIXTURE_DESCENDANT=$descendantFile
+    Assert ((Invoke-ChildSessionDispatch @('open','tree',$checkout,$brief)) -eq 0) 'tree open failed'
+    for ($n=0;$n -lt 200 -and -not [IO.File]::Exists($descendantFile);$n++) { Start-Sleep -Milliseconds 50 }
+    Remove-Item Env:FIXTURE_DESCENDANT
+    $descendant=[int][IO.File]::ReadAllText($descendantFile)
+    Assert ((Invoke-ChildSessionDispatch @('alive','tree')) -eq 0) 'tree agent not alive'
+    Assert ((Invoke-ChildSessionDispatch @('close','tree')) -eq 0) 'tree close failed'
+    $left=Get-Process -Id $descendant -ErrorAction SilentlyContinue
+    Assert (-not $left -or $left.HasExited) 'unrecorded descendant survived close'
     # Ordinary native argv also preserves empty strings, quotes, backslashes and newlines.
     $receiver=Join-Path $Root 'receiver.ps1'
     [IO.File]::WriteAllText($receiver,'[Console]::Write((ConvertTo-Json -InputObject @($args) -Compress));exit 17',$script:Utf8)
@@ -510,9 +528,10 @@ try {
     $decoded=@(ConvertFrom-Json ($script:Utf8.GetString($result.Stdout)))
     Assert ($decoded.Count -eq $values.Count) 'argv count changed'
     for ($i=0;$i -lt $values.Count;$i++) { Assert ($decoded[$i] -ceq $values[$i]) 'native argv changed' }
-    [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, capabilities, reviewer raw I/O/producer/extraction, byte freshness/CRLF/failure';terminal='synthetic transport; native processes'}))
+    [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, descendant tree close, capabilities, reviewer raw I/O/producer/extraction, byte freshness/CRLF/failure';terminal='synthetic transport; native processes'}))
 } finally {
-    foreach ($name in 'probe','fast','removed') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
+    foreach ($name in 'probe','fast','removed','tree') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
+    if ($descendant) { Stop-Process -Id $descendant -Force -ErrorAction SilentlyContinue }
     foreach ($p in $script:FixtureLaunchers) {
         if (-not $p.HasExited) { $p.Kill();$p.WaitForExit() }
         $text=$p.StandardError.ReadToEnd();if ($text) { [Console]::Error.WriteLine($text) }
