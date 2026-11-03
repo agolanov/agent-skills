@@ -94,18 +94,34 @@ json_string() {
   value=${value//$'\n'/\\n}; value=${value//$'\r'/\\r}; value=${value//$'\t'/\\t}
   printf '\"%s\"' "$value"
 }
-# A recorded tmux scope (socket:session ID:server PID; tmux 3.4 leaves the
-# session ID empty for an =name target) is gone when its server no longer runs
-# under the recorded PID, or no longer has the recorded session.
+# The scope of session $S is socket:session ID:server PID. tmux 3.4 answers
+# display-message for a missing target with exit 0 and empty fields, so prove
+# the session with has-session and read its ID through the "=name:" target.
+tmux_scope() {
+  local scope
+  tmux_call has-session -t "=$S" 2>/dev/null || return 1
+  scope=$(tmux_call display-message -p -t "=$S:" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || return 1
+  [[ $scope =~ :\$[0-9]+:[0-9]+$ ]] || return 1
+  printf '%s' "$scope"
+}
+# Records written before the session ID was captured hold socket::server PID
+# and match any session $S of that server, as they did when written.
+scope_matches() {
+  local recorded=$1 current=$2
+  [[ -n $current ]] || return 1
+  [[ $recorded == "$current" ]] && return 0
+  [[ $recorded == *::* && $recorded == "${current%:*:*}::${current##*:}" ]]
+}
+# A recorded scope is gone when its server no longer runs, or no longer has
+# that session ID under the recorded server PID. Only scopes with a session
+# ID qualify: a legacy socket::PID record cannot prove its session is gone.
 tmux_scope_gone() {
   local recorded=$1 socket rest sid pid output
-  local -a target=()
   pid=${recorded##*:}; rest=${recorded%:*}; sid=${rest##*:}; socket=${rest%:*}
-  [[ $pid =~ ^[0-9]+$ && ( -z $sid || $sid =~ ^\$[0-9]+$ ) && $socket == /* ]] || return 1
+  [[ $pid =~ ^[0-9]+$ && $sid =~ ^\$[0-9]+$ && $socket == /* ]] || return 1
   [[ -e $socket ]] || return 0
-  [[ -z $sid ]] || target=(-t "$sid")
-  if output=$(tmux_call -S "$socket" display-message -p ${target[@]+"${target[@]}"} '#{pid}' 2>&1); then
-    [[ $output != "$pid" ]]
+  if output=$(tmux_call -S "$socket" display-message -p -t "$sid" '#{session_id}:#{pid}' 2>&1); then
+    [[ $output != "$sid:$pid" ]]
   else
     case $output in
       *"can't find session"*|*'no server running'*|*'Connection refused'*|*'No such file or directory'*) return 0 ;;
@@ -127,8 +143,8 @@ record_matches_scope() {
   backend=$(record_field "$file" backend)
   if [[ $backend == tmux ]]; then
     recorded=$(record_field "$file" scope)
-    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || scope=''
-    [[ -z $scope || $recorded != "$scope" ]] || return 0
+    scope=$(tmux_scope) || scope=''
+    ! scope_matches "$recorded" "$scope" || return 0
     # A launch whose own tmux session is gone stays visible under its session
     # name while a recorded process survives, so that agent is still reported,
     # refused and closable. Without survivors the stale record stays hidden.
@@ -331,8 +347,8 @@ resolve() {
     if [[ -z $actual ]]; then OWN_ABSENT=1; return 1; fi
     [[ $actual == "$H_TAB" ]] || die 'owned herdr pane/tab mismatch'
   elif [[ $W == tmux ]]; then
-    scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}' 2>/dev/null) || scope=''
-    if [[ -z $scope || $(record_field "$record" scope) != "$scope" ]]; then
+    scope=$(tmux_scope) || scope=''
+    if ! scope_matches "$(record_field "$record" scope)" "$scope"; then
       # find returns a foreign scope only when that session is gone.
       [[ $(record_field "$record" session) == "$S" ]] && tmux_scope_gone "$(record_field "$record" scope)" ||
         die 'owned tmux socket/session mismatch'
@@ -479,7 +495,7 @@ cmd_open() {
   launcher=$prefix.sh
   state=$prefix.state
   local scope='' record_name=${prefix##*/}
-  if [[ $BACKEND == tmux ]]; then scope=$(tmux_call display-message -p -t "=$S" '#{socket_path}:#{session_id}:#{pid}'); fi
+  if [[ $BACKEND == tmux ]]; then scope=$(tmux_scope) || die "tmux session $S unavailable"; fi
   runtime_op create "$record_name" "$name" "$BACKEND" "$cwd" "$scope"
   printf 'starting\n' > "$state"
   {
