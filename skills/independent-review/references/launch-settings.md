@@ -90,6 +90,10 @@ Outcomes:
 - **Unavailable** (no record, ambiguous records, or the fields are absent): the same question as a mismatch, stating `settings unverified: <reason>`.
 - **Opt-out field:** nothing to compare; the report states the observed value or `unavailable`, with no question.
 
+## Native filesystem paths
+
+Use the selected runtime's actual home/configuration directory when finding runtime records. On PowerShell, read `$env:CLAUDE_CONFIG_DIR`/`$env:CODEX_HOME` or join `$HOME` with `.claude`/`.codex`, using `Join-Path` and `Get-ChildItem -LiteralPath`; POSIX notation above describes the same locations, not a Bash prerequisite. Preserve full caller configuration. A fake process or requested flag proves transport only; it never proves effective model/effort. Missing runtime fields keep the existing unverified-settings outcome.
+
 ## Nested agents
 
 A launched agent's settings govern that session only. Agents it starts itself (for example subagents of `superpowers:subagent-driven-development`) follow the skill and host that start them; this policy does not set or verify them.

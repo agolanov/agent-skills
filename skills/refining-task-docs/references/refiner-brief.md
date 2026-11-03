@@ -11,11 +11,12 @@ Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
+Terminal controls: <backend and supported capabilities from the root; plain-terminal questions need direct user attention>
 Window name: refine-<stem>
 Documents to review: <absolute document path>[, <absolute document path>]
 Context documents: <absolute document path>[, <absolute document path>]
 Review mark rules: <absolute refining-task-docs/references/review-mark.md>
-For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
+Git checks: <absolute installed independent-review/references/checkout-state.md>. Read it for each clean/path gate and continuation: verify checkout/branch/HEAD, record the four ordinary Git commands with actual exits/raw outputs, and compare exact repository-relative paths. Use ordinary Git for other read-only checks with GIT_OPTIONAL_LOCKS=0. Failed evidence blocks. Carry its ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits; the legacy Python helper is optional.
 
 Ownership: you are the only writer of these documents. The root verifies your report; it writes no document or mark.
 
@@ -45,4 +46,4 @@ Read and follow the complete child-sessions status contract at <absolute child-s
 
 For a silent-exit reopen, retain the brief and append:
 
-> Continue from the current state of the checkout: read git log and run the checkout-state preflight first. Uncommitted changes on your owned paths are your earlier session's work: inspect them and continue from them.
+> Continue from the current state of the checkout: read git log and record the ordinary Git evidence and verify checkout/branch/HEAD first. Uncommitted changes on your owned paths are your earlier session's work: inspect them and continue from them.

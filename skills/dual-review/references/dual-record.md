@@ -17,7 +17,7 @@ Targeted checks: <commands; cwd/source>
 Unavailable coverage: <None | checks/reasons>
 Assignment: codex cli, model <exact>, effort <exact>; claude cli, model <exact>, effort <exact>
 Settings evidence: <per reviewer: discovery and runtime records>
-Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (snapshots/comparison under Phases) <or: the caller's run | no complete suite defined>
+Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (Git outputs/comparison under Phases) <or: the caller's run | no complete suite defined>
 Ledger: none <or the caller's ledger input, below>; next D: 1
 Phase: suite | review | cross-check | done | blocked: <codex|claude|codex and claude> invalid result
 Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the suite); answer pending | scratch | invalidating; resume refused: monitored content not restored, comparison <path>; retained recovery baseline <path>>
@@ -34,8 +34,8 @@ Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the s
 - voided by restart on <new sha> (spend nothing): <result.md paths with their commit>
 
 ## Phases
-- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <snapshot or diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored untracked paths not monitored; submodule/nested-repository content not recursively monitored; special-file contents not monitored; submodule resolved HEAD and dirty state not monitored
-- Reconciled new-commit baseline: <explicit caller target/authorization, snapshots, unexplained residual changes check | None>
+- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <Git output/exit/diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored files and untracked-file contents not covered; Git flags/normalization may hide bytes; nested repositories/submodules not recursively covered; transient restored writes not detected
+- Reconciled new-commit baseline: <explicit caller target/authorization, Git outputs, unexplained residual changes check | None>
 ```
 
 ## report.md
@@ -74,7 +74,7 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 - claude R2: no match; no codex finding shares its location or requirement.
 
 ## Complete suite
-`<ordered commands/cwd/source>` exits <n> on <full sha>, checkout <absolute>, snapshots/comparison <paths>, environment changes <None|details>, coverage limits <details>, run by this session <or: no complete suite defined>
+`<ordered commands/cwd/source>` exits <n> on <full sha>, checkout <absolute>, Git outputs/comparison <paths>, environment changes <None|details>, coverage limits <details>, run by this session <or: no complete suite defined>
 
 ## Codex
 - Settings and evidence: <model/effort and runtime records; result.md paths>

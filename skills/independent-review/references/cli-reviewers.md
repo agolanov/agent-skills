@@ -1,7 +1,7 @@
 # CLI Reviewers
 
 Use a separate CLI session for the assigned system. Start a fresh reviewer for each attempt with the filled [review prompt](review-prompt.md) and finding ledger from the caller (the loop record, or the direct-use request).
-Check installed `codex review --help` or `claude --help` when constructing a launch. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the caller's review finishes or blocks.
+Check installed `codex review --help` or `claude --help` when constructing a launch. On native Windows inspect the resolved executable/npm shim and its help in the installed PowerShell; use a verified `.exe` or its `.ps1` shim, never evaluate a constructed command string. Use absolute paths, quote variables, and capture the real exit status separately from the answer. Wait for the process to finish using the host's background execution and wait tools; keep the controlling session active until the caller's review finishes or blocks.
 
 Carry the [review prompt](review-prompt.md) unchanged into the independent session; it owns the reviewer's capability and unchanged-state contract, and vendor review commands are tools inside it. Retain normal permissions, tools, skills/plugins and MCP configuration. Configure process-local permissions only for already authorized checks; persistent settings and silent authority expansion remain excluded.
 
@@ -15,12 +15,13 @@ Set `task_checkout`, `review_model` and `review_effort` from the caller (the loo
 settings=()
 [ "$review_model" = cli-default ] || settings+=(-c "model=\"$review_model\"")
 [ "$review_effort" = cli-default ] || settings+=(-c "model_reasoning_effort=\"$review_effort\"")
+review_exit=0
 (
   cd "$task_checkout" || exit
   codex review "${settings[@]}" - \
     < "$round_prompt" > "$round_dir/answer.md" 2> "$round_dir/stderr.log"
-)
-review_exit=$?
+) || review_exit=$?
+printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
 ```
 
 Review mode has no `--json` or `--output-last-message` in the tested CLI. Its stdout is the report; stderr contains runtime/command evidence and its session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
@@ -35,18 +36,61 @@ Use a subshell so the implementing session keeps its working directory:
 settings=()
 [ "$review_model" = cli-default ] || settings+=(--model "$review_model")
 [ "$review_effort" = cli-default ] || settings+=(--effort "$review_effort")
+review_exit=0
 (
   cd "$task_checkout" || exit
   claude --print "${settings[@]}" \
     --output-format stream-json --verbose \
     < "$round_prompt" > "$round_dir/events.jsonl" 2> "$round_dir/stderr.log"
-)
-review_exit=$?
-jq -r 'select(.type == "result") | .result // empty' \
-  "$round_dir/events.jsonl" > "$round_dir/answer.md"
+) || review_exit=$?
+printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
+# Run after the producer finishes. Use an already installed parser; install none.
+if command -v jq >/dev/null 2>&1; then
+  extraction_exit=0
+  jq -er -s 'map(select(.type == "result")) | if length == 1 and (.[0].result | type == "string" and length > 0) then .[0].result else error("missing/ambiguous result") end' \
+    "$round_dir/events.jsonl" > "$round_dir/answer.md" 2> "$round_dir/extraction-error.txt" || extraction_exit=$?
+elif command -v node >/dev/null 2>&1; then
+  extraction_exit=0
+  node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(x=>x.trim()).map(JSON.parse).filter(x=>x.type==="result");if(rows.length!==1||typeof rows[0].result!=="string"||!rows[0].result.trim())throw Error("missing/ambiguous result");process.stdout.write(rows[0].result);' \
+    "$round_dir/events.jsonl" > "$round_dir/answer.md" 2> "$round_dir/extraction-error.txt" || extraction_exit=$?
+else
+  extraction_exit=127
+  printf '%s\n' 'No installed JSON parser: extraction unavailable.' > "$round_dir/extraction-error.txt"
+fi
+printf '%s\n' "$extraction_exit" > "$round_dir/extraction.exit"
 ```
 
 Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
+
+## Native PowerShell I/O
+
+Use installed PowerShell 7 (verified here: pwsh 7.6.9), literal arrays and the small owner-local [reviewer-process.ps1](../scripts/reviewer-process.ps1). Dot-source it by its resolved absolute installed path. It uses ordinary Process/File APIs, preserves prompt/stdout/stderr bytes, and records `producer.exit`. It accepts an executable or installed PowerShell script. For an npm shim it resolves the single existing JavaScript target and installed node executable, avoiding the shim's text stdin pipeline; an ambiguous/missing target is unavailable launch coverage. Verify the actual installed shim/help, rather than assuming every script has npm's shape. Keep normal caller configuration/permissions and pass already authorized flags explicitly. No jq or Python is needed.
+
+Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, and the recorded model/effort. Codex:
+
+```powershell
+. $reviewer_io  # absolute installed independent-review/scripts/reviewer-process.ps1
+$vector = @('review')
+if ($review_model -cne 'cli-default') { $vector += @('-c', ('model="' + $review_model + '"')) }
+if ($review_effort -cne 'cli-default') { $vector += @('-c', ('model_reasoning_effort="' + $review_effort + '"')) }
+$vector += '-'
+$result = Invoke-ReviewerProcess -Executable $codex -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir
+$review_exit = $result.ProducerExit
+# Retain IOFailure too: an I/O error invalidates the answer even with producer exit 0.
+```
+
+`$codex`/`$claude` are the resolved installed command paths. Put Codex global permission options before `review`, per installed help and existing authority. Claude uses the same helper:
+
+```powershell
+$vector = @('--print', '--output-format', 'stream-json', '--verbose')
+if ($review_model -cne 'cli-default') { $vector += @('--model', $review_model) }
+if ($review_effort -cne 'cli-default') { $vector += @('--effort', $review_effort) }
+$result = Invoke-ReviewerProcess -Executable $claude -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir -OutputName events.jsonl
+$review_exit = $result.ProducerExit
+$extraction_exit = Export-ClaudeReviewAnswer -OutputDirectory $round_dir
+```
+
+Keep producer exit, launch/I/O errors and extraction exit separate. A missing executable or launch exception has no producer success; a JSON/result error cannot overwrite `producer.exit`. Extraction success never rescues a nonzero producer exit or a Claude error-result event. Validate runtime settings and the report only after inspecting all these records. For parallel calls, each job returns its producer result; extract after both producers complete.
 
 ## Result handling
 

@@ -69,6 +69,59 @@ def posix_git():
     report('posix-ordinary-git', 'pass', 'documented recipe: byte outputs, unchanged/dirty/staged comparisons and real failed-command exits')
 
 
+def consumer_recipe(relative, language, index=0):
+    return (ROOT / relative).read_text().split('```' + language + '\n')[index + 1].split('```', 1)[0]
+
+
+def posix_consumers():
+    fixture = ARTIFACTS / 'posix-consumers'; fixture.mkdir()
+    checkout = fixture / 'docs café $;'; checkout.mkdir()
+    run(['git', 'init', '-q', checkout])
+    doc = checkout / 'doc café $;.md'
+    body = b'\xef\xbb\xbf# caf\xc3\xa9  \nSecond\tline\n'
+    doc.write_bytes(body)
+    run(['git', '-C', checkout, 'add', '--', doc.name])
+    run(['git', '-C', checkout, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'document'])
+    sha = run(['git', '-C', checkout, 'rev-parse', 'HEAD']).stdout.decode().strip()
+    mark = ('Review: clean, 2026-11-03, reviewer codex, commit ' + sha + '\n').encode()
+    recipe = consumer_recipe('skills/refining-task-docs/references/review-mark.md', 'bash', 1)
+    for name, content, expected in [('lf', body+mark, 0), ('crlf', (body+mark).replace(b'\n',b'\r\n'), 0),
+                                    ('mixed', body+mark.replace(b'\n',b'\r\n'), 0),
+                                    ('mixed-body', body.replace(b'Second\tline\n', b'Second\tline\r\n')+mark, 1),
+                                    ('edit', body.replace(b'  ',b' ')+mark, 1), ('double', body+mark+mark, 1),
+                                    ('missing', body+mark.replace(sha.encode(),b'0'*40), 1)]:
+        doc.write_bytes(content)
+        evidence = fixture / name; evidence.mkdir()
+        env = dict(os.environ, file=str(doc), docs_repo=str(checkout), rel=doc.name, freshness_dir=str(evidence))
+        run(['bash', '-c', recipe+'\nexit "$freshness_exit"'], env=env, want=expected)
+    # A real failing show producer must be unavailable even with an empty output.
+    bin_dir = fixture / 'bin'; bin_dir.mkdir()
+    git = bin_dir / 'git'
+    git.write_text('#!/bin/bash\nif [[ $3 == show ]]; then exec "$REAL_GIT" -C "$2" show nonexistent-ref; fi\nexec "$REAL_GIT" "$@"\n')
+    git.chmod(0o700)
+    doc.write_bytes(body+mark); evidence=fixture / 'show-failed'; evidence.mkdir()
+    env = dict(os.environ, PATH=str(bin_dir)+os.pathsep+os.environ['PATH'], REAL_GIT=shutil.which('git'), file=str(doc), docs_repo=str(checkout), rel=doc.name, freshness_dir=str(evidence))
+    run(['bash', '-c', recipe+'\nexit "$freshness_exit"'], env=env, want=2)
+    assert (evidence / 'show.exit').read_text().strip() != '0'
+
+    # Execute the actual documented Claude recipe with a disposable CLI transport.
+    fake = bin_dir / 'claude'
+    fake.write_text('#!/bin/bash\ncat > "$PROMPT_LOG"\nprintf "%s\\n" "$EVENTS"\nprintf stderr >&2\nexit "$PRODUCER_EXIT"\n')
+    fake.chmod(0o700)
+    prompt = fixture / 'prompt.md'; prompt.write_bytes(b'prompt \x00 caf\xc3\xa9\r\n')
+    recipe = consumer_recipe('skills/independent-review/references/cli-reviewers.md', 'bash', 1)
+    for name, events, producer, extraction in [('valid', '{"type":"result","result":"VERDICT: CLEAN"}', 0, 0), ('failed-producer', '{"type":"result","result":"answer"}', 17, 0), ('bad-json', '{bad', 0, 1), ('missing-result', '{"type":"system"}', 0, 1)]:
+        attempt=fixture / ('cli-'+name); attempt.mkdir()
+        env=dict(os.environ, PATH=str(bin_dir)+os.pathsep+os.environ['PATH'], PROMPT_LOG=str(attempt/'prompt.raw'), EVENTS=events, PRODUCER_EXIT=str(producer), task_checkout=str(checkout), round_prompt=str(prompt), round_dir=str(attempt), review_model='cli-default', review_effort='cli-default')
+        run(['bash', '-c', recipe], env=env)
+        assert (attempt/'prompt.raw').read_bytes() == prompt.read_bytes()
+        assert int((attempt/'producer.exit').read_text()) == producer
+        actual=int((attempt/'extraction.exit').read_text())
+        assert actual == 0 if extraction == 0 else actual != 0
+        assert (attempt/'stderr.log').read_bytes() == b'stderr'
+    report('posix-consumers', 'pass', 'documented no-Python freshness and CLI recipes: byte preservation, uniform CRLF, changes/missing revision, failed show, raw prompt/stdout/stderr and separate producer/extraction exits; synthetic CLI only')
+
+
 def posix_child():
     fixture = ARTIFACTS / 'posix-child'; fixture.mkdir()
     bin_dir = fixture / 'bin'; bin_dir.mkdir()
@@ -170,7 +223,7 @@ def posix_child():
 
 
 WINDOWS = r'''
-param([string]$Owner,[string]$GitRecipe,[string]$Root)
+param([string]$Owner,[string]$GitRecipe,[string]$Root,[string]$ReviewerIO,[string]$FreshnessRecipe)
 $ErrorActionPreference='Stop'
 $PSNativeCommandUseErrorActionPreference=$false
 . $Owner
@@ -202,6 +255,88 @@ $staged=Capture-Git 'staged' $checkout
 Assert ((Get-Item -LiteralPath "$staged/cached-diff.stdout").Length -gt 0) 'staged diff missing'
 $bad=Capture-Git 'failed' (Join-Path $Root 'missing')
 foreach ($name in 'head','status','worktree-diff','cached-diff') { Assert ((Get-Content -LiteralPath "$bad/$name.exit") -ne '0') 'Git failure became clean' }
+
+
+# Native consumer I/O and freshness use their published recipes/owner helper.
+. $ReviewerIO
+$doc=Join-Path $checkout 'doc café $;.md'
+$body=[Text.UTF8Encoding]::new($false).GetBytes("# café  `nSecond`tline`n")
+[IO.File]::WriteAllBytes($doc,$body)
+& git -C $checkout -c core.autocrlf=false add -- 'doc café $;.md'
+& git -C $checkout -c user.name=Fixture -c user.email=fixture@example.test commit -qm document
+$sha=(& git -C $checkout rev-parse HEAD).Trim()
+$mark="Review: clean, 2026-11-03, reviewer codex, commit $sha`n"
+$utf8=[Text.UTF8Encoding]::new($false)
+$text=$utf8.GetString($body)+$mark
+$cases=@(
+    @{name='lf';text=$text;expected=0},
+    @{name='crlf';text=$text.Replace("`n","`r`n");expected=0},
+    @{name='edit';text=$text.Replace('café  ','café ');expected=1},
+    @{name='mixed';text=$text.Replace("Second`tline`n","Second`tline`r`n");expected=1},
+    @{name='double';text=($text+$mark);expected=1},
+    @{name='missing';text=$text.Replace($sha,('0'*40));expected=1}
+)
+foreach ($case in $cases) {
+    [IO.File]::WriteAllText($doc,$case.text,$utf8)
+    $docs_repo=$checkout;$file=$doc;$rel='doc café $;.md'
+    $freshness_dir=Join-Path $Root ('fresh-'+$case.name);[IO.Directory]::CreateDirectory($freshness_dir)|Out-Null
+    . $FreshnessRecipe
+    Assert ($freshness_exit -eq $case.expected) ('native freshness '+$case.name)
+}
+$script:RealGit=(Get-Command git -CommandType Application).Source
+function git {
+    if ($args[2] -eq 'show') { & $script:RealGit -C $args[1] show nonexistent-ref }
+    else { & $script:RealGit @args }
+}
+[IO.File]::WriteAllText($doc,$text,$utf8)
+$freshness_dir=Join-Path $Root 'fresh-show-failed';[IO.Directory]::CreateDirectory($freshness_dir)|Out-Null
+. $FreshnessRecipe
+Assert ($freshness_exit -eq 2) 'show producer failure became fresh/stale'
+Remove-Item Function:git
+$receiver=Join-Path $Root 'reviewer receiver café $;.ps1'
+$receiverText=@'
+[IO.File]::WriteAllText($env:REVIEW_ARGS,(ConvertTo-Json -InputObject @($args) -Compress))
+[Console]::OpenStandardInput().CopyTo([Console]::OpenStandardOutput())
+[Console]::OpenStandardError().Write([byte[]]@(101,114,114,0,255))
+exit 17
+'@
+[IO.File]::WriteAllText($receiver,$receiverText,$utf8)
+$env:REVIEW_ARGS=Join-Path $Root 'reviewer-args.json'
+$prompt=Join-Path $Root 'prompt raw.md';[IO.File]::WriteAllBytes($prompt,[byte[]]@(0,255,13,10,195,169))
+$attempt=Join-Path $Root 'reviewer-attempt'
+$values=[string[]]@('','quote " slash\','café $; --',"line`nbreak")
+$r=Invoke-ReviewerProcess -Executable $receiver -Vector $values -Checkout $checkout -PromptPath $prompt -OutputDirectory $attempt
+Assert ($r.ProducerExit -eq 17 -and -not $r.IOFailure) 'reviewer producer exit/I/O lost'
+Assert ((Get-Content -LiteralPath (Join-Path $attempt 'producer.exit')) -eq '17') 'saved producer exit wrong'
+Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $attempt 'answer.md'))) -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes($prompt))) 'reviewer prompt/stdout bytes changed'
+Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $attempt 'stderr.log'))) -ceq [Convert]::ToBase64String([byte[]]@(101,114,114,0,255))) 'reviewer stderr bytes changed'
+$decoded=@(ConvertFrom-Json ([IO.File]::ReadAllText($env:REVIEW_ARGS)))
+Assert ($decoded.Count -eq $values.Count) 'reviewer argv count changed'
+for ($i=0;$i -lt $values.Count;$i++) { Assert ($decoded[$i] -ceq $values[$i]) 'reviewer literal argv changed' }
+
+# An npm-style text pipeline must not transform the raw prompt. Resolve the
+# installed node runtime and the one target named by a copied shim shape.
+$npmRoot=Join-Path $Root 'npm fixture';[IO.Directory]::CreateDirectory((Join-Path $npmRoot 'node_modules/fixture'))|Out-Null
+$target=Join-Path $npmRoot 'node_modules/fixture/reviewer.js'
+[IO.File]::WriteAllText($target,'process.stdin.pipe(process.stdout);process.exitCode=19;',$utf8)
+$shim=Join-Path $npmRoot 'reviewer.ps1'
+[IO.File]::WriteAllText($shim,'$input | & node "$basedir/node_modules/fixture/reviewer.js" $args; exit $LASTEXITCODE',$utf8)
+$attempt=Join-Path $Root 'npm-attempt'
+$r=Invoke-ReviewerProcess -Executable $shim -Checkout $checkout -PromptPath $prompt -OutputDirectory $attempt
+Assert ($r.ProducerExit -eq 19 -and -not $r.IOFailure) 'npm producer exit lost'
+Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $attempt 'answer.md'))) -ceq [Convert]::ToBase64String([IO.File]::ReadAllBytes($prompt))) 'npm text shim changed prompt bytes'
+foreach ($case in @(
+    @{name='ok';events='{"type":"result","result":"VERDICT: CLEAN"}';expected=0},
+    @{name='malformed';events='{bad';expected=1},
+    @{name='absent';events='{"type":"system"}';expected=1},
+    @{name='multiple';events="{`"type`":`"result`",`"result`":`"a`"}`n{`"type`":`"result`",`"result`":`"b`"}";expected=1}
+)) {
+    $attempt=Join-Path $Root ('extract-'+$case.name);[IO.Directory]::CreateDirectory($attempt)|Out-Null
+    [IO.File]::WriteAllText((Join-Path $attempt 'events.jsonl'),$case.events,$utf8)
+    [IO.File]::WriteAllText((Join-Path $attempt 'producer.exit'),'17')
+    Assert ((Export-ClaudeReviewAnswer -OutputDirectory $attempt) -eq $case.expected) ('native extraction '+$case.name)
+    Assert ((Get-Content -LiteralPath (Join-Path $attempt 'producer.exit')) -eq '17') 'extraction overwrote producer exit'
+}
 
 # This fake replaces only the terminal transport. All launched shells/processes,
 # literal argv, file/state APIs and ownership checks are actual native Windows.
@@ -268,7 +403,7 @@ try {
     $decoded=@(ConvertFrom-Json ($script:Utf8.GetString($result.Stdout)))
     Assert ($decoded.Count -eq $values.Count) 'argv count changed'
     for ($i=0;$i -lt $values.Count;$i++) { Assert ($decoded[$i] -ceq $values[$i]) 'native argv changed' }
-    [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, capabilities';terminal='synthetic transport; native processes'}))
+    [IO.File]::WriteAllText((Join-Path $Root 'passed.json'),(ConvertTo-Json -InputObject @{version=$PSVersionTable.PSVersion.ToString();edition=$PSVersionTable.PSEdition;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription;executable=$power;cases='ordinary Git, literal argv, status/exit, environment, ownership refusal, capabilities, reviewer raw I/O/producer/extraction, byte freshness/CRLF/failure';terminal='synthetic transport; native processes'}))
 } finally {
     foreach ($name in 'probe','fast') { try { $null=Invoke-ChildSessionDispatch @('close',$name) } catch { [Console]::Error.WriteLine($_) } }
     foreach ($p in $script:FixtureLaunchers) {
@@ -293,11 +428,12 @@ def windows():
     def native(path): return run(['wslpath', '-w', path]).stdout.decode().strip() if interop else str(path)
     (staging / 'fixture.ps1').write_text(WINDOWS, encoding='utf-8-sig')
     (staging / 'git-recipe.ps1').write_text(recipe('powershell'), encoding='utf-8-sig')
+    (staging / 'freshness-recipe.ps1').write_text(consumer_recipe('skills/refining-task-docs/references/review-mark.md', 'powershell'), encoding='utf-8-sig')
     owner = native(ROOT / 'skills/child-sessions/scripts/child-session.ps1')
     script = native(staging / 'fixture.ps1'); git_recipe = native(staging / 'git-recipe.ps1'); root = native(staging)
     # Only fixed, correctly single-quoted paths enter this controller bootstrap.
     quote = lambda value: "'" + value.replace("'", "''") + "'"
-    code = '& ' + quote(script) + ' -Owner ' + quote(owner) + ' -GitRecipe ' + quote(git_recipe) + ' -Root ' + quote(root)
+    code = '& ' + quote(script) + ' -Owner ' + quote(owner) + ' -GitRecipe ' + quote(git_recipe) + ' -Root ' + quote(root) + ' -ReviewerIO ' + quote(native(ROOT / 'skills/independent-review/scripts/reviewer-process.ps1')) + ' -FreshnessRecipe ' + quote(native(staging / 'freshness-recipe.ps1'))
     run([power, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded(code)])
     passed = json.loads((staging / 'passed.json').read_text(encoding='utf-8-sig'))
     shutil.copy2(staging / 'passed.json', ARTIFACTS / 'windows-passed.json')
@@ -317,7 +453,7 @@ def windows():
 if __name__ == '__main__':
     try:
         if os.name == 'posix':
-            posix_git(); posix_child()
+            posix_git(); posix_consumers(); posix_child()
         windows()
         report('macos', 'unverified', 'no native macOS host; stock Bash/ps/Terminal path audited only')
     finally:

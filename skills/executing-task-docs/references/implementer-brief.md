@@ -13,10 +13,11 @@ Plan kind: <plan|other>
 Execution mode: <inline | subagents | direct> (<rule | explicit>); <reason, one sentence>
 Spec: <spec or None>
 Agent: <agent>
+Terminal controls: <backend and supported capabilities from the root; plain-terminal questions need direct user attention>
 Window name: <name>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
-For every clean/path gate and continuation, use the installed independent-review checkout-state reference, Direct-use preflight and Other read-only Git gates. Run all verification Git reads through its git-read wrapper; displayed git read commands mean this wrapper. Unavailable verification blocks.
+Git checks: <absolute installed independent-review/references/checkout-state.md>. Read it for each clean/path gate and continuation: verify checkout/branch/HEAD, record the four ordinary Git commands with actual exits/raw outputs, and compare exact repository-relative paths. Use ordinary Git for other read-only checks with GIT_OPTIONAL_LOCKS=0. Failed evidence blocks. Carry its ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits; the legacy Python helper is optional.
 
 Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and any follow-ups the Follow-ups line leaves to it.
 
@@ -55,4 +56,4 @@ Read and follow the complete child-sessions status contract at <absolute child-s
 
 For explicit resume or silent-exit recovery, retain the original identity/task and append this line before opening:
 
-> Continue from the current state of the checkout: read git log and run the checkout-state preflight first.
+> Continue from the current state of the checkout: read git log and record the ordinary Git evidence and verify checkout/branch/HEAD first.

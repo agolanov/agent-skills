@@ -7,7 +7,7 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | Skill | Description |
 |-------|-------------|
 | `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
-| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux window from a brief and wait for its status. |
+| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux/terminal window from a brief and wait for its status. |
 | `executing-task-docs` | Implement one task document in a child session with cross review, ending with a reviewed branch ready to merge and its follow-ups recorded. |
 | `writing-task-follow-ups` | Create, replace or clear a task branch's section in the follow-ups file beside its task document. |
 | `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
@@ -47,6 +47,14 @@ npx skills add agolanov/agent-skills --skill \
   refine-with-claude refine-with-a-subagent refine-with-dual-review \
   auto-cross-refine
 ```
+
+## Runtime support
+
+Use existing Git, agent CLIs and shells; the skills do not install runtimes or change profiles. Resolve the installed child-sessions helper by absolute path: its Bash entrypoint is self-contained, while native Windows uses `child-session.ps1` through installed PowerShell (see [platform runtime](skills/child-sessions/references/platform-runtime.md)). `runtime-dir` supplies artifact paths and `capabilities NAME` supplies supported controls. Plain terminals keep brief/status waiting; questions need direct attention in the visible window, and dialog counts are not observable.
+
+Current focused checks use Linux Git 2.43.0, Bash 5.2.21 and tmux 3.4, and actual native PowerShell 7.6.9 Core/.NET 10.0.14 processes on Windows. Windows PowerShell 5.1 import/status compatibility is checked separately; it is not a universal floor. Synthetic terminal transports exercise process/argv/status behavior, not visible terminal or paid-agent acceptance. Native macOS and native Windows herdr remain unverified here; stock macOS shell/ps/Terminal interfaces are audited. See the ignored local test notes when available for exact commands and acceptance coverage.
+
+Review and delivery gates use [ordinary Git evidence](skills/independent-review/references/checkout-state.md): HEAD, raw NUL status and both binary diffs, real exits and byte comparisons before/after. Failed evidence never means clean. These checks have ignored-file, untracked-content, Git flags/normalization, nested-repository and transient-write limits; they do not prove every filesystem byte stayed unchanged. The retained Python helper is optional compatibility. Native Windows reviewer I/O uses ordinary PowerShell process/file APIs and JSON parsing, with producer exit separate from extraction errors; no jq or Python is required there.
 
 ## Refinement
 
