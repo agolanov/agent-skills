@@ -36,7 +36,7 @@ One task per run. The child owns the review, its fixes and the review marks, and
 
 ## Brief
 
-Fill [refiner-brief.md](references/refiner-brief.md) with absolute resolved paths, following child-sessions' brief checklist, and write it to the brief path.
+Fill [refiner-brief.md](references/refiner-brief.md) with absolute resolved paths, following child-sessions' brief checklist, and write it to the brief path. `Stage convention:` names this skill's [display copy](references/stages-section.md) of the stage convention.
 
 Before acting on a launch, retain `capabilities <name>` and check its checkout/launch identity. Every `peek`, `send` and `key` below is conditional on that supported capability. With plain-terminal controls unavailable, tell the user once at launch that questions/dialogs need direct attention in that window, then continue through brief/status files; report dialog counts as not observable. A known `blocked` question still follows the status contract, with its answer entered directly by the user when `send` is unavailable. A timeout alone supplies no question or approval. Check `alive` before any supported input; never reopen a live agent to inject text. Reopen a proven dead launch at most once under the shared budget below. `close` stops only proven owned processes; unavailable window closure leaves a reported retained window, whose shell alone is not a live agent.
 
