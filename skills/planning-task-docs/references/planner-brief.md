@@ -1,6 +1,6 @@
 # Planner brief
 
-Fill this template with absolute resolved paths and write it to `<runtime>/plan-<slug>-brief.md`; the status is `<runtime>/plan-<slug>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Base SHA:` and `Launch settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. Keep exactly one of the `Task text:`, `Brief:`, `Spec:` and `Follow-ups file:` lines: the task text verbatim, or the input file's absolute path. Drop the `Brainstorming:` line for a spec input. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/plan-<slug>-brief.md`; the status is `<runtime>/plan-<slug>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Status file:`, `Base SHA:` and `Launch settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each `open`; those lines are the root's record and need no action from the child. Keep exactly one of the `Task text:`, `Brief:`, `Spec:` and `Follow-ups file:` lines: the task text verbatim, or the input file's absolute path. For a staged spec keep the five `Stage…`/`Plan path:`/`Earlier stages:` lines; drop them otherwise. They describe the next stage NN of SKILL.md Input rule 3: `Stage:` is `NN — <name>`; `Stage scope:` and `Stage done when:` carry the values of its `**Scope:**` and `**Done when:**` lines verbatim, without the labels; `Plan path:` is the absolute path of its stage plan, `plans/<spec-stem>-NN-<stage-slug>.md` in the spec's sibling `plans/` directory. `Earlier stages:` is one line per stage 01 to NN-1, in stage order, each `Earlier stages: MM — <absolute path of the plan Input rule 3 matched to stage MM>`, followed by ` — follow-ups <absolute path>` for each follow-ups file that exists beside that plan (`<plan stem>-follow-ups.md`, or the older `<plan stem>-tails.md`); for stage 01 it is the single line `Earlier stages: None`. Drop the `Brainstorming:` line for a spec input. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Write one task's spec and plan with superpowers, working in this checkout.
@@ -15,6 +15,11 @@ Window name: plan-<slug>
 Task text: <the task text, verbatim>
 Brief: <absolute brief path>
 Spec: <absolute spec path>
+Stage: NN — <name>
+Stage scope: <Scope line's value, verbatim>
+Stage done when: <Done when line's value, verbatim>
+Plan path: <absolute path plans/<spec-stem>-NN-<stage-slug>.md>
+Earlier stages: <absolute plan paths of stages 01..NN-1, one per line, with the follow-ups file of each when it exists, each line as the preamble says; None for stage 01>
 Follow-ups file: <absolute follow-ups file path>
 Status file: <absolute status path>
 Git checks: <absolute installed independent-review/references/checkout-state.md>. Read it for each clean/path gate and continuation: verify checkout/branch/HEAD, record the four ordinary Git commands with actual exits/raw outputs, and compare exact repository-relative paths. Use ordinary Git for other read-only checks with GIT_OPTIONAL_LOCKS=0. Failed evidence blocks. Carry its ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits; the legacy Python helper is optional.
@@ -30,6 +35,7 @@ Required installed skills (read these absolute SKILL.md paths):
 Work, by the input line present:
 - Task text or Brief: read the brief completely. Run brainstorming with the user in this window, starting from the task text or the brief; the user is beside this window, ask your questions here. Then run writing-plans against the approved spec.
 - Spec: read it completely and run writing-plans against it.
+- Spec with a Stage: line: read the whole spec, then plan only this stage, within its Stage scope and to its Stage done when. Read the Earlier stages plans and follow-ups files; a follow-ups finding that this stage's scope covers goes into the plan, any other stays in its file untouched. Plan against the code as it is now on the current branch, not as the earlier plans describe it. Write the plan at Plan path exactly, with the headers "**Spec:** <spec path relative to the project checkout>" and "**Stage:** NN", and run writing-plans against the spec read through this stage's scope.
 - Follow-ups file (each of its lines starting with "- " is one finding):
   a. Read the follow-ups file, the plan beside it (the same path without its -follow-ups or -tails suffix) and that plan's spec (its naming pair specs/YYYY-MM-DD-<slug>-design.md, else its **Spec:** header) when they exist, and the project code. Recheck every finding against the current code: it may have been fixed or moved since it was recorded.
   b. Show the findings with what the recheck found, and have the user select here which to fix. When the user selects none, write the status file with STATUS: failed and "no follow-ups selected" under Checks and under Review, and stop.
