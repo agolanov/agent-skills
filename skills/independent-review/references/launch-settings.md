@@ -10,11 +10,12 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | --- | --- | --- | --- | --- |
 | planner | `planning-task-docs` child | latest available Opus | latest available Sol | high |
 | refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
+| splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
 | implementer | `executing-task-docs` child in `subagents` or `direct` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Opus | latest available Sol | xhigh |
 | inline implementer | `executing-task-docs` child in `inline` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `executing-task-docs` Execution mode |
 | reviewer | `independent-review` CLI and native reviewer; both `dual-review` reviewers in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 
-The root chooses between the two implementer roles by the execution mode it decides in `executing-task-docs`; the planner, refiner and reviewer roles are unchanged.
+The root chooses between the two implementer roles by the execution mode it decides in `executing-task-docs`; the planner, splitter, refiner and reviewer roles are unchanged.
 
 Excluded from automatic choice, allowed explicitly: Fable (Claude), Astra (Codex).
 
@@ -45,7 +46,7 @@ Verify the model/effort pair is supported and permitted for that concrete model 
 
 Resolve once per run, record the concrete values with their source and discovery evidence, and reuse the record for every later launch of that role in the run. When changing system or launch method, re-resolve incompatible recorded values.
 
-Child sessions (planner, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root:
+Child sessions (planner, splitter, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root:
 
 ```text
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
