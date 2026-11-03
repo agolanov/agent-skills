@@ -28,7 +28,7 @@ The Parsing rules define every part of it, what Scope and Done when say included
 
 - **Lines.** Every rule reads lines with one trailing CR removed and skips fenced code blocks. A fence opens on a line starting, after at most three spaces, with three or more `` ` `` or three or more `~`; it closes on a line holding only the same character, at least as many times, after at most three spaces and before optional spaces or tabs; an unclosed fence runs to the end of the file. Fence lines and the lines between them are skipped, so a `## Stages` or `### Stage NN:` line shown in a fence, such as an example, is not a heading.
 - **Section.** The section heading is the line `## Stages`, exactly, and the file holds one (failures `no "## Stages"`; `two "## Stages"` for two or more). The section runs to the next line starting with `## `, or to the end of the file.
-- **Stage headings.** In the section, every line starting with `### ` matches `^### Stage ([0-9]{2}): (.+)$` (failure `heading not a stage: <line>`): group 1 is the stage number `NN`, group 2 the stage name. The name holds at least one character of `[A-Za-z0-9]`, so its stage slug is not empty and nothing guesses a plan path; a whitespace-only or all-Cyrillic name fails (failure `stage NN: name gives an empty slug`). A stage runs to the next line starting with `## ` or `### `, or to the end of the section. Other lines, before the first stage or inside one, are free text.
+- **Stage headings.** In the section, every line starting with `### ` matches `^### Stage ([0-9]{2}): (.+)$` (failure `heading not a stage: <line>`): group 1 is the stage number `NN`, group 2 the stage name. The name holds at least one character of `[A-Za-z0-9]`, so its stage slug is not empty and nothing guesses a plan path; a whitespace-only or all-Cyrillic name fails (failure `stage NN: name gives an empty slug`). A slug that is `follow-ups` or `tails`, or ends with `-follow-ups` or `-tails`, fails too, since its plan would be taken for a follow-ups file (failure `stage NN: name gives a reserved slug`). A stage runs to the next line starting with `## ` or `### `, or to the end of the section. Other lines, before the first stage or inside one, are free text.
 - **Fields.** Each stage holds exactly one `**Scope:**` line and exactly one `**Done when:**` line. A field line starts with its label and one space, followed by text holding a character other than space or tab; that text is the field's value. Failures `stage NN: missing **Scope:**`, `stage NN: two **Scope:**` for two or more, and the same for `**Done when:**`.
 - **Numbering.** Stage numbers are two digits, `01`, `02`, … consecutively in file order, with at least two stages. Failures `stage NN after MM` (`MM` the previous stage's number, `00` before the first stage) and `fewer than two stages`.
 - **Order.** Order is the only dependency: stage NN may rely on every lower-numbered stage and on nothing else. There is no `Depends on` per stage.
@@ -51,7 +51,7 @@ The Parsing rules define every part of it, what Scope and Done when say included
 - **1**: a rule failed. Stdout is empty; stderr holds one line, the failure as the Parsing rules word it. Exit 1 with `no "## Stages"` means the spec is not staged; any other exit 1 means its section is broken.
 - **2**: the file could not be read or the recipe could not run; stderr says why. This is unavailable evidence, neither a staged nor an unstaged spec.
 
-Only the first failure is reported, in this order: the count of `## Stages` lines in the whole file; then the section from top to bottom, each heading when it is reached (pattern, number, then name) and each stage's fields when the stage ends (Scope before Done when); then the stage count.
+Only the first failure is reported, in this order: the count of `## Stages` lines in the whole file; then the section from top to bottom, each heading when it is reached (pattern, number, empty slug, then reserved slug) and each stage's fields when the stage ends (Scope before Done when); then the stage count.
 
 Bash, tested with gawk, mawk and busybox awk (BWK/macOS awk and bash 3.2 untested):
 
@@ -91,6 +91,8 @@ stages_parse() {
           num = substr(x, 11, 2)
           if (num + 0 != prev + 1) fail(sprintf("stage %s after %02d", num, prev))
           if (substr(x, 15) !~ /[A-Za-z0-9]/) fail("stage " num ": name gives an empty slug")
+          slug = tolower(substr(x, 15)); gsub(/[^a-z0-9]+/, "-", slug); sub(/^-/, "", slug); sub(/-$/, "", slug)
+          if (slug == "follow-ups" || slug == "tails" || slug ~ /-(follow-ups|tails)$/) fail("stage " num ": name gives a reserved slug")
           prev = num + 0; sc = 0; dw = 0; st++
           out = out num "\t" substr(x, 15) "\n"
         } else if (num != "") {
@@ -159,6 +161,8 @@ $stages_exit = & {
                 $num = $m.Groups[1].Value
                 if ([int]$num -ne $prev + 1) { return (& $fail ('stage {0} after {1:d2}' -f $num, $prev)) }
                 if (-not [regex]::IsMatch($m.Groups[2].Value, '[A-Za-z0-9]')) { return (& $fail "stage ${num}: name gives an empty slug") }
+                $slug = [regex]::Replace($m.Groups[2].Value.ToLowerInvariant(), '[^a-z0-9]+', '-').Trim('-')
+                if ([regex]::IsMatch($slug, '(^|-)(follow-ups|tails)$')) { return (& $fail "stage ${num}: name gives a reserved slug") }
                 $prev = [int]$num; $sc = 0; $dw = 0
                 $stages.Add($num + "`t" + $m.Groups[2].Value)
             } elseif ($num) {
