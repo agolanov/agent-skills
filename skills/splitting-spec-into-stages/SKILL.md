@@ -14,22 +14,23 @@ One spec per run. The child writes the spec's `## Stages` section and talks to t
 
 ## Input
 
-The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Docs repository = `git -C <project>/docs/superpowers rev-parse --show-toplevel` when that directory exists, else the project checkout. Resolve the input; read a given file completely. Classify it by the first rule that matches; every stop happens before any window:
+The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout. Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Docs repository = `git -C <project>/docs/superpowers rev-parse --show-toplevel` when that directory exists, else the project checkout. Resolve the input; every stop happens before any window. An input naming no existing file (a missing path, a task text) stops, naming it: "no such file; only an existing design spec is split into stages". Read the file completely and classify it by the first rule that matches:
 
 1. **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`). Refuse, naming it: "a plan, not a spec; only a design spec is split into stages".
 2. **Spec**: named `*-design.md` or lying in a `specs/` directory. Run the spec checks below.
-3. **Anything else** (a brief, another file, a task text, a missing path): refuse, naming it: "not a spec; only a design spec is split into stages".
+3. **Anything else** (a brief, a follow-ups file, any other file): refuse, naming it: "not a spec; only a design spec is split into stages".
 
 Spec checks, in order:
 
-1. The spec lies in the docs repository; `<rel>` is its path relative to that repository. A spec outside it stops, naming both.
+1. `git -C <spec dir> rev-parse --show-toplevel` prints the docs repository; `<rel>` is the spec's path relative to it. Any other result stops, naming the spec's repository and the docs repository.
 2. Locate the installed `planning-task-docs/references/stages-section.md` (the sibling [stages-section.md](../planning-task-docs/references/stages-section.md#recipes)) by absolute path. Missing: stop, naming `planning-task-docs` for the user to install. The brief's `Stage convention:` line names this path.
 3. Run `stages_parse` from that file's Recipes on the spec, then follow its exit:
    - Exit 1 with stderr exactly `no "## Stages"`: the spec is unstaged; a `## Stages` line inside a fenced code block is no heading. Continue.
    - Exit 2: stop, reporting the stages evidence unavailable with the stderr reason.
    - Any other exit (0, or exit 1 naming a broken section): the spec has a `## Stages` heading. Refuse: "already staged; edit the section by hand or run `delivering-spec-stages`".
 4. Find its plans in the sibling `plans/` directory, with no question: the naming pair (`specs/YYYY-MM-DD-<slug>-design.md` with `plans/YYYY-MM-DD-<slug>.md`), and every plan whose `**Spec:**` header (path relative to the project checkout) names this spec, with or without a `**Stage:**` line. Any found: refuse, naming each plan: "already planned; splitting a spec whose work has started is a hand job".
-5. `git -C <docs repository> cat-file -e HEAD:<rel>` exits 0: the spec is tracked at the docs repository's HEAD. Any other exit stops: "commit the spec first".
+5. No line of the spec matches `^Review: (clean|clean except disputed), `, except its last line when that line is a full review mark: the last line and mark pattern of [prefix-check.md](references/prefix-check.md#rule). The split keeps every other such line (a displaced stale mark, a malformed mark, a mark followed by an empty line, a quoted example) and Verify 8 rejects it, so stop, naming each such line by number and text: "a `Review:` line other than a final review mark; remove or reword it and commit the spec first".
+6. `git -C <docs repository> cat-file -e HEAD:<rel>` exits 0: the spec is tracked at the docs repository's HEAD. Any other exit stops: "commit the spec first".
 
 ## Preflight
 
@@ -68,7 +69,7 @@ On `done`, all of these must hold:
 8. No line of the spec matches `^Review: (clean|clean except disputed), `.
 9. The final [child settings check](../independent-review/references/launch-settings.md#child-settings-check) over every opening's record matches, or the user accepted its result.
 
-Exit 2 of either recipe is unavailable evidence too: stop, keeping the window and status. A settings mismatch or `settings unverified: <reason>` never goes back to the child: show expected and observed values and the record paths, and ask the user to accept the result with the observed settings or stop with everything preserved. A user commit changing the spec goes to the user per Verify 2. Any other mismatch goes back to the child once: archive the status to `<file>-rejected-<n>`, `n` the smallest unused number, `send` one line naming the mismatch and asking for a fresh report at the same path, wait and verify again. A repeated mismatch goes to the user, with window and status kept.
+Exit 2 of `prefix_check` or `stages_parse` is unavailable evidence too: stop, keeping the window and status. A settings mismatch or `settings unverified: <reason>` never goes back to the child: show expected and observed values and the record paths, and ask the user to accept the result with the observed settings or stop with everything preserved. A user commit changing the spec goes to the user per Verify 2. Any other mismatch goes back to the child once: archive the status to `<file>-rejected-<n>`, `n` the smallest unused number, `send` one line naming the mismatch and asking for a fresh report at the same path, wait and verify again. A repeated mismatch goes to the user, with window and status kept.
 
 ## Report
 
