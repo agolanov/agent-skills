@@ -13,6 +13,7 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
 | `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan or a staged spec with an unplanned stage, or a follow-ups file) into a superpowers spec and plan in a child session. |
 | `splitting-spec-into-stages` | Split one large spec into stages in a child session, appending a `## Stages` section for staged planning and delivery. |
+| `delivering-spec-stages` | Take one large spec to the main branch stage by stage: split it when needed, then plan, review and deliver each stage in order through the existing skills. |
 | `refining-task-docs` | Cross-review one task's spec and plan in a child session, fix the findings, and mark the documents that pass with a `Review:` line. |
 | `delivering-task-queue` | Deliver several task documents, a list or a directory, through `delivering-task`, ordered by their `**Depends on:**` headers, in parallel up to a limit. |
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
