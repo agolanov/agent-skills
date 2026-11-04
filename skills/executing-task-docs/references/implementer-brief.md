@@ -13,7 +13,7 @@ Plan kind: <plan|other>
 Execution mode: <inline | subagents | direct> (<rule | explicit>); <reason, one sentence>
 Spec: <spec or None>
 Agent: <agent>
-Terminal controls: <backend and supported capabilities from the root; plain-terminal questions need direct user attention>
+Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: <name>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>

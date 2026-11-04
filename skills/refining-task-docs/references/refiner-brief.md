@@ -11,7 +11,7 @@ Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
-Terminal controls: <backend and supported capabilities from the root; plain-terminal questions need direct user attention>
+Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: refine-<stem>
 Documents to review: <absolute document path>[, <absolute document path>]
 Context documents: <absolute document path>[, <absolute document path>]
@@ -37,7 +37,7 @@ Work:
 
 When the review cannot end clean or clean except disputed, mark nothing and write STATUS: failed, naming under Review the open findings and the documents left unmarked.
 
-Boundaries: commit only on the current branch of the docs repository, and only the documents to review and the context documents you changed, always naming them with a pathspec (git --literal-pathspecs add -- <paths>, then git --literal-pathspecs commit -m <message> -- <paths>), so that other staged changes stay staged and out of your commits; --literal-pathspecs keeps Git from reading a file name such as ":(glob)…" as pathspec magic. Do not create a worktree or branch, merge, push or rebase. Edit no other file, and leave every other uncommitted change, staged or not, as it is: the user works in this checkout too and may commit there meanwhile. Ask the user your own questions in this window; use STATUS: blocked only for what the root must resolve (a Git problem, a missing input).
+Boundaries: commit only on the current branch of the docs repository, and only the documents to review and the context documents you changed, always naming them with a pathspec (git --literal-pathspecs add -- PATHS, then git --literal-pathspecs commit -m MESSAGE -- PATHS, where PATHS are those documents' paths and MESSAGE is your commit message), so that other staged changes stay staged and out of your commits; --literal-pathspecs keeps Git from reading a file name such as ":(glob)…" as pathspec magic. Quote each value yourself as one literal shell argument, for the shell you run in, so that `(`, spaces, `$` and quotes reach Git unchanged: in a POSIX shell inside single quotes, a single quote in the value written `'\''`; in PowerShell inside single quotes, a single quote doubled. Do not create a worktree or branch, merge, push or rebase. Edit no other file, and leave every other uncommitted change, staged or not, as it is: the user works in this checkout too and may commit there meanwhile. Ask the user your own questions in this window; use STATUS: blocked only for what the root must resolve (a Git problem, a missing input).
 
 Record each out-of-scope finding as: what — where (path:line) — why it is out of scope. In Review, report the final refine mode separately from the raw reviewer verdict; a clean except disputed closure may keep raw CHANGES. Never rename that raw verdict CLEAN. Include disputed findings and both positions.
 
