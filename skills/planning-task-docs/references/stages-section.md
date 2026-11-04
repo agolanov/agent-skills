@@ -174,7 +174,7 @@ $stages_exit = & {
         & $emit ([Console]::OpenStandardOutput()) (($stages -join "`n") + "`n")
         return 0
     } catch {
-        [Console]::Error.WriteLine("stages_parse: $($_.Exception.Message)")
+        try { [Console]::Error.WriteLine("stages_parse: $($_.Exception.Message)") } catch { }
         return 2
     }
 }
