@@ -10,6 +10,7 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 | `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux/terminal window from a brief and wait for its status. |
 | `executing-task-docs` | Implement one task document in a child session with cross review, ending with a reviewed branch ready to merge and its follow-ups recorded. |
 | `writing-task-follow-ups` | Create, replace or clear a task branch's section in the follow-ups file beside its task document. |
+| `resolving-task-follow-ups` | Recheck follow-ups files against the current code, fix the selected findings directly in the current session, and remove resolved findings from the files. |
 | `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
 | `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan or a staged spec with an unplanned stage, or a follow-ups file) into a superpowers spec and plan in a child session. |
 | `splitting-spec-into-stages` | Split one large spec into stages in a child session, appending a `## Stages` section for staged planning and delivery. |
