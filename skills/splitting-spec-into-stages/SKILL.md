@@ -1,6 +1,6 @@
 ---
 name: splitting-spec-into-stages
-description: Splits one large design spec without plans into ordered stages by appending a `## Stages` section, written in a visible child agent session where the user answers its questions. Use when a large unstaged spec should be split into stages before planning, or when `delivering-spec-stages` needs a spec split.
+description: Splits one large design spec without plans into ordered stages by appending a `## Stages` section, written in a visible child agent session where the user answers its questions. Use when a large unstaged spec should be split into stages before planning or before `delivering-spec-stages`.
 ---
 
 # Splitting Spec Into Stages
@@ -77,4 +77,4 @@ Exit 2 of `prefix_check` or `stages_parse` is unavailable evidence too: stop, ke
 
 ## Report
 
-Report the spec path, its stages as `stages_parse` lists them (number and name, each with the first sentence of its `**Scope:**`), the repository and commits that hold the split, the Input 6 commit of the spec (`committed <rel> <sha7>`) when one was made, every stage the child reported larger than the guideline with its reason (its Checks lines), and every Out of scope line. When Verify 3's preflight listed paths other than the spec, add `unrelated uncommitted changes left untouched: <count>`, without listing them. Add one settings line: role `splitter`, effective model and effort, source of each, the settings check outcome, and the record paths or the user's acceptance. After a verified `done`, `close split-<spec-stem>` and remove the recorded file; otherwise the window, status and recorded file stay for the user. Nothing is reviewed, planned or executed here: the next step is `refining-task-docs <spec>`.
+Report the spec path, its stages as `stages_parse` lists them (number and name, each with the first sentence of its `**Scope:**`), the repository and commits that hold the split, the Input 6 commit of the spec (`committed <rel> <sha7>`) when one was made, every stage the child reported larger than the guideline with its reason (its Checks lines), and every Out of scope line. When Verify 3's preflight listed paths other than the spec, add `unrelated uncommitted changes left untouched: <count>`, without listing them. Add one settings line: role `splitter`, effective model and effort, source of each, the settings check outcome, and the record paths or the user's acceptance. After a verified `done`, `close split-<spec-stem>` and remove the recorded file; otherwise the window, status and recorded file stay for the user. Nothing is reviewed, planned or executed here: the next step is `refining-task-docs <spec>`, then `delivering-spec-stages <spec>`.
