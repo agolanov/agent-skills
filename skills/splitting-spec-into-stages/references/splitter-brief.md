@@ -10,7 +10,7 @@ Docs repository: <absolute top level of the docs repository; the project checkou
 Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
-Terminal controls: <backend and supported capabilities from the root; plain-terminal questions need direct user attention>
+Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: split-<spec-stem>
 Spec: <absolute spec path>
 Stage convention: <absolute installed planning-task-docs/references/stages-section.md>
