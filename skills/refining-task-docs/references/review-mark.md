@@ -129,6 +129,6 @@ Performed by the child for every document it reviewed or changed, after the revi
 
 1. Delete every line matching `^Review: (clean|clean except disputed), ` anywhere in the document (a stale mark may have been displaced by later edits).
 2. For `clean except disputed`, keep the disputed findings and both positions in the document.
-3. Make sure the file ends with a newline (else the mark joins its last line), then commit the content when anything changed: `git add -- <file>`, then `git commit -m "docs: <basename>" -- <file>`; the pathspec keeps other staged changes out of the commit. `<sha>` = full `git rev-parse HEAD`.
-4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <opposite system>, commit <sha>` as the last line; commit it the same way: `git add -- <file>`, then `git commit -m "mark: <basename>" -- <file>`.
+3. Make sure the file ends with a newline (else the mark joins its last line), then commit the content when anything changed: `git --literal-pathspecs add -- <file>`, then `git --literal-pathspecs commit -m "docs: <basename>" -- <file>`; the pathspec keeps other staged changes out of the commit, and --literal-pathspecs keeps Git from reading a file name such as `:(glob)…` as pathspec magic. `<sha>` = full `git rev-parse HEAD`.
+4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <opposite system>, commit <sha>` as the last line; commit it the same way: `git --literal-pathspecs add -- <file>`, then `git --literal-pathspecs commit -m "mark: <basename>" -- <file>`.
 5. Run the freshness check; it must pass. A document changed after marking is reviewed and marked again.

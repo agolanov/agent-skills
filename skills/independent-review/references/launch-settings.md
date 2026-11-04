@@ -64,7 +64,7 @@ The reviewer path keeps its `Assignment:` and `Settings evidence:` records in in
 
 ## Child settings check
 
-The root verifies a planner, refiner or implementer child's effective model and effort from the child's runtime records, never from invocation flags or the child's self-report.
+The root verifies a planner, splitter, refiner or implementer child's effective model and effort from the child's runtime records, never from invocation flags or the child's self-report.
 
 **Binding a record to an opening.** Brief paths repeat across runs, so the brief path alone does not identify a session. Immediately before every `open` of the run (first open, silent-exit reopen, dead-agent reopen, main-moved reopen, `--resume`), the root appends to the runtime brief one line:
 
