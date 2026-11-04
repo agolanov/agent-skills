@@ -26,6 +26,7 @@ Header: `# list`, or for a directory `# directory <absolute dir>`; then one `# d
 - `blocked: <question>`: the child asked; the root is answering.
 - `done awaiting merge`: verified `done`, waiting for its finish half.
 - `rebasing`: returned to the child after main moved; the hold is set.
+- `merge held: <paths>`: `delivering-task` Merge stopped on the main checkout's uncommitted changes; the root asks the user to retry or stop; window, worktree, branch and status file are kept.
 - `delivered <sha7>`: merged, `<sha7>` the merge commit.
 - `failed: <reason>`: a stop, a `failed` status or a merge conflict; worktree, branch and status file are kept.
 - `stopped by the user`.
