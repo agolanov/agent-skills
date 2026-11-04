@@ -1,6 +1,6 @@
 ---
 name: delivering-spec-stages
-description: Takes one large design spec to the main branch stage by stage, splitting it into stages when it has none, then planning, reviewing and delivering each stage in order through the existing task skills. Use when a spec too large for one plan should be delivered stage by stage from one invocation, or when a staged spec's delivery should continue where it stopped.
+description: Takes one large design spec that already has a `## Stages` section to the main branch stage by stage, planning, reviewing and delivering each stage in order through the existing task skills. Use when a staged spec should be delivered stage by stage from one invocation, or when a staged spec's delivery should continue where it stopped.
 ---
 
 # Delivering Spec Stages
