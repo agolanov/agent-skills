@@ -18,7 +18,7 @@ Plans written task-by-task are often over-atomized: every tiny task costs a full
 
 ## Process
 
-1. **Locate the plan.** Use the path the user gave; otherwise ask. If the file has uncommitted changes, offer to commit them first.
+1. **Locate the plan.** Use the path the user gave; otherwise ask. `<repo>` is `git -C <plan-dir> rev-parse --show-toplevel` and `<rel>` the plan's path relative to it. Run `git -C <repo> --literal-pathspecs status --porcelain=v1 -z --untracked-files=all -- <rel>`: this one command is the whole check. When it prints an entry (the plan is untracked, or has staged or unstaged changes), commit the plan alone first, without asking: `git -C '<repo>' --literal-pathspecs add -- '<rel>'`, then `git -C '<repo>' --literal-pathspecs commit -m 'docs: <basename>' -- '<rel>'`, each path and message one literal shell argument, quoted for the shell that runs it (inside POSIX single quotes a single quote is written `'\''`; inside PowerShell single quotes it is doubled). Tell the user `committed <rel> <sha7>`. The pathspec commits the plan alone: other staged changes stay staged, unstaged and untracked paths stay as they are, and when the plan is one side of a staged rename only its own path is committed. When it prints nothing and `git -C <repo> check-ignore -q -- <rel>` exits 0, the plan is ignored: it is not committed, and you say so in one line. A failing Git command stops, reporting Git's error.
 2. **Parse tasks.** For each task note: files touched, interfaces (Consumes/Produces or similar), test cycle. If you cannot identify distinct tasks, say so and ask for clarification — do not guess and do not rewrite.
 3. **Check the header.** If it already has a `Consolidated:` line, tell the user and ask whether to run again.
 4. **Group adjacent tasks** with the rubric below. Never reorder tasks; only adjacent tasks may merge. If nothing merges, say the plan is already right-sized and leave the file untouched.
@@ -81,7 +81,7 @@ If a count dropped, you rewrote instead of concatenating. Redo the group.
 | Header already has `Consolidated:` | Say so; ask whether to run again |
 | Nothing to merge | Say so; leave the file untouched |
 | Task structure not recognizable | Say so; ask for clarification; do not rewrite |
-| Plan file has uncommitted changes | Offer to commit first |
+| Plan file has uncommitted changes | Commit it alone first, without asking |
 
 ## Worked Example
 
