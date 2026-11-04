@@ -17,7 +17,7 @@ Header: `# spec: <absolute spec path>`. Then one line per stage in number order:
 
 - `<state>` is one of the states below. No other spelling.
 - The plan field is the plan's path relative to the project checkout (as `**Spec:**` headers give it), or `-`. The merge field is the merge's short SHA (7), or `-`.
-- While a spec-level step runs, the stage list is not final (a spec being split has no stages yet), so the file holds one spec line instead of stage lines: `spec | <state> | - | -`. The spec line is replaced by the stage lines, one per stage in number order, once the stage list is final: after the split question is answered "proceed", after the stale staged spec's review, or at once when the staged spec is fresh. A run that stops before any spec-level step (a spec refused in Preflight, a `## Stages` that does not parse) writes no stage line.
+- While a spec-level step runs, the stage list is not final (a spec being split has no stages yet), so the file holds one spec line instead of stage lines: `spec | <state> | - | -`. The spec line is replaced by the stage lines, one per stage in number order, once the stage list is final: after the split question is answered "proceed", after the stale staged spec's review, or at once when the staged spec is fresh; the exception is Split 2's unstaged-plan stop, which writes `failed:` on the spec line and no stage line. A run that stops before any spec-level step (a spec refused in Preflight, a `## Stages` that does not parse) writes no stage line.
 - Rewrite the line at every state change, before acting on the next step. It is the root's only live record.
 
 ## States
