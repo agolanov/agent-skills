@@ -38,8 +38,8 @@ The Parsing rules define every part of it, what Scope and Done when say included
 - **Spec stem.** `<spec-stem>` is the spec's file stem without `-design` (`specs/2026-09-20-product-layer-separation-design.md` → `2026-09-20-product-layer-separation`).
 - **Stage plan.** The plan of stage NN is an ordinary superpowers plan at `plans/<spec-stem>-NN-<stage-slug>.md`, its header carrying `**Spec:** <spec path relative to the project checkout>` and `**Stage:** NN`.
 - **Candidates.** The candidates are the Markdown files of the spec's sibling `plans/` directory, except follow-ups files (`*-follow-ups.md`, and the older `*-tails.md`), which are never plans.
-- **Stage matching.** A candidate matches stage NN when its stem starts with `<spec-stem>-NN-`, or its `**Spec:**` header names the spec and its `**Stage:**` line says `NN`. A candidate matching two stages (its stem says NN, its headers MM) stops, naming the plan and both stages. Two candidates matching one stage stop, naming both. Nothing guesses.
-- **Unstaged plan.** Stage matching comes first. A plan of the spec (the naming pair `plans/<spec-stem>.md`, or a candidate whose `**Spec:**` header names the spec) that matches no stage is unstaged: for example the naming pair without `**Stage:**`, or a `**Spec:**` plan without `**Stage:**` whose stem does not start with `<spec-stem>-NN-`. The naming pair whose `**Spec:**` names the spec and whose `**Stage:**` says a stage's number, such as `01`, or a stem-matching plan with `**Spec:**` and no `**Stage:**`, is a stage plan. An unstaged plan stops `planning-task-docs`, naming it: "staged spec with an unstaged plan; remove or stage the plan".
+- **Stage matching.** A candidate matches stage NN when its stem starts with `<spec-stem>-NN-`, or its `**Spec:**` header names the spec and its `**Stage:**` line says `NN`. Matching by stem applies only to a candidate that belongs to no other spec: one whose `**Spec:**` header names another spec, or which is the naming pair of another spec (the sibling `specs/` directory holds `<candidate stem>-design.md` and it is not this spec), matches stage NN only by its headers. A candidate matching two stages (its stem says NN, its headers MM) stops, naming the plan and both stages. Two candidates matching one stage stop, naming both. Nothing guesses.
+- **Unstaged plan.** Stage matching comes first. A plan of the spec (the naming pair `plans/<spec-stem>.md`, or a candidate whose `**Spec:**` header names the spec) that matches no stage is unstaged: for example the naming pair without `**Stage:**`, or a `**Spec:**` plan without `**Stage:**` whose stem does not start with `<spec-stem>-NN-`. The naming pair whose `**Spec:**` names the spec and whose `**Stage:**` says a stage's number, such as `01`, or a stem-matching plan with `**Spec:**` and no `**Stage:**`, is a stage plan. An unstaged plan stops `planning-task-docs` and `delivering-spec-stages`, naming it: "staged spec with an unstaged plan; remove or stage the plan".
 - **Next stage.** The next stage is the lowest-numbered stage with no matching plan; when every stage has one, there is none.
 - **Delivered.** Stage NN is delivered when the first-parent history of main holds a merge commit with the subject `Merge branch '<branch>'` or `Merge branch '<branch>' into <main>`, `<branch>` being the branch `executing-task-docs` Preflight 2 derives from the stage plan's stem. No document is edited to record progress.
 
@@ -174,7 +174,7 @@ $stages_exit = & {
         & $emit ([Console]::OpenStandardOutput()) (($stages -join "`n") + "`n")
         return 0
     } catch {
-        [Console]::Error.WriteLine("stages_parse: $($_.Exception.Message)")
+        try { [Console]::Error.WriteLine("stages_parse: $($_.Exception.Message)") } catch { }
         return 2
     }
 }

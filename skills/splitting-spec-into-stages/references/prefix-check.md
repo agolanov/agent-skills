@@ -19,11 +19,13 @@ The comparison is of bytes only: no normalisation of encoding, line endings or w
 
 ## Recipes
 
-Bind `file` and `recorded` (`$file` and `$recorded` in pwsh) and run one recipe. Both share this contract and write the same bytes for the same inputs, except the text after `prefix_check: `:
+Bind `file` and `recorded` (`$file` and `$recorded` in pwsh) and run one recipe. Both share this contract. For readable regular files they give the same exit and, for exits 0 and 1, the same bytes, except the text after `prefix_check: `. Any other path (a directory, a device, a FIFO, a file that fails to open) is refused with exit 2 by Bash and may behave differently in pwsh:
 
 - **0**: pass. Stdout and stderr are empty.
 - **1**: fail. Stdout is empty; stderr holds one line. `differs from the original content at byte offset N` when `file` does not start with `R`: `N` is 0-based, the number of bytes of `file` before the first one that differs from `R`, or the length of `file` when it ends inside `R`. `no "## Stages" after the original content` when `file` starts with `R` and the bytes after it do not pass.
-- **2**: unavailable evidence, neither a pass nor a fail. Stdout is empty; stderr holds `cannot read file: <path>` or `cannot read recorded: <path>` when that path is not a readable regular file (`file` is checked first), or a line starting `prefix_check: ` when a tool fails.
+- **2**: unavailable evidence, neither a pass nor a fail. Stdout is empty; stderr holds `cannot read file: <path>` or `cannot read recorded: <path>` when Bash finds that path is not a readable regular file (`file` is checked first; pwsh gives this line when it cannot read the path), or a line starting `prefix_check: ` when a tool fails.
+
+The Bash recipe gates the last line of `recorded` at 107 bytes before it converts it to text. `Review: clean except disputed, YYYY-MM-DD, reviewer claude, commit <40 hex>` is the longest mark (8 + 21 + 2 + 10 + 2 + 15 + 2 + 7 + 40 = 107 bytes), so a longer last line cannot be a mark and is not converted to text; a change to the mark grammar must change this number and the pwsh pattern together.
 
 Bash, needing `od` and `awk`: `od` turns each file into decimal byte values, so NUL bytes, a missing final newline and long lines reach `awk` as plain numbers. Tested with GNU coreutils od and gawk or mawk, and with busybox od and awk (BSD/macOS od and awk, and bash 3.2, untested):
 
@@ -110,7 +112,7 @@ $prefix_exit = & {
         if ($j -lt $f.Length -and $f[$j] -ne 10 -and -not ($f[$j] -eq 13 -and ($j + 1 -eq $f.Length -or $f[$j + 1] -eq 10))) { return (& $fail $none) }
         return 0
     } catch {
-        & $say "prefix_check: $($_.Exception.Message)"
+        try { & $say "prefix_check: $($_.Exception.Message)" } catch { }
         return 2
     }
 }
