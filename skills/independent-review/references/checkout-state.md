@@ -56,7 +56,7 @@ Record before and after each phase, then compare corresponding stdout files as b
 
 ## Direct-use preflight
 
-Use the four-command boundary immediately before each clean/path gate; an earlier result is not a later gate. Confirm the recorded HEAD is the required commit. A **clean gate** requires successful commands, empty status and empty worktree/cached diffs. A direct-review dirty result takes the caller's existing commit-or-clone decision. Preserve unrelated work.
+Use the four-command boundary immediately before each clean/path gate; an earlier result is not a later gate. Confirm the recorded HEAD is the required commit. A **clean gate** requires successful commands, empty status and empty worktree/cached diffs. A direct review with a dirty result reviews the committed state, per **Uncommitted changes** in [direct use](../SKILL.md#direct-use). Preserve unrelated work.
 
 For path gates, parse the raw NUL-delimited porcelain v1 status, not its displayed lines. Each entry starts with two status columns and a space, followed by a repository-relative path; rename/copy entries have a second NUL-delimited path. Include both rename/copy paths. Compare exact paths with the caller's file set, preserving case, spaces and other literal characters; substring matching is insufficient. If the status cannot be parsed faithfully or conflicts with the diffs, stop that gate and inspect the evidence.
 
