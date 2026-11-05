@@ -18,7 +18,7 @@ One contract for every child outside `inline`: the parent writes a brief, starts
 - Any skill can be run as a whole outside `inline` by its caller, a parent skill or the user's words, through this contract; `--run` only names each skill's default target of that move.
 - The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window"): the session maps them to keys and announces the mapping.
 
-**System.** `--agent claude|codex` chooses the worker's system. Without it the worker is the caller's own system, identified from session identity as independent-review's [Session system](../../independent-review/SKILL.md#session-system) says, and a window's `open` receives it as `--agent`; the helper's own default is not this rule. A reviewer is the opposite system unless `--codex`, `--claude` or `--dual` chooses it. A `subagent` is always the caller's own system.
+**System.** `--agent claude|codex` chooses the worker's system. Without it the worker is the caller's own system, identified from session identity as independent-review's [Session system](../../independent-review/SKILL.md#session-system) says, and a window's `open` receives it as `--agent`; the helper's own default is not this rule. A reviewer is the opposite system unless `--codex`, `--claude` or `--dual` chooses it; with `subagent` and no system key it is the caller's own system. A `subagent` is always the caller's own system.
 
 ## Brief
 
@@ -47,13 +47,13 @@ Every place starts the child with the window's prompt:
 Read the brief at <absolute brief> completely and carry it out.
 ```
 
-Before every start, append the brief's `Opened:` line ([Settings](#settings)).
+Before every launch (each `open` of a window included) and every fresh child, append the brief's `Opened:` line ([Settings](#settings)); an answer or a restart that continues the same conversation never gets one.
 
 - **`window`:** [SKILL.md](../SKILL.md) as today: `open`, Startup, the foreground wait loop, Dialogs and the single reopen after a silent exit.
 - **`subagent`:** start a fresh agent with the host's agent tool ([Host mechanisms](#host-mechanisms)): the prompt above, no parent history, the host's normal tool set, and the pair of [Settings](#settings). It starts in the parent's working directory; the brief's `Checkout:` is where it works. Wait with the host's wait tools until it ends; it writes the status file before it ends.
 - **`background`:** start the CLI in the checkout with the prompt on stdin and stdout/stderr in a fresh run directory under `runtime-dir`, one per start or resume. Claude: `claude --print --output-format stream-json --verbose <permission args> [--model M] [--effort E]`. Codex: `codex exec <permission args> [-c model="M"] [-c model_reasoning_effort="E"] -`. `<permission args>` come from [Permissions](#permissions); a `cli-default` field omits its flag. Run the recipe through the host's background execution and wait for the process to exit with the host's wait tools (a Codex `exec_command` that yields a `session_id` is polled with `write_stdin` until it exits), keeping this session active. Record the producer exit and the session ID in the run directory; the report names both.
 
-Then read the status file's first line, as for a window: `done` and `failed` follow the window's status table ([Foreground wait loop](../SKILL.md#foreground-wait-loop)), `blocked` follows [Questions and continuation](#questions-and-continuation). A child that ends without a valid first line (a subagent's end, any producer exit) gets **one restart** by that section's continuation, the message being "Your turn ended without a status file. Continue from the current state of the checkout: read git log and git status first." A second ends the run, as a window's second silent exit: show the producer exit, stderr and the run directory, and preserve the checkout.
+Then read the status file's first line, as for a window: `done` and `failed` follow the window's status table ([Foreground wait loop](../SKILL.md#foreground-wait-loop)), `blocked` follows [Questions and continuation](#questions-and-continuation). A child that ends without a valid first line (a subagent's end, any producer exit) gets **one restart** by that section's continuation, the message being "Your turn ended without a status file. Continue from the current state of the checkout: read git log and git status first." A second ends the run, as a window's second silent exit: show the producer exit, stderr and the run directory, and preserve the checkout. A **launch failure** gets no restart and is reported with the CLI's message: a start exception (no producer exit), or the CLI refusing its arguments before any session starts (a usage error on stderr, no session ID).
 
 POSIX recipe (Bash). Bind absolute `checkout` and `run_dir` holding `prompt.md` (the start prompt, or a resume's continuation message), `agent` (`claude` or `codex`), `model` and `effort` (each may be `cli-default`), and `session_id` (empty to start, the recorded ID to resume):
 
@@ -134,7 +134,6 @@ $found = Select-String -LiteralPath (Join-Path $runDir $idSource) -Pattern $idPa
 Set-Content -LiteralPath (Join-Path $runDir 'session.id') -Value $(if ($found) { $found.Matches[0].Groups[1].Value } else { '' })
 ```
 
-A start exception is a launch failure with no producer exit; keep it apart from a nonzero exit.
 
 ## Questions and continuation
 
@@ -160,7 +159,7 @@ Checked 2026-11-05 on Linux (WSL2) with Claude Code 2.1.318 and codex-cli 0.166.
 | Subagent starts subagents | the agent tool is in a subagent's tool list and its `meta.json` records `spawnDepth` (observed); a nested start: unverified | the tool says spawned agents can spawn their own, and a depth-1 subagent lists `spawn_agent` (observed); `[agents] max_depth` in `config.toml` limits depth (this machine: `1`); a depth-2 spawn: unverified |
 | Subagent holds child-sessions' foreground wait loop | its shell tool takes foreground calls up to 600000 ms (schema); not exercised: unverified | spawned agents have the parent's tools (tool list); not exercised: unverified |
 | Subagent runtime record | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<parent project>/<parent session ID>/subagents/agent-<agent ID>.jsonl` beside its `.meta.json`; the first user message is the prompt; model `message.model` of assistant records, effort `message.output_config.effort` of request records and `effort` of assistant records (observed) | a rollout under `${CODEX_HOME:-$HOME/.codex}/sessions/` whose `session_meta.payload.source.subagent.thread_spawn.parent_thread_id` is the parent's thread, with the parent's cwd; the spawn message is a user message; `turn_context.payload.model` and `.effort` (observed) |
-| Background start | `claude --print` reads the prompt on stdin; `--output-format stream-json --verbose`, `--model`, `--effort`, `--permission-mode`; print mode skips the workspace-trust dialog (help); a print-mode `init` event showed `permissionMode: bypassPermissions` (observed on 2.1.316) | `codex exec ... -` reads the prompt on stdin; `-c model=...`, `-c model_reasoning_effort=...`, `--dangerously-bypass-approvals-and-sandbox` (help); `codex exec` sessions spawn subagents (observed 2026-11-01) |
+| Background start | `claude --print` reads the prompt on stdin; `--output-format stream-json --verbose`, `--model`, `--effort`, `--permission-mode`; print mode skips the workspace-trust dialog (help); a print-mode `init` event showed `permissionMode: bypassPermissions` (observed on 2.1.316) | `codex exec ... -` reads the prompt on stdin; `-c model=...`, `-c model_reasoning_effort=...`, `--dangerously-bypass-approvals-and-sandbox`, `-s`, but no `-a`/`--ask-for-approval`, which only top-level `codex` takes (help); `codex exec` sessions spawn subagents (observed 2026-11-01) |
 | Background session ID | `session_id` of the stream's `system`/`init` event (observed on 2.1.316, 2026-10-31; on 2.1.318 unverified) | the stderr header line `session id: <uuid>` (observed in review mode on 0.165.0 and 0.166.0; for `exec` unverified); the rollout's `session_meta.payload.id` carries the same ID |
 | Background resume | `claude --print --resume <id>` keeps the ID unless `--fork-session` (help); not exercised: unverified | `codex exec resume [OPTIONS] <id> -` reads the prompt on stdin; its options list `-c`, `-m` and `--dangerously-bypass-approvals-and-sandbox`, but no `--sandbox` or `--ask-for-approval` (help); not exercised: unverified |
 | Background runtime record | the **Claude child** transcript of launch-settings' [child settings check](../../independent-review/references/launch-settings.md#child-settings-check) | the **Codex child** rollout of the same check |
@@ -168,18 +167,18 @@ Checked 2026-11-05 on Linux (WSL2) with Claude Code 2.1.318 and codex-cli 0.166.
 
 ## Permissions
 
-A non-interactive child has nowhere to ask for a permission. A writing worker in `background` gets a window's permission arguments on every start and resume, built as `open` builds them: Claude `--permission-mode bypassPermissions`, Codex `--dangerously-bypass-approvals-and-sandbox`, or, when `CHILD_SESSION_CLAUDE_ARGS`/`CHILD_SESSION_CODEX_ARGS` is set, its whitespace-separated words without shell evaluation (a whitespace-only value means no arguments). A `subagent` runs with its host session's permissions. In every place the brief's `Authority:` bounds what the child does with them. A reviewer keeps [CLI reviewers](../../independent-review/references/cli-reviewers.md)' permission rules in every place, a window included ([window reviewers](../../independent-review/references/window-reviewers.md) step 5).
+A non-interactive child has nowhere to ask for a permission. A writing worker in `background` gets a window's permission arguments on every start and resume, built as `open` builds them: Claude `--permission-mode bypassPermissions`, Codex `--dangerously-bypass-approvals-and-sandbox`, or, when `CHILD_SESSION_CLAUDE_ARGS`/`CHILD_SESSION_CODEX_ARGS` is set, its whitespace-separated words without shell evaluation (a whitespace-only value means no arguments). Words the CLI refuses (for example `-a`, which `codex exec` does not take) make every start a launch failure ([Launch and wait](#launch-and-wait)). A `subagent` runs with its host session's permissions. In every place the brief's `Authority:` bounds what the child does with them. A reviewer keeps [CLI reviewers](../../independent-review/references/cli-reviewers.md)' permission rules in every place, a window included ([window reviewers](../../independent-review/references/window-reviewers.md) step 5).
 
 ## Settings
 
-Every role keeps its launch-settings policy in every place: resolve, pass and check the pair as [launch settings Places](../../independent-review/references/launch-settings.md#places) says, the `Opened:` line before every start included.
+Every role keeps its launch-settings policy in every place: resolve, pass and check the pair as [launch settings Places](../../independent-review/references/launch-settings.md#places) says, the `Opened:` line before every launch and fresh child included.
 
 ## Refused combinations
 
 Refused before anything starts, naming the combination:
 
 - a `subagent` of a system other than the current session's, for example `--codex --reviewer-run subagent` from Claude Code;
-- a `subagent` started by a session that is itself a subagent, where the host's subagents cannot start subagents ([Host mechanisms](#host-mechanisms); the session checks its own agent tool);
+- a `subagent` started by a session that is itself a subagent, where the host's subagents cannot start subagents ([Host mechanisms](#host-mechanisms)): the session checks its own agent tool and, on Codex, `[agents] max_depth` in the user's `config.toml` against its own depth (the segments of its canonical task name after `/root`). A spawn the host refuses at launch is reported as this combination, with no fallback to another place;
 - `--dual` with `subagent`;
 - a place that cannot select the role's model and effort ([Settings](#settings));
 - `--model` or `--effort` with an `inline` worker, except in the orchestrators, where they set the implementer;

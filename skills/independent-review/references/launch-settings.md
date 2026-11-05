@@ -84,7 +84,7 @@ Every opening of the window in the run has its own record, and each is checked.
 When:
 
 1. **Early check:** at the first return of the foreground `wait` after each `open`. Only a mismatch acts: the root stops the wait loop, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. A record not yet found or not yet unique, or a found record without the fields yet, is left to the final check. `delivering-task`'s queue runs this check in its own Wait loop.
-2. **Final check:** in Verify, after a `done` status, over every record of the run.
+2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, triager, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting.
 
 Outcomes:
 
@@ -101,12 +101,12 @@ Use the selected runtime's actual home/configuration directory when finding runt
 
 Every role keeps its policy in every place of the [run contract](../../child-sessions/references/run-contract.md#places):
 
-- **`inline`:** the worker is the current session. No settings are resolved, and explicit `--model`/`--effort` for it are refused before anything starts; in the orchestrators these keys set the implementer instead.
+- **`inline`** (the place `--run inline`, not the `inline` execution mode of the **inline implementer** row): the worker is the current session. No settings are resolved, and explicit `--model`/`--effort` for it are refused before anything starts; in the orchestrators these keys set the implementer instead.
 - **`window`:** unchanged: `open` passes the pair.
 - **`subagent`:** resolve by the **Native** bullet of **Resolution** and set the pair with the host's native controls, as the [native subagent reviewer](subagent-reviewers.md) steps 1 and 3 describe, for any role. A pair the place cannot select and verify is refused before launch, naming the place and the pair.
 - **`background`:** resolve by the **CLI** bullet and pass the pair as CLI flags (run contract [Launch and wait](../../child-sessions/references/run-contract.md#launch-and-wait)).
 
-The child settings check covers every opening in every place. The `Opened:` line goes into the brief before every start of a `subagent` or `background` child as before an `open` (a launch, a restart, a fresh child; continuing the same conversation is no opening), and the early check runs at the first status after each start.
+The child settings check covers every opening in every place. The `Opened:` line goes into the brief before every launch of a `subagent` or `background` child and before every fresh child, also one an answer or a restart falls back to, as before an `open`. An answer or a restart that continues the same conversation is no opening and never gets one: its turns land in the opening's record. The early check runs at the first status after each opening.
 
 - **`background`:** the record is the CLI session's transcript or rollout, selected as for a window (**Claude child**, **Codex child**) and bound by the brief path and the `Opened:` line.
 - **`subagent`:** the record is the host's runtime record named in run contract [Host mechanisms](../../child-sessions/references/run-contract.md#host-mechanisms), bound the same way. A record marked `unverified` there gives `settings unverified: <reason>`, the same question as an unavailable record.
