@@ -36,6 +36,8 @@ Spec checks, in order:
    - **Confirm.** `git -C <repo> cat-file -e HEAD:<rel>` must exit 0: the spec is tracked at the docs repository's HEAD; any other exit is a Git problem and stops, reporting it.
    - **Order.** Preflight 1's own-paths gate runs after this commit, so it catches only a change made after it, and the docs HEAD it records is the one after the commit, so Verify 2's `<recorded HEAD>..HEAD` range does not contain the root's own commit.
 
+`delivering-spec-stages/references/spec-checks.md` holds a display copy of this section from its first paragraph through spec check 3; keep them equal.
+
 ## Preflight
 
 1. Resolve applicable project rules. Run the own-paths gate on the docs repository over the spec, `<rel>`. A hit stops, naming the path. Record the full HEAD of the docs repository and the spec's SHA-256.

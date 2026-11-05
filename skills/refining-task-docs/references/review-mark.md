@@ -1,4 +1,4 @@
-Authoritative copy. `delivering-task/references/review-mark.md` holds a display copy of the format and freshness rule; keep both equal.
+Authoritative copy. `delivering-task/references/review-mark.md` and `delivering-spec-stages/references/review-mark.md` hold display copies of the format and freshness rule; keep all three equal.
 
 # Review mark
 

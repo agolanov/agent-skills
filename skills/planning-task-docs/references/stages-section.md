@@ -1,4 +1,4 @@
-Authoritative copy. `refining-task-docs/references/stages-section.md`, `splitting-spec-into-stages/references/stages-section.md` and `delivering-spec-stages/references/stages-section.md` hold display copies of the Parsing rules; keep them equal in all four.
+Authoritative copy. `refining-task-docs/references/stages-section.md`, `splitting-spec-into-stages/references/stages-section.md` and `delivering-spec-stages/references/stages-section.md` hold display copies of the Parsing rules; keep them equal in all four. `delivering-spec-stages/references/stages-parse.md` holds a display copy of the Recipes; keep both equal.
 
 # Stages section
 

@@ -1,3 +1,5 @@
+`delivering-spec-stages/references/stage-derivation.md` holds a display copy of Input 3's merged-subject search and leftovers list and of Input 5–6; keep them equal.
+
 # Queue
 
 `delivering-task` with several documents or a directory: the documents become units delivered in dependency order, independent ones in parallel in visible child sessions up to `--parallel N` (one at a time outside `window`), merged in order of readiness.
