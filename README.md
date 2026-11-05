@@ -4,28 +4,60 @@ Agent-agnostic skills for AI coding agents (Claude Code, Codex, and any agent su
 
 ## Skills
 
+### Tasks
+
+Take one task, or several, from a task text to the main branch.
+
 | Skill | Description |
 |-------|-------------|
-| `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
-| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux/terminal window from a brief and wait for its status. |
+| `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan or a staged spec with an unplanned stage, or a follow-ups file) into a superpowers spec and plan in a child session. |
+| `refining-task-docs` | Cross-review one task's spec and plan in a child session, fix the findings, and mark the documents that pass with a `Review:` line. |
 | `executing-task-docs` | Implement one task document in a child session with cross review, ending with a reviewed branch ready to merge and its follow-ups recorded. |
+| `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
+| `delivering-task-queue` | Deliver several task documents, a list or a directory, through `delivering-task`, ordered by their `**Depends on:**` headers, in parallel up to a limit. |
+
+### Staged specs
+
+Deliver a spec too large for one task stage by stage.
+
+| Skill | Description |
+|-------|-------------|
+| `splitting-spec-into-stages` | Split one large spec into stages in a child session, appending a `## Stages` section for staged planning and delivery. |
+| `delivering-spec-stages` | Take one staged spec to the main branch stage by stage: plan, review and deliver each stage in order through the existing skills. A spec without stages is split first with `splitting-spec-into-stages`. |
+
+### Follow-ups
+
+Record and settle the findings left after a delivered task.
+
+| Skill | Description |
+|-------|-------------|
 | `writing-task-follow-ups` | Create, replace or clear a task branch's section in the follow-ups file beside its task document. |
 | `triaging-task-follow-ups` | Recheck follow-ups files against the current code, fix the small findings directly in the current session, group the findings that need design into task briefs, and remove settled findings from the files. |
 | `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation: triage them, then plan, review and deliver each resulting task brief to the main branch. |
-| `delivering-task` | Execute one task document through `executing-task-docs`, then merge it into the main branch and clean up. |
-| `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan or a staged spec with an unplanned stage, or a follow-ups file) into a superpowers spec and plan in a child session. |
-| `splitting-spec-into-stages` | Split one large spec into stages in a child session, appending a `## Stages` section for staged planning and delivery. |
-| `delivering-spec-stages` | Take one staged spec to the main branch stage by stage: plan, review and deliver each stage in order through the existing skills. A spec without stages is split first with `splitting-spec-into-stages`. |
-| `refining-task-docs` | Cross-review one task's spec and plan in a child session, fix the findings, and mark the documents that pass with a `Review:` line. |
-| `delivering-task-queue` | Deliver several task documents, a list or a directory, through `delivering-task`, ordered by their `**Depends on:**` headers, in parallel up to a limit. |
+
+### Review and refinement
+
+Review committed work with a separate reviewer, with or without a fix cycle.
+
+| Skill | Description |
+|-------|-------------|
 | `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
 | `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
 | `dual-review` | Codex and Claude review in parallel; findings only one raised are cross-checked; one severity-ranked list of confirmed findings, without fixes. |
-| `refine-with-dual-review` | Run the cycle with both reviewers in every round. |
 | `refine-with-codex` | Run the cycle with a separate Codex reviewer process. |
 | `refine-with-claude` | Run the cycle with a separate Claude reviewer process. |
 | `refine-with-a-subagent` | Run the cycle with a built-in subagent of the implementing system. |
+| `refine-with-dual-review` | Run the cycle with both reviewers in every round. |
 | `auto-cross-refine` | Choose the opposite reviewer system: Codex to Claude, Claude to Codex. |
+
+### Utilities
+
+Standalone helpers: `child-sessions` also runs the child sessions of the task skills.
+
+| Skill | Description |
+|-------|-------------|
+| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux/terminal window from a brief and wait for its status. |
+| `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
 
 ## Installation
 
