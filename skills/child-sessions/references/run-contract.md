@@ -230,7 +230,7 @@ try {
   ($producerExit.ToString([Globalization.CultureInfo]::InvariantCulture) + "`n"), $utf8)
 $found = Select-String -LiteralPath (Join-Path $runDir $idSource) -Pattern $idPattern -ErrorAction Stop | Select-Object -First 1
 $recordedId = if ($found) { $found.Matches[0].Groups[1].Value } else { '' }
-if ($recordedId.Contains("`r") -or $recordedId.Contains("`n") -or $recordedId.StartsWith([string][char]0xFEFF)) { throw 'Malformed CLI session ID' }
+if ($recordedId.Contains("`r") -or $recordedId.Contains("`n") -or $recordedId.StartsWith([string][char]0xFEFF, [StringComparison]::Ordinal)) { throw 'Malformed CLI session ID' }
 [IO.File]::WriteAllText((Join-Path $runDir 'session.id'), ($recordedId + "`n"), $utf8)
 [IO.File]::WriteAllText((Join-Path $runDir 'wrapper.done.tmp'), "complete`n", $utf8)
 [IO.File]::Move((Join-Path $runDir 'wrapper.done.tmp'), (Join-Path $runDir 'wrapper.done'))
@@ -405,7 +405,7 @@ $ErrorActionPreference = 'Stop'
 $utf8 = [Text.UTF8Encoding]::new($false, $true)
 function Read-Record([string]$Name) {
   $value = $utf8.GetString([IO.File]::ReadAllBytes((Join-Path $runDir $Name)))
-  if ($value.StartsWith([string][char]0xFEFF) -or $value.Contains("`r") -or $value.Contains([string][char]0)) {
+  if ($value.StartsWith([string][char]0xFEFF, [StringComparison]::Ordinal) -or $value.Contains("`r") -or $value.Contains([string][char]0)) {
     throw ('Malformed record: ' + $Name)
   }
   return $value
