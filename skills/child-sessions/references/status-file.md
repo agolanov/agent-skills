@@ -27,7 +27,7 @@ HEAD: <full SHA>
 <command → result>
 
 ## Review
-<final refine verdict: CLEAN, or CLEAN EXCEPT DISPUTED with the disputed findings listed>
+<role-dependent result: implementer's final refine verdict, reviewer's raw verdict, or caller-defined cross-check outcome; actual progress/reason when blocked or failed>
 
 ## Out of scope
 <one line per finding: what — where (path:line) — why it is out of scope>
@@ -45,6 +45,16 @@ HEAD: <full SHA>
 Two sections are optional, otherwise omitted: `## Artifacts`, present only when the calling task asks for it, lists files the child created or changed, one absolute path per line; `## Decisions`, present when the child or its children decided anything without the user under `--auto`, lists those decisions as [auto.md](auto.md#decisions) says.
 
 Keep every field and section except the optional `## Artifacts` and `## Decisions`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
+
+## Role-dependent results
+
+An **implementer** keeps the existing final refine result in `## Review`: `CLEAN`, or `CLEAN EXCEPT DISPUTED` with the disputed findings listed.
+
+A **reviewer** uses `STATUS: done` when its review assignment finished, including when it found changes. In `## Review`, begin with the exact raw `VERDICT: CLEAN` or `VERDICT: CHANGES` line from the answer. A cross-check using a caller-defined report records that report's raw outcome and references its answer instead of inventing a loop verdict. Done describes completion of reviewing, independently of findings, result validity or verification coverage.
+
+For reviewers, BRANCH/CHECKOUT/HEAD identify the reviewed tree; `## Commits` is `None`; `## Checks` lists actual commands/results separately from inherited evidence; `## Artifacts` is required by the reviewer brief and names the absolute answer file. A blocked/failed reviewer records actual progress and its reason in the existing sections, with `## Questions` explaining a block, and invents no final verdict. Controller dialog counts belong to the controller's result/output, not a child-written claim.
+
+## Publication and reading
 
 Write the report completely before exposing a terminal first line (for example, write a temporary file beside it, then rename it to the status path). The root may read as soon as that first line appears.
 

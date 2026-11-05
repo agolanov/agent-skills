@@ -101,6 +101,10 @@ Carry these limits in state/suite/review records. A finding verdict, result vali
 
 ## Phase recovery and resume
 
+**Pending window phase:** before the Git recovery below, use the retained owner/name/launch records to confirm fresh `alive` exit exactly 1 for **every** participant whose phase has unconfirmed shutdown. Missing ownership/name records or another exit keeps caller control `blocked: reviewer shutdown unconfirmed` (system-qualified with `state.md` in dual review), including beside a diagnostic proven difference. Preserve affected attempts, clone/source mappings, diagnostics, phase baseline and spent counts. No Git recovery comparison, write adjudication, retry or new baseline proceeds while a participant may be alive. See the [window completion barrier](window-reviewers.md#stop-confirm-capture-validate) and its ownership/descendant limits. Ordinary non-window recovery is unchanged.
+
+On every continuation of that pending phase, including a resumed caller's single-reviewer round, confirm all participants stopped first, then freshly capture/compare every monitored tree against the saved before. Only this stopped-process boundary permits proven-write adjudication or normal invalid-completion/retry rules. Retain any previously proven difference and other conditions alongside final evidence. If unchanged, retain the invalid-completion outcome and charge it once under existing caller rules, preserving any spend already recorded; resume never double-charges or resets/extends budgets. A retained shell/window with `alive` exit 1 is reported independently.
+
 Keep the successful before evidence until a phase is resolved. Clone mode tracks both the reviewed clone and original checkout, naming which changed or is unavailable.
 
 - Failed **before** evidence: launch nothing and spend no attempt. Resolve the error and obtain the pending phase's baseline; do not attribute a later authorized commit to an earlier reviewer.
@@ -109,7 +113,7 @@ Keep the successful before evidence until a phase is resolved. Clone mode tracks
 - Same-HEAD resume, both `scratch` and `invalidating`, requires unchanged recorded evidence against the pre-interruption baseline before applying the answer and existing reuse/spend rules. Keep the answer unapplied while changes remain unexplained.
 - Authorized new-HEAD reconciliation requires an explicit reconciled baseline, a new target and no unexplained residual changes. Resolve an interrupted phase first; preserve old evidence and spent attempts. Refresh suite/review evidence for the new commit.
 
-A demonstrated difference returns `checkout changed` even beside errors. Preserve outputs, available unexpected content and diffs externally, identify their source and let the caller adjudicate. A read failure alone is not a write claim. Never reset or fold unexpected writes into commits automatically.
+A demonstrated difference retains `checkout changed` precedence even beside errors; pending window shutdown still blocks caller control until the lifecycle precondition above is met. Preserve outputs, available unexpected content and diffs externally, identify their source and let the caller adjudicate only after that precondition. A read failure alone is not a write claim. Never reset or fold unexpected writes into commits automatically.
 
 An interrupted legacy-helper phase keeps its original evidence method until it is resolved or explicitly reconciled by its caller; ordinary Git outputs cannot silently certify equality with a legacy capture. New phases use the ordinary Git boundary by default.
 

@@ -17,24 +17,32 @@ Targeted checks: <commands; cwd/source>
 Unavailable coverage: <None | checks/reasons>
 Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Settings evidence: <per reviewer: discovery and runtime records>
+Window identity: <not applicable (background) | persisted token path/allocation; owner entrypoint; per-attempt names/launch IDs/capabilities; clone/source mappings>
 Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (Git outputs/comparison under Phases) <or: the caller's run | no complete suite defined>
 Ledger: none <or the caller's ledger input, below>; next D: 1
-Phase: suite | review | cross-check | done | blocked: <codex|claude|codex and claude> invalid result
+Phase: suite | review | cross-check | done | blocked
+Block reason: None | <codex|claude|codex and claude> invalid result (budget exhausted) | <codex|claude|codex and claude> reviewer shutdown unconfirmed (completion recovery pending)
 Interrupted: none <or: checkout changed after <phase> (<reviewers in it> | the suite); answer pending | scratch | invalidating; resume refused: monitored content not restored, comparison <path>; retained recovery baseline <path>>
+Completion recovery: <None | affected phase/attempts; every participant's owner/name/launch and actual close/alive exits/diagnostics; pending before baseline in every tree; retained spend; saved attempt results; resume via --resume <state.md>, fresh alive 1 for all before final Git comparison/adjudication/retry; --write only for proven-write adjudication after that boundary>
 
 ## Attempts
 - codex review: spent 0 of 2
   - attempt-1: valid; <dual dir>/review/codex/attempt-1/result.md; commit <sha>
+    Dialogs: answered 3; declined 1; escalated 1
 - claude review: spent 1 of 2
-  - attempt-1: invalid: exit 1; <dual dir>/review/claude/attempt-1/result.md
+  - attempt-1: invalid: unsuccessful completion; <dual dir>/review/claude/attempt-1/result.md
+    Dialogs: answered 0; declined 0; escalated 0
   - attempt-2: valid; <dual dir>/review/claude/attempt-2/result.md; commit <sha>
+    Dialogs: answered 0; declined 0; escalated 0
 - codex cross-check: spent 0 of 2
   - attempt-1: valid; <dual dir>/cross-check/codex/attempt-1/result.md; commit <sha>
+    Dialogs: not observable: <unsupported observation capability>
 - claude cross-check: spent 0 of 2
 - voided by restart on <new sha> (spend nothing): <result.md paths with their commit>
+- completion-pending example: <system/phase/attempt>; invalid: reviewer shutdown unconfirmed <or checkout changed; otherwise invalid: reviewer shutdown unconfirmed>; <result.md>; spend <already charged once | pending existing caller rule>; Dialogs: <saved record>
 
 ## Phases
-- <suite | review | cross-check | retry>; attempts <identifiers>; tree <clone/original/checkout>: before/after <Git output/exit/diagnostic paths>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored files and untracked-file contents not covered; Git flags/normalization may hide bytes; nested repositories/submodules not recursively covered; transient restored writes not detected
+- <suite | review | cross-check | retry>; attempts <identifiers>; owned shutdown <not applicable | per-participant owner/name/launch, close/alive exits and retained-window diagnostics>; tree <clone/original/checkout>: before/after <Git output/exit/diagnostic paths; final after only once every participant is stopped>; comparison <result path and exit>; errors <None|details>; preserved diff <path>; pending recovery baseline <path|None>; ignored files and untracked-file contents not covered; Git flags/normalization may hide bytes; nested repositories/submodules not recursively covered; transient restored writes not detected
 - Reconciled new-commit baseline: <explicit caller target/authorization, Git outputs, unexplained residual changes check | None>
 ```
 
@@ -75,6 +83,15 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 
 ## Complete suite
 `<ordered commands/cwd/source>` exits <n> on <full sha>, checkout <absolute>, Git outputs/comparison <paths>, environment changes <None|details>, coverage limits <details>, run by this session <or: no complete suite defined>
+Per-attempt Suite evidence: inherited: <records | None: caller supplied no suite evidence>; independently executed: <records | None: not required in this phase | missing: commands/reasons | no complete suite defined>
+Targeted checks: <separate actual reproductions/checks with commands/results/evidence | None>
+
+## Dialogs
+- review/codex/attempt-1: answered 3; declined 1; escalated 1
+- review/claude/attempt-1 (invalid): answered 0; declined 0; escalated 0
+- review/claude/attempt-2 (retry): answered 0; declined 0; escalated 0
+- cross-check/codex/attempt-1: not observable: <unsupported observation capability>
+- Observable counters (partial): answered 3; declined 1; escalated 1; not observable: cross-check/codex/attempt-1
 
 ## Codex
 - Settings and evidence: <model/effort and runtime records; result.md paths>
@@ -86,6 +103,8 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 - Coverage: <...>
 - Checks run: <...>
 ```
+
+The dialog examples show window records; a background run instead uses `not applicable (background)` for every attempt. Retain one record per saved attempt across review, retries and cross-checks, including invalid attempts; resume deduplicates those identities. Aggregates name nonobservable attempts alongside observable totals; `declined` is a subset of `answered`, and escalations can later be answered. Keep raw verdicts as given beside the derived verdict. Direct output carries these records; a shutdown block points to `state.md` and its retained attempt records.
 
 ## Ledger input
 
