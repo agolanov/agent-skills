@@ -39,6 +39,10 @@ Status file: <absolute>
 - A skill's own brief template (planner, splitter, refiner, implementer) is a run-contract brief too: its identity block carries `Place:` and `Auto:`, and its Work stands in for `Skill:` and `Arguments:`.
 - A subagent's last message lands in the parent's context: the brief tells it to end with the status file's first line only.
 
+## Earlier runs
+
+A skill names a run's brief, status and run directories after its task (`plan-<slug>`, `loop-<slug>`), and every session of the user shares `runtime-dir`, so files of those names may belong to a run still in progress, started by this session or another, in this project or another. A live window of that name is refused, as each skill says. Before renaming the other files of those names as an earlier run's leftovers, check whether a `subagent` or `background` run may still use them: a brief whose `Place:` line names `subagent` or `background` while its status file is absent or its first line is neither `STATUS: done` nor `STATUS: failed`, or a run directory of those names without `producer.exit`. Nothing outside a window proves that such a run has ended, and renaming its files would hand its parent another run's status and session ID. Show those files and ask the user whether that run has ended: rename them only on the user's yes; otherwise stop, naming them. Under `--auto` this question reaches the user ([auto.md](auto.md#hard-to-undo)).
+
 ## Launch and wait
 
 Every place starts the child with the window's prompt:
