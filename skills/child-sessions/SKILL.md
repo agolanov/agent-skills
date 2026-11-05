@@ -1,11 +1,15 @@
 ---
 name: child-sessions
-description: Runs Claude Code or Codex in a visible terminal window (connected herdr, installed tmux, or the existing native terminal) from a brief file and waits for its status file. Use when a task must run in a separate agent session the user can watch, or when another skill needs to open, answer, or close such a session.
+description: Runs a Claude Code or Codex child session from a brief file, in a visible terminal window, a native subagent or a background CLI process, and waits for its status file. Use when work must run in a separate agent session, or when another skill needs to open, answer, continue or close one.
 ---
 
 # Child Sessions
 
 Run a child in a visible window; coordinate through a brief, terminal input, and a child-written status file. This skill controls the session lifecycle. The calling task supplies the scope and any integration authority.
+
+## Run places
+
+This file runs a child in a `window`. A child in a `subagent` or a `background` CLI process follows [run-contract.md](references/run-contract.md), which also holds the brief lines, questions, permissions and refusals the three places share. When no system is chosen, the caller passes `--agent` with its own system ([run contract](references/run-contract.md#places)); the helper's own default stays as it is.
 
 ## Locate and open
 
@@ -20,7 +24,7 @@ runtime_dir=$("$child_session" runtime-dir) || exit 2
 "$child_session" capabilities "$name"
 ```
 
-Native PowerShell examples and the literal string-array recipe are in platform-runtime.md. `checkout` and `brief` are absolute paths. Preserve literal spaces, Unicode and shell metacharacters with the native vector/recipe; never evaluate task strings. Optional `--model M` and `--effort E` retain CLI defaults when omitted; the caller chooses the agent (default Claude). The helper preserves existing default CLI flags and whitespace-only argument overrides.
+Native PowerShell examples and the literal string-array recipe are in platform-runtime.md. `checkout` and `brief` are absolute paths. Preserve literal spaces, Unicode and shell metacharacters with the native vector/recipe; never evaluate task strings. Optional `--model M` and `--effort E` retain CLI defaults when omitted; the caller chooses the agent ([Run places](#run-places)); the helper defaults to Claude. The helper preserves existing default CLI flags and whitespace-only argument overrides.
 
 An explicit compatible `CHILD_SESSION_BACKEND=herdr|tmux|terminal` wins. Otherwise prove the current connected herdr workspace/pane, then use installed tmux on POSIX, then the existing terminal's verified native interface. Finding herdr alone is insufficient; stale inherited IDs stop with diagnostics. Rediscover and match this session's identity and checkout before retrying, never substitute a focused/user pane. Herdr opens tabs by default; `--split right|down` keeps the existing alone-in-tab rule and otherwise emits the fallback note. No installation is part of this workflow.
 
