@@ -1,6 +1,6 @@
 # Splitter brief
 
-Fill this template with absolute resolved paths and write it to `<runtime>/split-<spec-stem>-brief.md`; the status is `<runtime>/split-<spec-stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Spec:`, `Stage convention:`, `Status file:`, `Base SHA:` and `Launch settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each launch (each `open` included) and each fresh child; those lines are the root's record and need no action from the child. `Place:` is the place of SKILL.md Preflight 2 and `Auto:` is `no`. Outside `window` drop the `Terminal controls:` and `Window name:` lines. Keep the one `Talking to the user` paragraph whose parenthesis names the brief's Place, and drop the parenthesis. `Stage convention:` is the absolute path of the installed `planning-task-docs/references/stages-section.md` that SKILL.md Input located. In the Work lines, `<rel>` is the spec's path relative to the docs repository and `<basename>` its file name. Replace every placeholder, including the owned status-contract path.
+Fill this template with absolute resolved paths and write it to `<runtime>/split-<spec-stem>-brief.md`; the status is `<runtime>/split-<spec-stem>-status.md`. The child has no parent conversation or loaded skills. Keep every labelled line at the start of its line, exactly as shown (label, colon, one space); tools read `Spec:`, `Stage convention:`, `Status file:`, `Base SHA:` and `Launch settings:` literally. The root appends one `Opened: <UTC time, ISO 8601 to the second>` line at the end before each launch (each `open` included) and each fresh child; those lines are the root's record and need no action from the child. `Place:` is the place of SKILL.md Preflight 2 and `Auto:` is `yes` when the run has `--auto`, else `no`; `<absolute auto.md>` is the installed child-sessions `references/auto.md`. Outside `window` drop the `Terminal controls:` and `Window name:` lines. Keep the one `Talking to the user` paragraph whose parenthesis names the brief's Place, in every place the second one when `Auto:` is `yes`, and drop the parenthesis. `Stage convention:` is the absolute path of the installed `planning-task-docs/references/stages-section.md` that SKILL.md Input located. In the Work lines, `<rel>` is the spec's path relative to the docs repository and `<basename>` its file name. Replace every placeholder, including the owned status-contract path.
 
 ```text
 Split one design spec into stages, working in this checkout.
@@ -10,7 +10,7 @@ Docs repository: <absolute top level of the docs repository; the project checkou
 Base SHA: <full docs repository HEAD>
 Agent: <claude|codex>
 Place: <window|subagent|background>
-Auto: no
+Auto: <yes|no>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: split-<spec-stem>
@@ -40,7 +40,7 @@ Boundaries: work on the current branch of the docs repository. Do not create a w
 
 Talking to the user (window): the user is beside this window: ask your questions here, and use STATUS: blocked only for what the root must resolve (a Git problem, a missing input). After writing the status file, stay in this window; the root closes it.
 
-Talking to the user (subagent, background): nobody is beside you. Ask every question by writing STATUS: blocked with the question, options and your recommendation; continue when the answer arrives. End every turn by writing the status file, with its exact first line as your last message and nothing after it.
+Talking to the user (subagent, background, or Auto yes): nobody answers you directly. Ask every question by writing STATUS: blocked with the question, options and your recommendation; continue when the answer arrives. End every turn by writing the status file, with its exact first line as your last message and nothing after it. When Auto is yes, also read <absolute auto.md> and follow it as a child, and list every answer you gave without the user under ## Decisions in the status.
 
 Record each out-of-scope finding as: what — where (path:line) — why it is out of scope.
 

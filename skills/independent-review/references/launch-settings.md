@@ -93,6 +93,8 @@ Outcomes:
 - **Unavailable** (no record, ambiguous records, or the fields are absent): the same question as a mismatch, stating `settings unverified: <reason>`.
 - **Opt-out field:** nothing to compare; the report states the observed value or `unavailable`, with no question.
 
+Under `--auto` the early check's question and the mismatch or unavailable question are routed by child-sessions' [auto.md](../../child-sessions/references/auto.md#deciding), which hands accepting a mismatch to the deciding session; an acceptance there is recorded as accepted by that session, under its `## Decisions`.
+
 ## Native filesystem paths
 
 Use the selected runtime's actual home/configuration directory when finding runtime records. On PowerShell, read `$env:CLAUDE_CONFIG_DIR`/`$env:CODEX_HOME` or join `$HOME` with `.claude`/`.codex`, using `Join-Path` and `Get-ChildItem -LiteralPath`; POSIX notation above describes the same locations, not a Bash prerequisite. Preserve full caller configuration. A fake process or requested flag proves transport only; it never proves effective model/effort. Missing runtime fields keep the existing unverified-settings outcome.

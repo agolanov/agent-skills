@@ -26,14 +26,14 @@ Header: `# list`, or for a directory `# directory <absolute dir>`; then one `# d
 - `blocked: <question>`: the child asked; the root is answering.
 - `done awaiting merge`: verified `done`, waiting for its finish half; with `--no-merge` that finish half merges nothing and ends `done: branch ready`.
 - `rebasing`: returned to the child after main moved; the hold is set.
-- `merge held: <paths>`: `delivering-task` Merge stopped on the main checkout's uncommitted changes; the root asks the user to retry or stop; window, worktree, branch and status file are kept.
+- `merge held: <paths>`: `delivering-task` Merge stopped on the main checkout's uncommitted changes; the root asks the user to retry or stop ([queue](queue.md) Finish half 7, which says how `--auto` answers); window, worktree, branch and status file are kept.
 - `delivered <sha7>`: merged, `<sha7>` the merge commit.
 - `done: branch ready`: with `--no-merge`, verified and its End done; its window closed, its worktree, branch and status file kept.
 - `failed: <reason>`: a stop, a `failed` status or a merge conflict; worktree, branch and status file are kept.
-- `stopped by the user`.
+- `stopped by the user`: the user stopped the unit, or under `--auto` the session that answered for them, as its `## Decisions` line records.
 - `not started: depends on failed <unit>`, `not started: depends on stopped <unit>`: a dependency, directly or transitively, failed or was stopped.
 - `not started: depends on unmerged <unit>`: with `--no-merge`, the unit depends on `<unit>`, a unit of the run that this run never merges ([queue](queue.md) Input 3, No merge hold).
-- `not started: depends on missing <entry>`: the user chose to skip the unit over a `**Depends on:**` entry that is neither in the run nor merged on main (Input 4); its dependents get the same state.
+- `not started: depends on missing <entry>`: the user (under `--auto`, the session that answered for them) chose to skip the unit over a `**Depends on:**` entry that is neither in the run nor merged on main (Input 4); its dependents get the same state.
 
 On a rerun with an identical header, `delivered <sha7>` units are done and every other state is a candidate again, its dependencies re-evaluated (Input 2).
 

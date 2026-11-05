@@ -35,7 +35,7 @@ Status file: <absolute>
 ```
 
 - A thin launcher consumes `--run` and the keys that set the worker it launches (`--model`, `--effort`) and writes every other key into `Arguments:`. In the orchestrators `--model` and `--effort` set the implementer, so they stay in `Arguments:`.
-- The child reads `Skill:` completely and performs that skill `inline` in its own session with `Arguments:`, adding `--auto` when `Auto: yes` (the parent writes `yes` when its own run has `--auto`). `Authority:` bounds what it writes, commits and decides. It writes the status file by [status-file.md](status-file.md).
+- The child reads `Skill:` completely and performs that skill `inline` in its own session with `Arguments:`, adding `--auto` when `Auto: yes` (the parent writes `yes` when its own run has `--auto`), and then follows [auto.md](auto.md) as a child; with `Auto: no` it asks as the skill says. `Authority:` bounds what it writes, commits and decides. It writes the status file by [status-file.md](status-file.md).
 - A skill's own brief template (planner, splitter, refiner, implementer) is a run-contract brief too: its identity block carries `Place:` and `Auto:`, and its Work stands in for `Skill:` and `Arguments:`.
 - A subagent's last message lands in the parent's context: the brief tells it to end with the status file's first line only.
 
@@ -137,8 +137,9 @@ Set-Content -LiteralPath (Join-Path $runDir 'session.id') -Value $(if ($found) {
 
 ## Questions and continuation
 
-- A `subagent` or `background` child asks nobody directly: a question ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. In a `window` an interactive skill (brainstorming) may still ask the user in the window; any other question takes the same status.
+- A `subagent` or `background` child asks nobody directly: a question ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. In a `window` an interactive skill (brainstorming) may still ask the user in the window, except under `--auto`; any other question takes the same status.
 - Without `--auto`, the parent answers within its authority or asks the user, showing the question, options and recommendation as written.
+- Under `--auto`, [auto.md](auto.md) governs both sides: the child asks nobody, in a window either, and the parent routes the question by its [Deciding](auto.md#deciding) and records an answer given without the user under `## Decisions`.
 - Before continuing, archive the status: rename it to `<file>-blocked-<n>` with an unused number, as for a window ([status-file.md](status-file.md)); the child writes a fresh status at the original path.
 - Continue **the same child conversation** by the host mechanism of [Host mechanisms](#host-mechanisms), the answer as one message (multiline content in a file, the message naming its absolute path), then wait as at launch:
   - `subagent`: the host's message tool to the same agent;
@@ -189,6 +190,6 @@ Refused before anything starts, naming the combination:
 An orchestrator (`delivering-spec-stages`, `delivering-task-follow-ups`) runs each nested skill as a nested call in a `subagent`:
 
 - **Brief:** the identity lines with `Skill:` the nested skill's absolute SKILL.md, `Arguments:` its arguments, `Checkout:`, `Authority:`, `Place: subagent`, `Auto:` and `Status file:`, and the instruction: "Run the skill completely, its windows included, and write its Report under a status section `## Report`, after the status contract's sections."
-- **Run:** the subagent reads and runs the nested skill completely, its child-sessions windows included, and returns its status. The orchestrator reads the first line and `## Report`; a `blocked` call continues by [Questions and continuation](#questions-and-continuation), the same subagent first.
+- **Run:** the subagent reads and runs the nested skill completely, its child-sessions windows included, and returns its status. The orchestrator reads the first line and `## Report`, and under `--auto` the status's `## Decisions`, which it carries into its own report; a `blocked` call continues by [Questions and continuation](#questions-and-continuation), the same subagent first.
 - **Settings:** the host's default, the orchestrator session's model, neither set nor verified (launch-settings [Nested agents](../../independent-review/references/launch-settings.md#nested-agents)); the nested skill's own workers take their roles as usual.
 - **Host that cannot hold the call:** when the host has no subagents, or its subagents cannot run child-sessions' foreground wait loop ([Host mechanisms](#host-mechanisms), or a nested subagent's status saying so), the orchestrator runs that call `inline` and reports why.

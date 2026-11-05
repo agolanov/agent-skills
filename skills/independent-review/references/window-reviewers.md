@@ -6,7 +6,7 @@ A window reviewer is an interactive Codex or Claude session in a visible window,
 
 1. Locate the installed `child-sessions` SKILL.md and read it with its references `platform-runtime.md`, `brief-writing.md` and `status-file.md`; resolve and retain its entrypoint as they say. An unavailable `child-sessions` or window backend is a capability blocker: report it, keeping the place and settings.
 2. Name the window `review-<codex|claude>-<run token>-<attempt dir basename>`, with the reviewer's system. The run token is the basename of the directory that holds this run's attempt directories: the `<dual dir>` under `--dual`, the caller's round directory for a loop caller, otherwise the direct-use run directory, one fresh directory (for example from `mktemp -d`) that holds the direct-use attempt directories. Remove from both basenames every character outside `[A-Za-z0-9_-]`, child-sessions' name pattern.
-3. Write the brief to `<attempt dir>/brief.md`: the filled review prompt, followed by these lines with absolute paths. The attempt directory takes the place of child-sessions' `runtime-dir` for the brief and the status file.
+3. Write the brief to `<attempt dir>/brief.md`: the filled review prompt, its `Auto:` line included, followed by these lines with absolute paths. The attempt directory takes the place of child-sessions' `runtime-dir` for the brief and the status file.
 
    ```text
    Answer file: <attempt dir>/answer.md
@@ -37,7 +37,7 @@ A window reviewer is an interactive Codex or Claude session in a visible window,
 
 6. Wait with child-sessions' foreground wait loop, its Startup watch included; its single reopen after a silent exit is this step 5's `open`, override and `Opened:` line included. When a caller opens two windows at once (the dual review), wait on them in turn, one bounded `wait` per window per turn, until both have a status.
 7. Dialogs follow child-sessions **Dialogs**. For that rule the attempt directory is the reviewer's recorded runtime directory, where it writes its answer, status and scratch; a write inside the reviewed tree (in clone mode, also inside the user's checkout) is outside the reviewer's authority.
-8. A `STATUS: blocked` goes to the caller as a question (in direct use, the user); its answer returns through child-sessions' `blocked` row. A `STATUS: failed`, or a second silent exit, ends the wait as an unsuccessful completion.
+8. A `STATUS: blocked` goes to the caller as a question (in direct use, the user; under `--auto` the caller routes it by [auto.md](../../child-sessions/references/auto.md#deciding)); its answer returns through child-sessions' `blocked` row. A `STATUS: failed`, or a second silent exit, ends the wait as an unsuccessful completion.
 
 ## Validate and close
 

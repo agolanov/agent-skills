@@ -47,8 +47,35 @@ Standalone helpers: `child-sessions` also runs the child sessions of the task sk
 
 | Skill | Description |
 |-------|-------------|
-| `child-sessions` | Run Claude Code or Codex in a visible herdr/tmux/terminal window from a brief and wait for its status. |
+| `child-sessions` | Run Claude Code or Codex from a brief in a visible herdr/tmux/terminal window, a native subagent or a background CLI process, and wait for its status; holds the run contract and the `--auto` rules the other skills share. |
 | `consolidating-plans` | Consolidate over-atomized implementation plans into larger dispatch units for subagent execution. |
+
+## Run places and autonomous mode
+
+Every skill takes `--run <place>`, which says where its worker runs:
+
+| Place | Where |
+|-------|-------|
+| `inline` | the current session does the work itself |
+| `subagent` | a native subagent of the current session's host, always of the same system |
+| `background` | a separate non-interactive `claude` or `codex` CLI process, not visible |
+| `window` | a visible interactive session through `child-sessions` (herdr, else tmux, else the native terminal) |
+
+Each skill picks its default: a window where the worker talks to the user or works long, otherwise no window.
+
+| Skill | `--run` places | Default |
+|-------|----------------|---------|
+| `planning-task-docs`, `splitting-spec-into-stages` | the planner, the splitter | `window`, also under `--auto` |
+| `refining-task-docs` | the refiner, which owns the review loop and fixes | `window` |
+| `delivering-task` | the implementer of each task | `window`; in another place several tasks run one at a time |
+| `review-fix-loop` | the loop owner, which fixes | `inline` |
+| `independent-review` | the reviewer | `background`; `inline` is refused |
+| `triaging-task-follow-ups`, `consolidating-plans` | the skill itself | `inline` |
+| `delivering-spec-stages`, `delivering-task-follow-ups` | the orchestrator itself | `inline`, its nested skills in subagents |
+
+A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
+
+`--auto`, given to the first session, runs the whole chain without the user: every child sends its questions to its parent, a parent answers what its own task, its documents or the skill's recommended option settle, and the rest goes up to the first session, which decides. The user is asked only when the first session is unsure what to build, or when an action is hard to undo (deleting unmerged work, discarding uncommitted changes, pushing). The final report lists every decision taken without the user. The rules are in [auto.md](skills/child-sessions/references/auto.md).
 
 ## Installation
 
