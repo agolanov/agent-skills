@@ -31,7 +31,7 @@ A window reviewer is an interactive Codex or Claude session in a visible window,
    "$child_session" capabilities "$name"
    ```
 
-   On native PowerShell, set the variable to one space for the dispatch call and remove it afterwards: Windows PowerShell 5.1 deletes a variable assigned an empty string (pwsh 7.6.9 keeps it), which would bring back the writing defaults, and the helper reads a whitespace-only value as no arguments.
+   On native PowerShell, first save whether the variable exists and its value, set it to one space for the dispatch call, and restore it in a `finally` block: put the saved value back, and remove the variable only when it did not exist before. Windows PowerShell 5.1 deletes a variable assigned an empty string (pwsh 7.6.9 keeps it), which would bring back the writing defaults, and the helper reads a whitespace-only value as no arguments; removing a value the caller had set would give its later workers in the same process the writing defaults instead of its own arguments.
 
 ## Wait
 

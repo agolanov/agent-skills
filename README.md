@@ -75,7 +75,7 @@ Each skill picks its default: a window where the worker talks to the user or wor
 
 A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
 
-`--auto`, given to the first session, runs the whole chain without the user: every child sends its questions to its parent, a parent answers what its own task, its documents or the skill's recommended option settle, and the rest goes up to the first session, which decides. The user is asked only when the first session is unsure what to build, or when an action is hard to undo (deleting unmerged work, discarding uncommitted changes, pushing). The final report lists every decision taken without the user. The rules are in [auto.md](skills/child-sessions/references/auto.md).
+`--auto`, given to the first session, runs the whole chain without the user: every child sends its questions to its parent, a parent answers what its own task, its documents or the skill's recommended option settle, and the rest goes up to the first session, which decides. The user is asked only when the first session is unsure what to build, or when an action is hard to undo (deleting unmerged work, discarding uncommitted changes or untracked or ignored files, pushing). The final report lists every decision taken without the user. The rules are in [auto.md](skills/child-sessions/references/auto.md).
 
 ## Installation
 

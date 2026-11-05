@@ -33,7 +33,7 @@ An answer chooses among the options the skill offers and adds none: no push, no 
 
 ## Hard to undo
 
-An action is hard to undo when it destroys work or state Git cannot restore from the repository's own history (deleting a branch or worktree with unmerged commits, discarding uncommitted changes or untracked files, removing files outside the task's own paths), or when it leaves the machine (push, publish). A question with such an action among its options always reaches the user, even with a recommended option and even when the recommendation is another option: each child passes it up by step 2, and the first session asks.
+An action is hard to undo when it destroys work or state Git cannot restore from the repository's own history (deleting a branch or worktree with unmerged commits, discarding uncommitted changes, untracked files or ignored files, removing files outside the task's own paths), or when it leaves the machine (push, publish). A question with such an action among its options always reaches the user, even with a recommended option and even when the recommendation is another option: each child passes it up by step 2, and the first session asks.
 
 ## Decisions
 
