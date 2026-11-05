@@ -36,7 +36,7 @@ A window reviewer is an interactive Codex or Claude session in a visible window,
 ## Wait
 
 6. Wait with child-sessions' foreground wait loop, its Startup watch included; its single reopen after a silent exit is this step 5's `open`, override and `Opened:` line included. When a caller opens two windows at once (the dual review), wait on them in turn, one bounded `wait` per window per turn, until both have a status.
-7. Dialogs follow child-sessions **Dialogs**. For that rule the attempt directory is the reviewer's recorded runtime directory, where it writes its answer, status and scratch; a write inside the reviewed tree (in clone mode, also inside the user's checkout) is outside the reviewer's authority.
+7. Dialogs follow child-sessions [Dialogs](../../child-sessions/SKILL.md#dialogs), including its separate user decision for new folder trust, also under `--auto`. Record the pending or answered trust decision, exact folder and known persistent effect under launch coverage/limitations. For that rule the attempt directory is the reviewer's recorded runtime directory, where it writes its answer, status and scratch; a write inside the reviewed tree (in clone mode, also inside the user's checkout) is outside the reviewer's authority.
 8. A `STATUS: blocked` goes to the caller as a question (in direct use, the user; under `--auto` the caller routes it by [auto.md](../../child-sessions/references/auto.md#deciding)); its answer returns through child-sessions' `blocked` row. A `STATUS: failed`, or a second silent exit, ends the wait as an unsuccessful completion.
 
 ## Validate and close
