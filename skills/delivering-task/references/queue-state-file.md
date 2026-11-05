@@ -32,7 +32,7 @@ Header: `# list`, or for a directory `# directory <absolute dir>`; then one `# d
 - `failed: <reason>`: a stop, a `failed` status or a merge conflict; worktree, branch and status file are kept.
 - `stopped by the user`.
 - `not started: depends on failed <unit>`, `not started: depends on stopped <unit>`: a dependency, directly or transitively, failed or was stopped.
-- `not started: depends on unmerged <unit>`: with `--no-merge`, the unit depends on `<unit>`, a unit of the run that this run never merges ([queue](queue.md) Input 1, No merge).
+- `not started: depends on unmerged <unit>`: with `--no-merge`, the unit depends on `<unit>`, a unit of the run that this run never merges ([queue](queue.md) Input 3, No merge hold).
 - `not started: depends on missing <entry>`: the user chose to skip the unit over a `**Depends on:**` entry that is neither in the run nor merged on main (Input 4); its dependents get the same state.
 
 On a rerun with an identical header, `delivered <sha7>` units are done and every other state is a candidate again, its dependencies re-evaluated (Input 2).
