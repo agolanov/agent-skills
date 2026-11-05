@@ -64,7 +64,7 @@ Install a single skill:
 npx skills add agolanov/agent-skills --skill consolidating-plans
 ```
 
-After upgrading, remove installed skill directories that this table no longer lists.
+After upgrading, remove installed skill directories that the Skills tables above no longer list.
 
 The review skills share dependencies, and a window reviewer runs through `child-sessions`. Install them together:
 

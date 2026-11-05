@@ -24,7 +24,7 @@ Header: `# list`, or for a directory `# directory <absolute dir>`; then one `# d
 - `ready`: not started in this run.
 - `running`: its start half ran; the child is working.
 - `blocked: <question>`: the child asked; the root is answering.
-- `done awaiting merge`: verified `done`, waiting for its finish half.
+- `done awaiting merge`: verified `done`, waiting for its finish half; with `--no-merge` that finish half merges nothing and ends `done: branch ready`.
 - `rebasing`: returned to the child after main moved; the hold is set.
 - `merge held: <paths>`: `delivering-task` Merge stopped on the main checkout's uncommitted changes; the root asks the user to retry or stop; window, worktree, branch and status file are kept.
 - `delivered <sha7>`: merged, `<sha7>` the merge commit.
