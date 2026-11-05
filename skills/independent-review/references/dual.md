@@ -1,6 +1,6 @@
 # Dual Review
 
-Codex CLI and Claude CLI review one recorded commit target in parallel; a finding only one of them raised goes to the other for a cross-check; the confirmed findings come back as one severity-ranked report with a derived verdict. The pair is always these two CLI reviewers, in separate processes, whatever system runs the dual review; both run every review. The dual review changes nothing in the checkout, commits nothing, and returns one of: `<dual dir>/report.md`, `checkout changed: <state.md>`, `blocked: <codex|claude|codex and claude> invalid result`.
+Codex CLI and Claude CLI review one recorded commit target in parallel; a finding only one of them raised goes to the other for a cross-check; the confirmed findings come back as one severity-ranked report with a derived verdict. The pair is always Codex and Claude, in separate CLI processes in the assigned background or window place, whatever system runs the dual review; both run every review. The dual review changes nothing in the checkout, commits nothing, and returns one of: `<dual dir>/report.md`, `checkout changed: <state.md>`, `blocked: <codex|claude|codex and claude> invalid result`.
 
 A caller (`review-fix-loop` with the `dual` assignment) supplies the absolute checkout, branch, fixed base, reviewed commit, target row and review order, requirements/rules/checks, both reviewers' settings, its round directory as `<dual dir>`, its complete-suite run, and the ledger input of step 4. Direct use resolves them in step 1.
 

@@ -68,7 +68,7 @@ The reviewer path keeps its `Assignment:` and `Settings evidence:` records in in
 
 The root verifies the effective model and effort of every child it launches for a role other than the reviewer (whose evidence independent-review **Validate** judges), in every place but `inline` ([Places](#places)), from the child's runtime records, never from invocation flags or the child's self-report.
 
-**Binding a record to an opening.** Brief paths repeat across runs, so the brief path alone does not identify a session. Immediately before every `open` of the run (first open, silent-exit reopen, dead-agent reopen, main-moved reopen, `--resume`), the root appends to the runtime brief one line:
+**Binding a record to an opening.** Brief paths repeat across runs, so the brief path alone does not identify a session. Immediately before every `open` of the run (first open, silent-exit reopen, dead-agent reopen, main-moved reopen, or a window opened by `delivering-task --resume`), the root appends to the runtime brief one line:
 
 ```text
 Opened: <UTC time, ISO 8601 to the second>

@@ -1,6 +1,6 @@
 ---
 name: independent-review
-description: Runs one validated review of committed work by a reviewer of the other system, or by Codex and Claude together with a cross-check under `--dual`, in the background, a native subagent or a visible window, without changing the checkout. Use when the user wants a one-off or two-model review, or when another skill needs one validated review.
+description: Runs one validated review of committed work by an independent reviewer, or by Codex and Claude together with a cross-check under `--dual`, in the background, a native subagent or a visible window, without changing the checkout. Use when the user wants a one-off or two-model review, or when another skill needs one validated review.
 ---
 
 # Independent Review
