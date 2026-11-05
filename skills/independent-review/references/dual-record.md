@@ -15,7 +15,7 @@ Requirements/rules/checks: <links or concise text>
 Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
 Targeted checks: <commands; cwd/source>
 Unavailable coverage: <None | checks/reasons>
-Assignment: codex cli, model <exact>, effort <exact>; claude cli, model <exact>, effort <exact>
+Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Settings evidence: <per reviewer: discovery and runtime records>
 Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (Git outputs/comparison under Phases) <or: the caller's run | no complete suite defined>
 Ledger: none <or the caller's ledger input, below>; next D: 1
@@ -89,7 +89,7 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 
 ## Ledger input
 
-A caller such as `review-fix-loop` passes its full finding ledger and `Next D` (dual-review step 4); direct use has none.
+A caller such as `review-fix-loop` passes its full finding ledger and `Next D` ([dual review](dual.md#4-matching) step 4); direct use has none.
 
 ```markdown
 Next D: 3

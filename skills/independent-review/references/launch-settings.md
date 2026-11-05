@@ -13,7 +13,7 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
 | implementer | `executing-task-docs` child in `subagents` or `direct` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Opus | latest available Sol | xhigh |
 | inline implementer | `executing-task-docs` child in `inline` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `executing-task-docs` Execution mode |
-| reviewer | `independent-review` CLI and native reviewer; both `dual-review` reviewers in the review and the cross-check phases | latest available Opus | latest available Sol | high |
+| reviewer | `independent-review` reviewer in every place; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 
 The root chooses between the two implementer roles by the execution mode it decides in `executing-task-docs`; the planner, splitter, refiner and reviewer roles are unchanged.
 
