@@ -1,4 +1,4 @@
-Display copy. `refining-task-docs/references/review-mark.md` is the authoritative copy and holds the marking procedure; keep the format and freshness rule equal in both.
+Display copy. `refining-task-docs/references/review-mark.md` is the authoritative copy and holds the marking procedure, and `delivering-spec-stages/references/review-mark.md` is another display copy; keep the format and freshness rule equal in all three.
 
 # Review mark
 
