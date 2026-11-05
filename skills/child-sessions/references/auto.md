@@ -1,6 +1,6 @@
 # Autonomous mode
 
-`--auto` lets a chain of skills reach its result without the user. Every skill accepts it. Under it, a question a skill would put to the user is **routed** by [Deciding](#deciding) instead, and the user is asked only when the first session is unsure what to build or an option is [hard to undo](#hard-to-undo). Without `--auto` nothing here applies: each skill asks the user as it says.
+`--auto` lets a chain of skills reach its result without the user. Every skill accepts it. Under it, a question a skill would put to the user is **routed** by [Deciding](#deciding) instead, and the user is asked when the first session is unsure what to build, an option is [hard to undo](#hard-to-undo), or a new folder-trust decision is needed below. Without `--auto` nothing here applies: each skill asks the user as it says.
 
 ## Passing
 
@@ -10,10 +10,10 @@
 
 ## Questions
 
-- A child under `--auto` asks nobody directly, in a window too: every question it cannot settle by [Deciding](#deciding) step 1, those of the skills it runs included, ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. Windows still open where a skill opens them, for watching; nobody needs to answer in them.
+- A child under `--auto` asks nobody directly, in a window too: every question it cannot settle by [Deciding](#deciding) step 1, those of the skills it runs included, ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. Windows still open where a skill opens them, for watching; new folder trust follows the separate user boundary below.
 - A question that reaches a session is routed by [Deciding](#deciding): a child's `blocked` status, a question the session's own skill would ask the user, or a question a window child shows on screen.
 - A window whose launch has no `send` cannot receive an answer. The parent still decides it by Deciding and records it, then delivers it as child-sessions' `blocked` row does without `send` ([SKILL.md](../SKILL.md#foreground-wait-loop)): it shows the user that given answer, word for word, to type into the window. The user is asked to type it, never to decide it, and the report names this as the window backend's limitation.
-- Permission and folder-trust dialogs in a window follow child-sessions [Dialogs](../SKILL.md#dialogs) unchanged: the root approves what lies in scope; everything else is declined and reported, or left to the user unanswered.
+- Permission dialogs retain child-sessions [Dialogs](../SKILL.md#dialogs) bounds. A **new folder-trust decision always reaches the user**, even under `--auto`; neither the child nor the root supplies that consent. Leave the dialog unanswered and report its exact folder and known persistent effect. A fresh worktree or reviewer clone can pause an auto chain for this separate decision; keep the selected place and consent boundary. Existing trust requires no new decision.
 
 ## Deciding
 
