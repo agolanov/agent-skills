@@ -8,7 +8,7 @@ Last line of a reviewed spec or plan, exact shape:
 Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex>, commit <full SHA>
 ```
 
-`commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the opposite system that performed the review. `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `auto-cross-refine` ends `clean` or `clean except disputed`, never by the root.
+`commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the system that performed the review, taken from the review loop's `Assignment:` (the opposite system by default, the child's own system under `--reviewer-run subagent`). `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `review-fix-loop` ends `clean` or `clean except disputed`, never by the root.
 
 ## Freshness
 
@@ -130,5 +130,5 @@ Performed by the child for every document it reviewed or changed, after the revi
 1. Delete every line matching `^Review: (clean|clean except disputed), ` anywhere in the document (a stale mark may have been displaced by later edits).
 2. For `clean except disputed`, keep the disputed findings and both positions in the document.
 3. Make sure the file ends with a newline (else the mark joins its last line), then commit the content when anything changed: `git --literal-pathspecs add -- '<file>'`, then `git --literal-pathspecs commit -m 'docs: <basename>' -- '<file>'`; the pathspec keeps other staged changes out of the commit, and --literal-pathspecs keeps Git from reading a file name such as `:(glob)…` as pathspec magic. Each value a listed command takes (path, file, directory, message, branch) is one literal shell argument, quoted by whoever runs the command for the shell it runs in: in a POSIX shell inside single quotes, a single quote in the value written `'\''`; in PowerShell inside single quotes, a single quote doubled; so that `(`, spaces, `$` and quotes reach Git unchanged. `<sha>` = full `git rev-parse HEAD`.
-4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <opposite system>, commit <sha>` as the last line; commit it the same way: `git --literal-pathspecs add -- '<file>'`, then `git --literal-pathspecs commit -m 'mark: <basename>' -- '<file>'`.
+4. Append exactly one line `Review: <clean|clean except disputed>, <today>, reviewer <the system that performed the review, from the loop's Assignment:>, commit <sha>` as the last line; commit it the same way: `git --literal-pathspecs add -- '<file>'`, then `git --literal-pathspecs commit -m 'mark: <basename>' -- '<file>'`.
 5. Run the freshness check; it must pass. A document changed after marking is reviewed and marked again.

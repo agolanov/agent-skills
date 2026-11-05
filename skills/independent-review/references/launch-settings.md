@@ -58,7 +58,7 @@ Refiner and implementer briefs also record the settings of the reviewer their cr
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 ```
 
-The child passes the explicit reviewer values to `auto-cross-refine` as explicit model/effort; with `reviewer policy` it passes none. Before opening, the root checks that an explicit reviewer model belongs to the reviewer system (the system opposite to the child's agent) and that the pair is supported; a mismatch stops before any window.
+The child passes the explicit reviewer values to `review-fix-loop` as `--reviewer-model`/`--reviewer-effort`; with `reviewer policy` it passes none. Before opening, the root checks that an explicit reviewer model belongs to the reviewer system the brief's `Reviewer run:` place resolves (the child's own system for `subagent`, otherwise the system opposite to the child's agent) and that the pair is supported; a mismatch stops before any window.
 
 The reviewer path keeps its `Assignment:` and `Settings evidence:` records in independent-review **Result**.
 

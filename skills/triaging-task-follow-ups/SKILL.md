@@ -5,9 +5,9 @@ description: Rechecks the findings of follow-ups files against the current code,
 
 # Triaging Task Follow-ups
 
-`triaging-task-follow-ups <follow-ups file|directory>... [--review]`
+`triaging-task-follow-ups <follow-ups file|directory>... [--review] [--reviewer-run background|subagent|window] [--reviewer-model M] [--reviewer-effort E]`
 
-The current session does the work itself, on the current branch of the current checkout: it opens no window, creates no worktree or branch and writes no spec or plan. Every finding ends with one outcome: **fix** (fixed here), **drop** (removed with no change), **brief** (moved into a task brief for `planning-task-docs`) or **keep** (left in its file). The user selects the outcomes and decides whether the result is committed.
+The current session does the work itself, on the current branch of the current checkout: it opens no window (only a `--reviewer-run window` reviewer of **Review** does), creates no worktree or branch and writes no spec or plan. Every finding ends with one outcome: **fix** (fixed here), **drop** (removed with no change), **brief** (moved into a task brief for `planning-task-docs`) or **keep** (left in its file). The user selects the outcomes and decides whether the result is committed.
 
 ## Input
 
@@ -58,7 +58,7 @@ In each follow-ups file, delete the lines of the fixed, dropped and briefed find
 
 ## Review
 
-Only with `--review`, and only after a commit; without a commit report `review skipped: nothing committed`. Identify your own system (Codex or Claude) from session identity, as `auto-cross-refine` does, and perform the installed `independent-review --reviewer <the opposite system> <commit sha>`, naming the fixed findings' lines as the requirements. Show its verdict and findings as given, not adjudicated, with the `result.md` path. Fix nothing on your own: the user decides what happens next.
+Only with `--review`, and only after a commit; without a commit report `review skipped: nothing committed`. `--reviewer-run`, `--reviewer-model` and `--reviewer-effort` set this reviewer and mean nothing without `--review`. Perform the installed `independent-review [--run <--reviewer-run>] [--model <--reviewer-model>] [--effort <--reviewer-effort>] <commit sha>`, passing only the keys given, with no system key: independent-review chooses the reviewer system by its default. Name the fixed findings' lines as the requirements. Show its verdict and findings as given, not adjudicated, with the `result.md` path. Fix nothing on your own: the user decides what happens next.
 
 ## Report
 

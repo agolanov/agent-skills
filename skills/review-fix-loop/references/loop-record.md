@@ -2,7 +2,7 @@
 
 Reuse an existing task log outside the checkout when possible. This is a short Markdown example, not a parser format. Fill it with inspected facts; do not copy illustrative status/evidence as a result.
 
-With the `dual` assignment, findings carry dual-review's merged IDs `D<n>` with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to dual-review as its ledger input; a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
+With the `dual` assignment, findings carry the merged IDs `D<n>` of the [dual review](../../independent-review/references/dual.md) with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to the dual review as its [ledger input](../../independent-review/references/dual.md#4-matching); a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
 
 ```markdown
 # Review Fix Loop record
@@ -16,8 +16,8 @@ Resolved complete suite: <ordered exact commands; cwd/source | no complete suite
 Targeted checks: <commands; cwd/source>
 Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
-Assignment: <cli|subagent>/<codex|claude>, model <exact>, effort <exact>
-<or> Assignment: dual: codex <model>/<effort>; claude <model>/<effort>
+Assignment: <background|subagent|window>/<codex|claude>, model <exact>, effort <exact>
+<or> Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
 Round limit: 5 <or explicit user limit>
 Completed rounds: 0
@@ -29,7 +29,7 @@ Next D: <dual: next free D<n>, starting at 1>
 Target: <range|fix commit|dispositions only>
 Reviewed commit: <HEAD>
 Previous verdict: <none or verdict>
-Result validity/completion: <exit or native completion; metadata; monitored-state evidence; omissions; dual: the dual-review return>
+Result validity/completion: <exit or native completion; metadata; monitored-state evidence; omissions; dual: the dual review's return>
 Dual record: <dual dir>; raw verdicts codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
 Verdict: <CLEAN|CHANGES; dual: the report's derived verdict>
 Findings/decisions:

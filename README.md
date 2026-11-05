@@ -41,14 +41,8 @@ Review committed work with a separate reviewer, with or without a fix cycle.
 
 | Skill | Description |
 |-------|-------------|
-| `review-fix-loop` | Shared review/fix protocol; requires an assigned reviewer. |
-| `independent-review` | One validated review by a separate Codex or Claude reviewer, without fixes. |
-| `dual-review` | Codex and Claude review in parallel; findings only one raised are cross-checked; one severity-ranked list of confirmed findings, without fixes. |
-| `refine-with-codex` | Run the cycle with a separate Codex reviewer process. |
-| `refine-with-claude` | Run the cycle with a separate Claude reviewer process. |
-| `refine-with-a-subagent` | Run the cycle with a built-in subagent of the implementing system. |
-| `refine-with-dual-review` | Run the cycle with both reviewers in every round. |
-| `auto-cross-refine` | Choose the opposite reviewer system: Codex to Claude, Claude to Codex. |
+| `review-fix-loop` | Review committed work and fix the findings until clean, in the session that did the work. The reviewer is the other system by default, or Codex, Claude or both (`--codex`, `--claude`, `--dual`), in the background, a native subagent or a window (`--reviewer-run`). |
+| `independent-review` | One validated review by a separate reviewer, without fixes. With `--dual`, Codex and Claude review in parallel, cross-check the findings only one raised, and return one severity-ranked list of confirmed findings. |
 
 ### Utilities
 
@@ -75,13 +69,11 @@ npx skills add agolanov/agent-skills --skill consolidating-plans
 
 After upgrading, uninstall old installed copies of `deliver-task`, `prepare-tasks`, `deliver-queue`, `reviewing-task-docs` and `resolving-task-follow-ups`: `delivering-task` replaces `deliver-task`, `planning-task-docs` with `refining-task-docs` replace `prepare-tasks`, `delivering-task-queue` replaces `deliver-queue`, `refining-task-docs` replaces `reviewing-task-docs`, and `triaging-task-follow-ups` replaces `resolving-task-follow-ups`.
 
-The refinement skills share dependencies. Install the complete bundle together:
+The review skills share dependencies, and a window reviewer runs through `child-sessions`. Install them together:
 
 ```sh
 npx skills add agolanov/agent-skills --skill \
-  review-fix-loop independent-review dual-review refine-with-codex \
-  refine-with-claude refine-with-a-subagent refine-with-dual-review \
-  auto-cross-refine
+  review-fix-loop independent-review child-sessions
 ```
 
 ## Runtime support
@@ -97,20 +89,19 @@ Review and delivery gates use [ordinary Git evidence](skills/independent-review/
 In Codex, invoke a skill with `$`; in Claude Code, use `/`. For example:
 
 ```text
-$refine-with-codex
-$refine-with-claude --effort xhigh
-$refine-with-a-subagent
-$refine-with-dual-review
-$auto-cross-refine
-$dual-review
-$independent-review --codex
+$review-fix-loop
+$review-fix-loop --claude --reviewer-effort xhigh
+$review-fix-loop --dual
+$review-fix-loop --reviewer-run window
+$independent-review
+$independent-review --dual
 ```
 
 The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, skill composition, scope and completion rules, and the [review prompt](skills/independent-review/references/review-prompt.md) of `independent-review` for the reviewer's capabilities.
 
 [Launch settings](skills/independent-review/references/launch-settings.md) defines the automatic model/effort defaults for every launched agent role (planner, refiner and reviewer: latest available Opus for Claude, latest available Sol for Codex, effort `high`; implementer: the same models with effort `xhigh`; inline implementer, the implementer in `inline` execution mode: latest available Sonnet for Claude, latest available Sol for Codex, effort `medium` or `high`) and independent per-field overrides; the value `cli-default` opts a field out to the CLI's configured default. `refining-task-docs`, `executing-task-docs`, `delivering-task` and `delivering-task-queue` also accept `--reviewer-model` and `--reviewer-effort` for the reviewer of their cross review. Native mode requires controls and runtime evidence for both settings; it never silently switches to CLI.
 
-`review-fix-loop` can also be invoked directly with an assignment, such as `$review-fix-loop --codex`. Without one it asks which method to use. Only `auto-cross-refine` chooses the opposite system automatically. Launchers require `review-fix-loop` and `independent-review`; `refine-with-dual-review` also requires `dual-review`, and the automatic selector additionally requires its selected CLI launcher. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
+Without `--codex`, `--claude` or `--dual`, `review-fix-loop` and `independent-review` choose the system opposite to the current session's as the reviewer, Codex for Claude Code and Claude for Codex, and run it in the background; with `--reviewer-run subagent` (`--run subagent` for `independent-review`) the reviewer is a native subagent of the session's own system. `--reviewer-model` and `--reviewer-effort` set the reviewer of `review-fix-loop`; its `--model` and `--effort` belong to the loop owner. The cycle requires `independent-review`, and a window reviewer also `child-sessions`. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
 
 ## License
 
