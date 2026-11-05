@@ -11,11 +11,11 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | planner | `planning-task-docs` child | latest available Opus | latest available Sol | high |
 | refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
 | splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
-| implementer | `executing-task-docs` child in `subagents` or `direct` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Opus | latest available Sol | xhigh |
-| inline implementer | `executing-task-docs` child in `inline` mode (also through `delivering-task` and `delivering-task-queue`), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `executing-task-docs` Execution mode |
+| implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes | latest available Opus | latest available Sol | xhigh |
+| inline implementer | `delivering-task` child in `inline` mode (one document or each unit of its queue), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `delivering-task` Execution mode |
 | reviewer | `independent-review` reviewer in every place; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 
-The root chooses between the two implementer roles by the execution mode it decides in `executing-task-docs`; the planner, splitter, refiner and reviewer roles are unchanged.
+The root chooses between the two implementer roles by the execution mode it decides in `delivering-task`; the planner, splitter, refiner and reviewer roles are unchanged.
 
 Excluded from automatic choice, allowed explicitly: Fable (Claude), Astra (Codex).
 
@@ -23,7 +23,7 @@ Excluded from automatic choice, allowed explicitly: Fable (Claude), Astra (Codex
 
 For each field (model, effort) separately: the current explicit value; else the recorded value when continuing the same run (reopen, retry, `--resume`, the same review loop); else the role default. An explicit value for one field leaves the other on its own precedence.
 
-A caller that resolved values from this policy for the agent it launches through another skill (as `delivering-task-queue` does for its units) passes them as policy values, not explicit overrides: the receiving skill records them with source `policy` and does not re-resolve them.
+A caller that resolved values from this policy for the agent it launches through another skill, or through its own per-unit sections (as `delivering-task`'s queue does for its units), passes them as policy values, not explicit overrides: the receiving skill records them with source `policy` and does not re-resolve them.
 
 ## CLI-defaults opt-out
 
@@ -77,11 +77,11 @@ The record of an opening is the one session file that matches the selector below
 - **Claude child:** session transcripts `*.jsonl` under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/` holding a user message that contains the brief's absolute path. Evidence: `message.model` of assistant records and `message.output_config.effort` of request records (observed field names on Claude Code, 2026-11-01).
 - **Codex child:** rollouts `*.jsonl` under `${CODEX_HOME:-$HOME/.codex}/sessions/` whose `session_meta` cwd is the child's checkout and which hold a user message containing the brief's absolute path; that message need not be the first user message, since a rollout can begin with an environment-context user message. Evidence: `turn_context.payload.model` and `turn_context.payload.effort` (observed 2026-11-01).
 
-Every opening of the window in the run has its own record, and each is checked. Openings recorded in a legacy brief before it gained `Opened:` lines are not checked: the report names them `not checked: opened before launch settings were recorded`, with no question.
+Every opening of the window in the run has its own record, and each is checked.
 
 When:
 
-1. **Early check:** at the first return of the foreground `wait` after each `open`. Only a mismatch acts: the root stops the wait loop, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. A record not yet found or not yet unique, or a found record without the fields yet, is left to the final check. `delivering-task-queue` runs this check in its own Wait loop.
+1. **Early check:** at the first return of the foreground `wait` after each `open`. Only a mismatch acts: the root stops the wait loop, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. A record not yet found or not yet unique, or a found record without the fields yet, is left to the final check. `delivering-task`'s queue runs this check in its own Wait loop.
 2. **Final check:** in Verify, after a `done` status, over every record of the run.
 
 Outcomes:

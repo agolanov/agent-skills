@@ -1,21 +1,15 @@
----
-name: writing-task-follow-ups
-description: Creates, replaces or clears one branch's section in the follow-ups file beside a task document, listing findings left outside the task (out-of-scope items, deferred and disputed review findings). Use when a task branch's review is done and its leftover findings must be recorded, or when another skill hands over follow-ups to write.
----
+# Follow-ups
 
-# Writing Task Follow-ups
+**Write follow-ups** creates, replaces or clears one branch's section in the follow-ups file beside a task document, listing findings left outside the task (out-of-scope items, deferred and disputed review findings). It is an operation of `delivering-task`: the child performs it in the tracked layout, through its brief's Follow-ups line; the root performs it in the separate-docs and ignored layouts (End 3). It runs in the session that performs it, child or root, and opens no window. It behaves the same whoever performs it.
 
-For each clean/path gate and continuation below and in child briefs, use the four ordinary Git commands and identity checks in [checkout state](../independent-review/references/checkout-state.md#direct-use-preflight), with process-local `GIT_OPTIONAL_LOCKS=0`, actual exits and raw output files. Only the follow-ups file is owned. Other staged or unstaged paths pass and stay untouched; the post-commit own-paths gate requires that file to have no pending change. A clean gate requires successful commands and empty status and diffs; path gates parse NUL-delimited status and compare exact repository-relative paths, including both rename paths. Failed or unavailable Git evidence stops the dependent action. Use ordinary Git for other read-only checks, retaining real exits. Evidence has the reference's ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits. Stage/commit only owned paths; write, merge and push authority stays explicit.
+For each clean/path gate and continuation below and in child briefs, use the four ordinary Git commands and identity checks in [checkout state](../../independent-review/references/checkout-state.md#direct-use-preflight), with process-local `GIT_OPTIONAL_LOCKS=0`, actual exits and raw output files. Only the follow-ups file is owned. Other staged or unstaged paths pass and stay untouched; the post-commit own-paths gate requires that file to have no pending change. A clean gate requires successful commands and empty status and diffs; path gates parse NUL-delimited status and compare exact repository-relative paths, including both rename paths. Failed or unavailable Git evidence stops the dependent action. Use ordinary Git for other read-only checks, retaining real exits. Evidence has the reference's ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits. Stage/commit only owned paths; write, merge and push authority stays explicit.
 
-
-`writing-task-follow-ups --doc <task-document> --branch <branch> --head <full-sha> --checkout <checkout> [--findings <file>] [--no-commit]`
-
-Runs in the session that invokes it, child or root; it opens no window. It behaves the same whoever calls it.
+Inputs: `--doc <task-document> --branch <branch> --head <full-sha> --checkout <checkout> [--findings <file>] [--no-commit]`
 
 ## Input
 
 1. `--doc`: absolute path of the task document (for a plan, the plan) in the checkout where the file is to be written. `--branch`: the task branch. `--head`: full SHA of the last commit the review covered. `--checkout`: the checkout to commit in (the task worktree, or the docs main checkout). The date is today, `YYYY-MM-DD`.
-2. Findings: one per line in the entry form `- <what> — <where> — <why>`, where `<where>` is a concrete `path:line` and `<why>` says why the finding is outside the task; a disputed finding's `<why>` carries both positions and the open question. They come from the file named by `--findings`, else from the lines the caller lists with the invocation. No findings is a valid input. A line not in the entry form goes back to the caller; never invent, merge or drop a finding.
+2. Findings: one per line in the entry form `- <what> — <where> — <why>`, where `<where>` is a concrete `path:line` and `<why>` says why the finding is outside the task; a disputed finding's `<why>` carries both positions and the open question. They come from the file named by `--findings`, else from the lines given with the operation. No findings is a valid input. A line not in the entry form goes back to whoever gathered the findings; never invent, merge or drop a finding.
 
 ## File
 
