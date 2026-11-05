@@ -74,17 +74,37 @@ The root verifies the effective model and effort of every child it launches for 
 Opened: <UTC time, ISO 8601 to the second>
 ```
 
-The record of an opening is the one session file that matches the selector below and whose first user message containing the brief's absolute path has its own `timestamp` at or after that opening's `Opened:` time and before the brief's next `Opened:` time (no upper bound for the last). Leading records of a Claude transcript without a timestamp (`last-prompt`, `mode` and similar) are skipped. At the final check, no such file is `unavailable: no record` and more than one is `unavailable: ambiguous records <paths>`; at the early check both only mean the record is not yet established. Keep each matched record path for the final check and the report.
+Bind the execution identity before comparing settings. For a brief-based child, the first actual user prompt containing the brief's absolute path must have its own `timestamp` at or after that opening's `Opened:` time and before the brief's next `Opened:` time (no upper bound for the last). Require the launch checkout too; a known runtime-produced CLI session ID further restricts the match. Skip untimestamped leading records (`last-prompt`, `mode` and similar). Environment-context messages and tool/event output do not stand in for the actual prompt. For a background CLI reviewer, bind the actual prompt sent on stdin instead; it need not contain a brief path.
 
-- **Claude child:** session transcripts `*.jsonl` under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/` holding a user message that contains the brief's absolute path. Evidence: `message.model` of assistant records and `message.output_config.effort` of request records (observed field names on Claude Code, 2026-11-01).
-- **Codex child:** rollouts `*.jsonl` under `${CODEX_HOME:-$HOME/.codex}/sessions/` whose `session_meta` cwd is the child's checkout and which hold a user message containing the brief's absolute path; that message need not be the first user message, since a rollout can begin with an environment-context user message. Evidence: `turn_context.payload.model` and `turn_context.payload.effort` (observed 2026-11-01).
+- **Claude child:** session transcripts `*.jsonl` under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`, with the launch checkout. User prompt text is a string `message.content`, or the `text` of its top-level text blocks; inspect neither `tool_result` contents nor recursively serialized JSON for the brief path. A CLI opening uses only the main transcript: exclude `subagents/agent-*.jsonl` and records marked `isSidechain: true` or with a nonempty `agentId`, even when they share the parent's `sessionId` and `cwd`. A native opening uses the returned `agent-<agent ID>.jsonl`, bound to the returned ID and parent identity through its parent/metadata records, as [Host mechanisms](../../child-sessions/references/run-contract.md#host-mechanisms) describes. That assigned agent's own sidechain marker is expected; exclude its descendants, not the assigned agent.
+- **Codex child:** rollouts `*.jsonl` under `${CODEX_HOME:-$HOME/.codex}/sessions/`, with `session_meta.payload.cwd` equal to the launch checkout. Prompt text is user-role message text, not tool/event output; an initial environment-context user message need not be the actual prompt. For a regular CLI opening, require a CLI source or a corroborated producer ID matched against `session_meta.payload.id`; shared `session_id` alone is insufficient. Exclude arbitrary `thread_spawn` helpers. For a native opening, bind the returned agent/thread ID and parent ancestry, with the launch checkout, and exclude that agent's descendants.
+- **Background `codex review -`:** bind the `exec` producer's `session_meta.payload.id` to the runtime ID in stderr. Then bind its unique execution delegate: `session_meta.payload.source` is `{"subagent":"review"}`, its top-level `session_meta.payload.parent_thread_id` equals the producer ID, and its `cwd` is the same launch checkout. The delegate has a distinct `id` but shares `session_id`; it owns the stdin prompt and execution `turn_context`. This mandatory review delegate is eligible, unlike arbitrary helper descendants. Keep producer and delegate as two distinct identity roles, not two candidates for one role.
+
+At the final check, zero eligible candidates for any required role is `unavailable: no record`; multiple candidates for that role are `unavailable: ambiguous records <paths>`, even if one has matching settings. A missing or ambiguous mandatory review delegate is unverified. At the early check these outcomes only mean the identity is not yet established. Retain selected and excluded record paths with their binding or exclusion reasons for the final check and report. File mtime or the newest record never establishes identity.
+
+### Typed settings fields
+
+Read these fields only after binding the record to its opening and role:
+
+| Runtime record and role | Model evidence | Effort evidence |
+| --- | --- | --- |
+| Claude assistant record | `message.model` supplies effective model evidence | Top-level assistant `effort` may corroborate request effort |
+| Claude `api-request` record | `params.model` corroborates assistant model | `params.output_config.effort` |
+| Claude `api-request-blob` record with an object `message` | `message.model` corroborates assistant model | `message.output_config.effort` |
+| Codex TUI/exec `turn_context` | `payload.model` | `payload.effort` |
+| Bound Codex review execution delegate's `turn_context` and `thread_settings_applied` | `payload.model` and `thread_settings_applied.thread_settings.model` | `payload.effort` and `thread_settings_applied.thread_settings.reasoning_effort` |
+| Codex review producer's startup/header and `thread_settings_applied.thread_settings` | Launch corroboration only | Launch corroboration only |
+
+Inspect every concrete value in the bound opening, including continuations and mid-session changes. For regular CLI sessions inspect the main transcript without arbitrary helpers/sidechains; for a background Codex review inspect the uniquely bound execution delegate and retain producer fields separately as launch corroboration; for a native reviewer inspect its own records without descendants. For each assignment field not opted out, any conflicting concrete value is a mismatch, including a delegate changed by a `review_model` override when the producer matches. A matching producer never substitutes for missing or mismatching execution settings.
+
+Missing/null in one record is not itself a mismatch. No effective evidence for a required field is `unavailable`; unknown schemas do not authorize recursively searching for effort. Keep per-field [CLI-defaults opt-outs](#cli-defaults-opt-out): an opted-out field is observed, not compared. Child mismatches/unavailable evidence keep the questions below; reviewer validation keeps its invalidation rules.
 
 Every opening of the window in the run has its own record, and each is checked.
 
 When:
 
 1. **Early check:** at the first return of the foreground `wait` after each `open`. Only a mismatch acts: the root stops the wait loop, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. A record not yet found or not yet unique, or a found record without the fields yet, is left to the final check. `delivering-task`'s queue runs this check in its own Wait loop.
-2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, triager, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting.
+2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, triager, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting. A window reviewer runs final settings validation only after its [stop, confirm, capture, validate](window-reviewers.md#stop-confirm-capture-validate) barrier, with reviewer invalidation replacing the child question.
 
 Outcomes:
 
