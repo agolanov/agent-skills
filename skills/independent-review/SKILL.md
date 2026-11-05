@@ -13,7 +13,7 @@ An assignment is a reviewer system and a place. Resolve both before anything sta
 
 **System:** `--codex`, `--claude`, `--dual` (Codex and Claude together), or equivalent prose. With none, the reviewer is the system opposite to this session's ([Session system](#session-system)), except with the place `subagent`, where it is this session's own system, the only system a native subagent can have. Two system keys conflict: ask which one applies.
 
-**Place:** `--run background|subagent|window`, default `background`; under `--dual` the place holds for both reviewers. `--run inline` is refused before anything starts: reviewing one's own work is not independent.
+**Place:** `--run background|subagent|window`, or equivalent words ("let Codex review it in a window"), which the session maps to the key and announces. Default `background`; a resumed dual review keeps its recorded place ([State and resume](references/dual.md#state-and-resume)). Under `--dual` the place holds for both reviewers. `--run inline` is refused before anything starts: reviewing one's own work is not independent.
 
 Refused before any launch, naming the combination:
 
@@ -25,7 +25,7 @@ The removed keys are refused, naming their replacements: `--subagent` (now `--ru
 
 A caller (`review-fix-loop`) passes the system and its `--reviewer-run` as the place; these rules apply to them as to direct use. Explicit model and effort values are validated for the reviewer system these rules resolve.
 
-Read [launch settings](references/launch-settings.md) for the reviewer role; honor independent model/effort overrides, announce and record the resolved assignment. Missing runtime capabilities block this method; changing method/settings needs explicit authorization.
+Read [launch settings](references/launch-settings.md) for the reviewer role; honor independent model/effort overrides, announce and record the resolved assignment. Missing runtime capabilities block this place; changing place/settings needs explicit authorization.
 
 ### Session system
 
