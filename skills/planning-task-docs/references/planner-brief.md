@@ -49,7 +49,7 @@ Boundaries: work on the current branch of each repository. Do not create a workt
 
 Talking to the user (window): the user is beside this window: ask your questions here, and use STATUS: blocked only for what the root must resolve (a Git problem, a missing input). After writing the status file, stay in this window; the root closes it.
 
-Talking to the user (subagent, background, or Auto yes): nobody answers you directly. Ask every question, the spec's approval included, by writing STATUS: blocked with the question, options and your recommendation; continue when the answer arrives. End every turn by writing the status file, with its exact first line as your last message and nothing after it. When Auto is yes, also read <absolute auto.md> and follow it as a child, and list every answer you gave without the user under ## Decisions in the status.
+Talking to the user (subagent, background, or Auto yes): nobody answers you directly. Ask every question, the spec's approval included, by writing STATUS: blocked with the question, options and your recommendation; continue when the answer arrives. End every turn by writing the status file, with its exact first line as your last message and nothing after it. When Auto is yes, also read <absolute auto.md> and follow it as a child: answer yourself a question its Deciding step 1 settles, ask only the rest this way, and list every answer you gave without the user under ## Decisions in the status.
 
 Record each out-of-scope finding as: what — where (path:line) — why it is out of scope.
 

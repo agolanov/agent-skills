@@ -12,7 +12,7 @@ For each clean/path gate and continuation below and in child briefs, use the fou
 
 One task per run. The refiner owns the review, its fixes and the review marks, and `--run` places it ([Run](#run)). By default it is a child in a `window`, a visible session where it talks to the user; a child in a `subagent` or `background` asks every question through the root; under `inline` this session is the refiner. In every place its reviewer is a separate agent in the `--reviewer-run` place. The root resolves the documents, runs the refiner in the project checkout, waits, verifies Git/status facts and reports paths. Outside `inline` it writes no document or mark and never edits a child status. It invokes no other task skill: the user chooses what runs next. A stop placed "before any window" below comes, in every place, before the refiner starts.
 
-Under `--auto` read child-sessions' [auto.md](../child-sessions/references/auto.md): the brief says `Auto: yes`, so the refiner runs its review loop with `--auto` and asks nobody, in its window either, and each of its questions reaches the root as `STATUS: blocked`; the root routes it and every question below that would go to the user by auto.md's Deciding, and the report lists `## Decisions`.
+Under `--auto` read child-sessions' [auto.md](../child-sessions/references/auto.md): the brief says `Auto: yes`, so the refiner runs its review loop with `--auto` and asks nobody, in its window either, and each question it cannot settle by auto.md's [Deciding](../child-sessions/references/auto.md#deciding) step 1 reaches the root as `STATUS: blocked`; the root routes it and every question below that would go to the user by auto.md's Deciding, and the report lists `## Decisions`.
 
 ## Input
 

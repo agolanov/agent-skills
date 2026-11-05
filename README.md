@@ -52,7 +52,7 @@ Standalone helpers: `child-sessions` also runs the child sessions of the task sk
 
 ## Run places and autonomous mode
 
-Every skill takes `--run <place>`, which says where its worker runs:
+Every skill except `child-sessions`, the engine the others launch through, takes `--run <place>`, which says where its worker runs; the second table below lists the places each skill accepts:
 
 | Place | Where |
 |-------|-------|
@@ -63,15 +63,15 @@ Every skill takes `--run <place>`, which says where its worker runs:
 
 Each skill picks its default: a window where the worker talks to the user or works long, otherwise no window.
 
-| Skill | `--run` places | Default |
-|-------|----------------|---------|
-| `planning-task-docs`, `splitting-spec-into-stages` | the planner, the splitter | `window`, also under `--auto` |
-| `refining-task-docs` | the refiner, which owns the review loop and fixes | `window` |
-| `delivering-task` | the implementer of each task | `window`; in another place several tasks run one at a time |
-| `review-fix-loop` | the loop owner, which fixes | `inline` |
-| `independent-review` | the reviewer | `background`; `inline` is refused |
-| `triaging-task-follow-ups`, `consolidating-plans` | the skill itself | `inline` |
-| `delivering-spec-stages`, `delivering-task-follow-ups` | the orchestrator itself | `inline`, its nested skills in subagents |
+| Skill | `--run` places | Default | Other values |
+|-------|----------------|---------|--------------|
+| `planning-task-docs`, `splitting-spec-into-stages` | the planner, the splitter | `window`, also under `--auto`, for watching | `inline`, `subagent`, `background` |
+| `refining-task-docs` | the refiner, which owns the review loop and fixes | `window` | `inline`, `subagent`, `background` |
+| `delivering-task` | the implementer of each task | `window` | `inline`, `subagent`, `background`; with several documents these run the tasks one at a time in queue order, and `--parallel` applies to `window` only |
+| `review-fix-loop` | the loop owner, which fixes | `inline`: the session that did the work fixes it | `subagent`, `background`, `window` |
+| `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `subagent`, `window`; `inline` is refused, since reviewing one's own work is not independent |
+| `triaging-task-follow-ups`, `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
+| `delivering-spec-stages`, `delivering-task-follow-ups` | the orchestrator itself | `inline`; its nested skills run in subagents | `background`, `window` |
 
 A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
 

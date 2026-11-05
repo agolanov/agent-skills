@@ -10,7 +10,7 @@
 
 ## Questions
 
-- A child under `--auto` asks nobody directly, in a window too: every question, those of the skills it runs included, ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. Windows still open where a skill opens them, for watching; nobody needs to answer in them.
+- A child under `--auto` asks nobody directly, in a window too: every question it cannot settle by [Deciding](#deciding) step 1, those of the skills it runs included, ends its turn with `STATUS: blocked`, its Questions holding the question, the options and its recommendation. Windows still open where a skill opens them, for watching; nobody needs to answer in them.
 - A question that reaches a session is routed by [Deciding](#deciding): a child's `blocked` status, a question the session's own skill would ask the user, or a question a window child shows on screen.
 - A window whose launch has no `send` cannot receive an answer. The parent still decides it by Deciding and records it, then delivers it as child-sessions' `blocked` row does without `send` ([SKILL.md](../SKILL.md#foreground-wait-loop)): it shows the user that given answer, word for word, to type into the window. The user is asked to type it, never to decide it, and the report names this as the window backend's limitation.
 - Permission and folder-trust dialogs in a window follow child-sessions [Dialogs](../SKILL.md#dialogs) unchanged: the root approves what lies in scope; everything else is declined and reported, or left to the user unanswered.
@@ -19,7 +19,7 @@
 
 A session that receives a question under `--auto`:
 
-1. answers it itself when the answer follows from its own task, brief or documents (the user's request, the task document, a plan's `**Files:**` block), or from the skill's recommended option: an option the skill's own text recommends, such as queue Input 3's "record it `delivered <sha7>` (recommended)" or the outcomes the triage's Select proposes. A child's recommendation in its Questions is not one: it is shown, never followed by itself;
+1. answers it itself when the answer follows from its own task, brief or documents (the user's request, the task document, a plan's `**Files:**` block), or from the skill's recommended option (an option the skill's own text recommends, such as queue Input 3's "record it `delivered <sha7>` (recommended)" or the outcomes the triage's Select proposes), unless an option is [hard to undo](#hard-to-undo). A child's recommendation in its Questions is not one: it is shown, never followed by itself;
 2. otherwise, when it is itself a child, writes its own `STATUS: blocked` with the question, the options, the child's recommendation and the context its parent needs; its parent routes it by these same steps;
 3. as the first session, answers it, unless it is unsure what to build or an option is hard to undo; then it asks the user, showing the question, the options and the recommendation.
 
@@ -33,7 +33,7 @@ An answer chooses among the options the skill offers and adds none: no push, no 
 
 ## Hard to undo
 
-An action is hard to undo when it destroys work or state Git cannot restore from the repository's own history (deleting a branch or worktree with unmerged commits, discarding uncommitted changes, removing files outside the task's own paths), or when it leaves the machine (push, publish). A question with such an action among its options always reaches the user, even with a recommended option and even when the recommendation is another option: each child passes it up by step 2, and the first session asks.
+An action is hard to undo when it destroys work or state Git cannot restore from the repository's own history (deleting a branch or worktree with unmerged commits, discarding uncommitted changes or untracked files, removing files outside the task's own paths), or when it leaves the machine (push, publish). A question with such an action among its options always reaches the user, even with a recommended option and even when the recommendation is another option: each child passes it up by step 2, and the first session asks.
 
 ## Decisions
 
