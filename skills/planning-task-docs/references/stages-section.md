@@ -1,4 +1,4 @@
-Authoritative copy. `refining-task-docs/references/stages-section.md`, `splitting-spec-into-stages/references/stages-section.md` and `delivering-spec-stages/references/stages-section.md` hold display copies of the Parsing rules; keep them equal in all four.
+Authoritative copy. `refining-task-docs/references/stages-section.md`, `splitting-spec-into-stages/references/stages-section.md` and `delivering-spec-stages/references/stages-section.md` hold display copies of the Parsing rules; keep them equal in all four. `delivering-spec-stages/references/stages-parse.md` holds a display copy of the Recipes; keep both equal.
 
 # Stages section
 
@@ -41,7 +41,7 @@ The Parsing rules define every part of it, what Scope and Done when say included
 - **Stage matching.** A candidate matches stage NN when its stem starts with `<spec-stem>-NN-`, or its `**Spec:**` header names the spec and its `**Stage:**` line says `NN`. Matching by stem applies only to a candidate that belongs to no other spec: one whose `**Spec:**` header names another spec, or which is the naming pair of another spec (the sibling `specs/` directory holds `<candidate stem>-design.md` and it is not this spec), matches stage NN only by its headers. A candidate matching two stages (its stem says NN, its headers MM) stops, naming the plan and both stages. Two candidates matching one stage stop, naming both. Nothing guesses.
 - **Unstaged plan.** Stage matching comes first. A plan of the spec (the naming pair `plans/<spec-stem>.md`, or a candidate whose `**Spec:**` header names the spec) that matches no stage is unstaged: for example the naming pair without `**Stage:**`, or a `**Spec:**` plan without `**Stage:**` whose stem does not start with `<spec-stem>-NN-`. The naming pair whose `**Spec:**` names the spec and whose `**Stage:**` says a stage's number, such as `01`, or a stem-matching plan with `**Spec:**` and no `**Stage:**`, is a stage plan. An unstaged plan stops `planning-task-docs` and `delivering-spec-stages`, naming it: "staged spec with an unstaged plan; remove or stage the plan".
 - **Next stage.** The next stage is the lowest-numbered stage with no matching plan; when every stage has one, there is none.
-- **Delivered.** Stage NN is delivered when the first-parent history of main holds a merge commit with the subject `Merge branch '<branch>'` or `Merge branch '<branch>' into <main>`, `<branch>` being the branch `executing-task-docs` Preflight 2 derives from the stage plan's stem. No document is edited to record progress.
+- **Delivered.** Stage NN is delivered when the first-parent history of main holds a merge commit with the subject `Merge branch '<branch>'` or `Merge branch '<branch>' into <main>`, `<branch>` being the branch `delivering-task` Preflight 2 derives from the stage plan's stem. No document is edited to record progress.
 
 ## Recipes
 

@@ -4,6 +4,7 @@
 
 - `<runtime>` is the resolved installed child helper's successful `runtime-dir` output, outside Git.
 - `<spec-stem>` is the spec's stem by the Spec stem rule of [stages-section.md](stages-section.md#parsing-rules), with every character outside `[A-Za-z0-9_-]` replaced by `-` (as `splitting-spec-into-stages` Preflight 5 names its window).
+- A nested call's brief is `<runtime>/stages-<spec-stem>-<NN>-<phase>-brief.md` and its status `<runtime>/stages-<spec-stem>-<NN>-<phase>-status.md`, `<NN>` the stage and `<phase>` `plan`, `refine` or `deliver`. A status archived before an answer becomes `<file>-blocked-<n>`, as run contract Questions and continuation says.
 
 ## State file
 
@@ -23,11 +24,11 @@ Header: `# spec: <absolute spec path>`. Then one line per stage in number order:
 ## States
 
 - `pending`: not acted on in this run yet: a stage with or without a plan, a fresh plan still to deliver. Later stages stay `pending` when the run ends earlier and are reported never started.
-- `planning`: while `planning-task-docs` runs for the stage.
-- `refining`: while `refining-task-docs` runs for the stage's plan.
-- `delivering`: while `delivering-task` runs for the stage, both halves, a `--resume` included.
+- `planning`: while the stage's `planning-task-docs` call runs.
+- `refining`: while the `refining-task-docs` call for the stage's plan runs.
+- `delivering`: while the stage's `delivering-task` call runs, through its merge and cleanup, a `--resume` included.
 - `delivered <sha7>`: after the stage's merge, or at once when the run finds the merge; `<sha7>` is the merge commit.
-- `failed: <skill>: <reason>` or `failed: <reason>`: the run ends here. The first is for a sub-skill (`planning-task-docs`, `refining-task-docs`, `delivering-task`) that refuses, stops, or ends `failed` or `blocked` while the user does not answer, naming the sub-skill. The second is for this skill's own stop, naming the rule: two plans matching one stage, a plan the planner reported that is not stage NN's, a changed Scope or Done when of a fresh plan's stage, a rename, renumbering or removal of a delivered or running stage by a refiner, an unproven leftover, a resumed stage whose plan is stale, an unstaged plan of the staged spec. It is written on the line of the stage the run is at, or on the spec line when Stage list 1's Unstaged plan check stops before writing the stage lines. A run that stops in Preflight writes no line: a stop before Preflight 4 creates no state file and leaves an earlier run's file as it is.
+- `failed: <skill>: <reason>` or `failed: <reason>`: the run ends here. The first is for a nested call (`planning-task-docs`, `refining-task-docs`, `delivering-task`) that ends `failed`, or `blocked` while the user does not answer, naming its skill. The second is for this skill's own stop, naming the rule: two plans matching one stage, a plan the planner reported that is not stage NN's, a changed Scope or Done when of a fresh plan's stage, a rename, renumbering or removal of a delivered or running stage by a refiner, an unproven leftover, a resumed stage whose plan is stale, an unstaged plan of the staged spec. It is written on the line of the stage the run is at, or on the spec line when Stage list 1's Unstaged plan check stops before writing the stage lines. A run that stops in Preflight writes no line: a stop before Preflight 4 creates no state file and leaves an earlier run's file as it is.
 - `stopped by the user`: the user stopped the run at this stage.
 
 Nothing is committed: the state file is the run's only record, and the final report carries the table.

@@ -35,13 +35,16 @@ HEAD: <full SHA>
 ## Artifacts
 <one absolute path per line of files the child created or changed for the calling task>
 
+## Decisions
+<one line per answer given without the user under --auto, the child's own and its children's: - <question> — <answer> — <who answered> — <basis>>
+
 ## Questions
 <for blocked: the question, options, and the child's recommendation>
 ```
 
-Optional: present only when the calling task asks for it, otherwise omitted; lists files the child created or changed, one absolute path per line.
+Two sections are optional, otherwise omitted: `## Artifacts`, present only when the calling task asks for it, lists files the child created or changed, one absolute path per line; `## Decisions`, present when the child or its children decided anything without the user under `--auto`, lists those decisions as [auto.md](auto.md#decisions) says.
 
-Keep every field and section except the optional `## Artifacts`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
+Keep every field and section except the optional `## Artifacts` and `## Decisions`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
 
 Write the report completely before exposing a terminal first line (for example, write a temporary file beside it, then rename it to the status path). The root may read as soon as that first line appears.
 
