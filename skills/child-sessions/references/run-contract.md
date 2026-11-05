@@ -240,7 +240,7 @@ if ($recordedId.Contains("`r") -or $recordedId.Contains("`n") -or $recordedId.St
 
 When no synchronous host-task wait is exposed, run one foreground watcher at a time, normally with a 60-second internal deadline and 1-second intervals. Bind absolute `run_dir`/`runDir` and `watch_seconds`/`watchSeconds` in **1..60** (normally 60; a synthetic deadline probe may use 1). Invoke with an explicit Bash tool `timeout: 75000` ms or a verified native tool equivalent with margin. Keep the nested coordinator active through the result. The raw OS-read function is the only fixture seam: disposable V2 runners may replace that leaf, then invoke the unchanged watcher entry. Production reads real proc/installed commands; parsing, record validation, identity comparison and the deadline body are never replaced. This adds no user key, installed helper or persistent configuration.
 
-The startup observation lasts 30 seconds from the persisted `launch.time`, never from a later watcher's start. `0` means complete recording; `124` means still live at the deadline, so continue one bounded watcher. `2` means unavailable timestamp/identity/process evidence; `3` means incomplete recording. A gone, zombie or replaced wrapper gets one final marker/record recheck before `3`. Preserve logs and stop on `2`/`3`; do not launch another producer to repair recording. A malformed present marker or required record is `3`. A missing CLI ID still gives ready recording with a valid empty `session.id`, and is reported separately as launch failure.
+The startup observation lasts 30 seconds from the persisted `launch.time`, never from a later watcher's start. Validate the timestamp grammar on every loop pass, but apply calendar chronology and age checks only while identity is absent; a confirmed same live process waits to its bounded deadline even after a backward calendar-clock step. `0` means complete recording; `124` means the same live wrapper, or an identity still pending within the persisted startup grace, at the deadline; continue one bounded watcher without resetting `launch.time`. `2` means unavailable timestamp/identity/process evidence; `3` means incomplete recording. A gone, zombie or replaced wrapper gets one final marker/record recheck before `3`. Preserve logs and stop on `2`/`3`; do not launch another producer to repair recording. A malformed present marker or required record is `3`. A missing CLI ID still gives ready recording with a valid empty `session.id`, and is reported separately as launch failure.
 
 POSIX completion watcher (Bash).
 
@@ -340,7 +340,7 @@ inspect_process() {
   return 0
 }
 watch_main() {
-  local complete_exit inspect_exit launch_time now deadline wrapper_pid wrapper_start same_live
+  local complete_exit inspect_exit launch_time now deadline wrapper_pid wrapper_start
   [[ $watch_seconds =~ ^([1-9]|[1-5][0-9]|60)$ && $run_dir == /* ]] || return 2
   check_complete; complete_exit=$?
   (( complete_exit == 1 )) || return "$complete_exit"
@@ -351,13 +351,11 @@ watch_main() {
     (( complete_exit == 1 )) || return "$complete_exit"
     load_record "$run_dir/launch.time" && [[ $record =~ ^[0-9]+$ && ${#record} -le 18 ]] || return 2
     launch_time=$((10#$record))
-    now=$(date +%s) || return 2
-    [[ $now =~ ^[0-9]+$ && ${#now} -le 18 ]] || return 2
-    now=$((10#$now))
-    (( now >= launch_time )) || return 2
-    same_live=0
     if [[ ! -e "$run_dir/wrapper.identity" ]]; then
-      (( now - launch_time < 30 )) || return 2
+      now=$(date +%s) || return 2
+      [[ $now =~ ^[0-9]+$ && ${#now} -le 18 ]] || return 2
+      now=$((10#$now))
+      (( now >= launch_time && now - launch_time < 30 )) || return 2
     else
       load_record "$run_dir/wrapper.identity" || return 2
       [[ $record == *$'\n'* ]] || return 2
@@ -385,12 +383,8 @@ watch_main() {
         (( complete_exit == 1 )) || return "$complete_exit"
         return 3
       fi
-      same_live=1
     fi
-    if (( SECONDS >= deadline )); then
-      (( same_live == 1 )) && return 124
-      return 2
-    fi
+    if (( SECONDS >= deadline )); then return 124; fi
     sleep 1 || return 2
   done
 }
@@ -455,11 +449,9 @@ function Watch-Main {
       [long]$launchTime = 0
       if (-not [long]::TryParse($launch.Substring(0, $launch.Length - 1), [Globalization.NumberStyles]::None,
           [Globalization.CultureInfo]::InvariantCulture, [ref]$launchTime)) { return 2 }
-      $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-      if ($now -lt $launchTime) { return 2 }
-      $sameLive = $false
       if (-not (Test-Path -LiteralPath (Join-Path $runDir 'wrapper.identity') -ErrorAction Stop)) {
-        if ($now - $launchTime -ge 30) { return 2 }
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        if ($now -lt $launchTime -or $now - $launchTime -ge 30) { return 2 }
       } else {
         $identity = Read-Record 'wrapper.identity'
         if ($identity -cnotmatch '\A([1-9][0-9]*)\n([1-9][0-9]*)\n\z') { return 2 }
@@ -477,12 +469,8 @@ function Watch-Main {
           if ($complete -ne 1) { return $complete }
           return 3
         }
-        $sameLive = $true
       }
-      if ($clock.Elapsed.TotalSeconds -ge $watchSeconds) {
-        if ($sameLive) { return 124 }
-        return 2
-      }
+      if ($clock.Elapsed.TotalSeconds -ge $watchSeconds) { return 124 }
       Start-Sleep -Seconds 1
     }
   } catch { [Console]::Error.WriteLine($_); return 2 }

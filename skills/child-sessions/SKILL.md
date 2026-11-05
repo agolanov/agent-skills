@@ -38,6 +38,8 @@ Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidenc
 
 Use foreground `wait` calls of **150 seconds on Claude Code**, including when the coordinator is a subagent, and **240 seconds on Codex**. Check the host's effective foreground limit and observed runtime evidence with margin before opening. For a 150-second helper wait, set the Bash tool's `timeout` explicitly to **175000 ms** when the installed schema permits it; the default 120000 ms is too short. An earlier experiment backgrounded a 540-second wait at 180 seconds; that observation is no guarantee for untested hosts. The helper's never-seen startup grace is 120 seconds: a host unable to hold a call longer than that cannot hold this loop. Refuse before opening the window and use only the caller's existing authorized fallback. Repeated fresh short waits reset that grace and do not satisfy the loop.
 
+Codex example:
+
 ```bash
 "$child_session" wait "$name" "$status_file" 240
 ```
