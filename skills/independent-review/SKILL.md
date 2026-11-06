@@ -35,7 +35,7 @@ Identify this session's own system, Codex or Claude Code, from session identity,
 
 ## Review coverage
 
-Scope context to the task's requirements, changed code and relevant dependencies. Name the exact requirement-bearing files or sections, including shared invariants; a link to a roadmap does not require reading unrelated stages. Read required instructions and selected units completely. An explicit user request for whole-document reading remains a requirement.
+Scope context to the task's requirements, changed code and relevant dependencies. Select the files or sections that define that scope and its shared invariants. A reference does not make unrelated content required reading. Read required instructions and selected units completely. An explicit user request for whole-document reading remains a requirement.
 
 The reviewer chooses reading, navigation and security-review tools under existing permissions. Tool preferences, unread unrelated sections and non-use of optional helpers do not invalidate substantive work or make Verification incomplete. Keep authority, mandatory instruction loading, required checks and unchanged-state gates binding. A caller claiming missing essential coverage identifies the unreviewed in-scope requirement, changed path or required check and the unresolved question; a preferred method alone is no coverage gap. Preserve covered work and eligible check evidence rather than repeating them solely for a process discrepancy.
 
