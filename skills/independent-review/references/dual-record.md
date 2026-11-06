@@ -13,12 +13,16 @@ Reviewed commit: <full sha>
 Target row and order: <final pass, direct use | caller's row and order>
 Requirements/rules/checks: <links or concise text>
 Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
-Targeted checks: <commands; cwd/source>
+Targeted checks: <commands; cwd/source and coverage>
+Required phase/producer: <per check, source and obligation; None when absent>
 Unavailable coverage: <None | checks/reasons>
 Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Settings evidence: <per reviewer: discovery and runtime records>
 Window identity: <not applicable (background) | persisted token path/allocation; owner entrypoint; per-attempt names/launch IDs/capabilities; clone/source mappings>
-Complete suite: `<ordered commands/cwd>`, exits <n>, commit <full sha>, checkout <absolute>, known environment changes <None|details>, run by this session (Git outputs/comparison under Phases) <or: the caller's run | no complete suite defined>
+Original suite runs: <immutable absolute records; ordered commands/cwd/source, actual exits, original tested checkout/HEAD/dirty inputs, dependency/profile/environment facts; caller or controller producer | no complete suite defined>
+Current target/acceptance: <full committed SHA/checkout/branch; successful boundary; acceptance path with inspected intervening diff/dispositions and input applicability>
+Fresh checks: <run paths; actual commands/cwd/exits/tested state and coverage | None>
+Coverage: <per required item: retained | fresh | pending | failed/unavailable; satisfied/pending phase/producer obligations and known limits>
 Ledger: none <or the caller's ledger input, below>; next D: 1
 Phase: suite | review | cross-check | done | blocked
 Block reason: None | <codex|claude|codex and claude> invalid result (budget exhausted) | <codex|claude|codex and claude> reviewer shutdown unconfirmed (completion recovery pending)
@@ -82,7 +86,9 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 - claude R2: no match; no codex finding shares its location or requirement.
 
 ## Complete suite
-`<ordered commands/cwd/source>` exits <n> on <full sha>, checkout <absolute>, Git outputs/comparison <paths>, environment changes <None|details>, coverage limits <details>, run by this session <or: no complete suite defined>
+Original runs: <immutable absolute records, original tested checkout/HEAD/dirty states, exact ordered commands/cwd/source/exits, producer and phase; no complete suite defined when applicable>
+Current target/acceptance: <committed checkout/branch/full SHA; successful current boundary; inspected intervening differences and acceptance links; dependency/profile/environment applicability and limits>
+Final coverage: <per required item retained/fresh/pending/failed; fresh check paths/actual executions; phase/producer obligations satisfied or pending; actual full execution distinguished from composed coverage>
 Per-attempt Suite evidence: inherited: <records | None: caller supplied no suite evidence>; independently executed: <records | None: not required in this phase | missing: commands/reasons | no complete suite defined>
 Targeted checks: <separate actual reproductions/checks with commands/results/evidence | None>
 

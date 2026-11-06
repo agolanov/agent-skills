@@ -13,7 +13,11 @@ Base: <fixed base>
 Pre-loop HEAD (squash anchor): <last task commit before the loop>
 Requirements/rules/checks: <links or concise text>
 Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
-Targeted checks: <commands; cwd/source>
+Targeted checks: <commands; cwd/source and intended coverage>
+Required phase/producer: <per check, source and obligation; None when absent>
+Original runs: <immutable absolute records, original tested checkout/HEAD/dirty state>
+Current acceptance: <absolute record; current committed target and inspected differences>
+Coverage: <per required item: retained | fresh | pending | failed/unavailable>
 Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <background|subagent|window>/<codex|claude>, model <exact>, effort <exact>
@@ -37,7 +41,8 @@ Findings/decisions:
 - D2 <severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
-Checks: <commands/cwd/exits/commit/checkout; Git outputs/comparison; environment changes; coverage gaps>
+Checks: <fresh commands/cwd/exits/tested states/checkout and affected coverage; immutable run paths; Git outputs/comparison; dependency/profile/environment facts and gaps>
+Acceptance: <current committed target; original-run/acceptance links; intervening differences and disposition; unchanged coverage and fresh checks; pending broader coverage and phase/producer obligations>
 State: <before/after Git output/exit/diagnostic paths; comparison result/exits/errors; retained recovery baseline>; ignored files and untracked-file contents not covered; Git flags/normalization may hide bytes; nested repositories/submodules not recursively covered; transient restored writes not detected
 Verification: complete | incomplete: <checks/coverage gaps>
 Pending-round retry count: <retained across reconciliation; dual: spent attempts per reviewer per call in the round's state.md>
@@ -46,7 +51,7 @@ Pending-round retry count: <retained across reconciliation; dual: spent attempts
 Status: <running | clean | clean except disputed | blocked: reason>
 Final reviewed commit: <HEAD>
 Raw last verdict: <CLEAN|CHANGES; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, raw codex <..>, claude <..>>
-Implementing-session complete suite: <command/exit/evidence on final commit>
+Final composed verification: <current committed target; original runs/tested states and acceptance links; retained/fresh passing coverage per required item; satisfied phase/producer obligations; actual full executions distinguished from composed coverage; pending/failed/unavailable checks>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; deferred minors; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>
 ```
