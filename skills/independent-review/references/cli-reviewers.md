@@ -9,6 +9,8 @@ Carry the [review prompt](review-prompt.md) unchanged into the independent sessi
 
 The Codex launch uses `codex review -` as an independent session carrying the complete review prompt through stdin. Put the target in that prompt: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
 
+Before launch, fill the review prompt's report-delivery slot with an absent absolute `<round_dir>/answer.md` outside every monitored checkout. Require the reviewer to write the complete Required report there atomically (temporary sibling, then rename), before returning its native review result. This authorized report write is separate from the unchanged-checkout rule. Preserve stdout separately as `stdout.log`: review mode's native final schema can reduce it to findings and a short explanation, even when a complete report was produced in commentary.
+
 Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request; a field may be `cli-default`), and `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**:
 
 ```bash
@@ -16,15 +18,18 @@ settings=()
 [ "$review_model" = cli-default ] || settings+=(-c "model=\"$review_model\"")
 [ "$review_effort" = cli-default ] || settings+=(-c "model_reasoning_effort=\"$review_effort\"")
 review_exit=0
+[ ! -e "$round_dir/answer.md" ] && [ ! -L "$round_dir/answer.md" ] || exit 2
 (
   cd "$task_checkout" || exit
   codex review "${settings[@]}" - \
-    < "$round_prompt" > "$round_dir/answer.md" 2> "$round_dir/stderr.log"
+    < "$round_prompt" > "$round_dir/stdout.log" 2> "$round_dir/stderr.log"
 ) || review_exit=$?
 printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
 ```
 
-Review mode has no `--json` or `--output-last-message` in the tested CLI. Its stdout is the report; stderr contains runtime/command evidence and its session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
+Review mode has no `--json` or `--output-last-message` in the tested CLI. Read the complete answer file, stdout, stderr and producer exit together; stdout alone is not report completeness evidence. Stderr contains runtime/command evidence and the producer session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
+
+**Recover before retrying.** For an already completed run whose answer file is missing or incomplete, bind its unique review execution delegate by [record selection](launch-settings.md#child-settings-check). Inspect that delegate's assistant messages for a complete Required report, including `commentary`; its final message may instead be the short native JSON. Recover only one unambiguous complete report for this target, verbatim to the answer file, retaining the original files and the source record/message phase. Validate required fields, target, completion, effective settings, unchanged state and consistency with the native verdict as usual. A short stdout does not itself spend a retry. Missing, ambiguous, contradictory or incomplete evidence remains invalid; never substitute another session, combine progress fragments into a report or synthesize a CLEAN verdict.
 
 **Why stdin review mode:** on codex-cli 0.165.0 (2026-10-29) identical round prompts sent to `codex exec` and `codex review -` produced the same findings, verdicts and coverage, with exit 0, HEAD and porcelain unchanged and the assigned model/effort in the runtime records; in round 2 both verified the fix commit first. This is evidence for the tested version only: rerun the comparison after relevant runtime/launch changes. On codex-cli 0.166.0 (2026-10-31) review mode completed the real run of the dual review (`independent-review --dual`) and the three review rounds of its delivery; the `exec`/`review` comparison was not rerun on that version. Raw artifacts live in ignored `tests/refine/e2e-notes.md` and in the e2e notes of the dual review (`independent-review --dual`) under `tests/`, not in a fresh clone.
 
@@ -76,7 +81,8 @@ $vector = @('review')
 if ($review_model -cne 'cli-default') { $vector += @('-c', ('model="' + $review_model + '"')) }
 if ($review_effort -cne 'cli-default') { $vector += @('-c', ('model_reasoning_effort="' + $review_effort + '"')) }
 $vector += '-'
-$result = Invoke-ReviewerProcess -Executable $codex -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir
+if (Test-Path -LiteralPath (Join-Path $round_dir 'answer.md')) { throw 'The answer path must be absent before launch.' }
+$result = Invoke-ReviewerProcess -Executable $codex -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir -OutputName stdout.log
 $review_exit = $result.ProducerExit
 # Retain IOFailure too: an I/O error invalidates the answer even with producer exit 0.
 ```

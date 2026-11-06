@@ -138,19 +138,46 @@ function Test-ChildSessionAlive {
     }
     return $true
 }
+function Find-ChildSessionHerdrCaller {
+    param([string]$Herdr)
+    $script:HerdrWorkspace=$env:HERDR_WORKSPACE_ID
+    $script:HerdrPane=$env:HERDR_PANE_ID
+    $caller=$env:CODEX_THREAD_ID;$agent='codex'
+    if (-not $caller) { $caller=$env:CLAUDE_CODE_SESSION_ID;$agent='claude' }
+    if ($caller) {
+        $result=Invoke-ChildSessionNative $Herdr @('agent','list') $script:Runtime
+        if ($result.ExitCode -ne 0) { return $false }
+        $rows=(ConvertFrom-Json ($script:Utf8.GetString($result.Stdout))).result.agents
+        $matches=@($rows | Where-Object { $_.agent_session.agent -ceq $agent -and $_.agent_session.kind -ceq 'id' -and $_.agent_session.value -ceq $caller })
+        if ($matches.Count -ne 1) { return $false }
+        foreach ($value in @($matches[0].workspace_id,$matches[0].pane_id,$matches[0].tab_id)) {
+            if ($value -isnot [string] -or [string]::IsNullOrWhiteSpace($value) -or $value -match '\s') { return $false }
+        }
+        $script:HerdrWorkspace=$matches[0].workspace_id;$script:HerdrPane=$matches[0].pane_id
+    }
+    if (-not $script:HerdrWorkspace -or -not $script:HerdrPane) { return $false }
+    $result=Invoke-ChildSessionNative $Herdr @('pane','list','--workspace',$script:HerdrWorkspace) $script:Runtime
+    if ($result.ExitCode -ne 0) { return $false }
+    $panes=(ConvertFrom-Json ($script:Utf8.GetString($result.Stdout))).result.panes
+    if (@($panes | Where-Object { $_.pane_id -ceq $script:HerdrPane }).Count -ne 1) { return $false }
+    if ($script:HerdrWorkspace -cne $env:HERDR_WORKSPACE_ID -or $script:HerdrPane -cne $env:HERDR_PANE_ID) {
+        [Console]::Error.WriteLine('child-session: recovered current '+$agent+' caller in herdr workspace '+$script:HerdrWorkspace+', pane '+$script:HerdrPane)
+    }
+    return $true
+}
 function Get-ChildSessionBackend {
     $backend=$env:CHILD_SESSION_BACKEND
     if (-not $backend) { if ($env:HERDR_ENV -eq '1') { $backend='herdr' } else { $backend='terminal' } }
     if ($backend -notin @('herdr','terminal')) { throw 'Native Windows backend must be herdr or terminal; tmux is a separate optional WSL environment.' }
     if ($backend -eq 'herdr') {
-        $herdr=(Get-Command herdr.exe -ErrorAction Stop).Source
-        if (-not $env:HERDR_WORKSPACE_ID -or -not $env:HERDR_PANE_ID) { throw 'HERDR_WORKSPACE_ID and HERDR_PANE_ID are required to prove the current native connection.' }
-        $result=Invoke-ChildSessionNative $herdr @('pane','list','--workspace',$env:HERDR_WORKSPACE_ID) $script:Runtime
-        if ($result.ExitCode -ne 0) { throw 'Current herdr workspace unavailable; inherited IDs may be stale.' }
-        $panes=ConvertFrom-Json ($script:Utf8.GetString($result.Stdout))
-        if (-not @($panes.result.panes | Where-Object { $_.pane_id -ceq $env:HERDR_PANE_ID }).Count) { throw 'Current herdr pane identity unavailable; no focused-pane substitution.' }
-        $script:Herdr=$herdr
-    } else {
+        $connected=$false
+        try { $herdr=(Get-Command herdr.exe -ErrorAction Stop).Source;$connected=Find-ChildSessionHerdrCaller $herdr }
+        catch { [Console]::Error.WriteLine('child-session: herdr caller lookup unavailable: '+$_.Exception.Message) }
+        if ($connected) { $script:Herdr=$herdr }
+        elseif ($env:CHILD_SESSION_BACKEND) { throw 'Explicit herdr requires a proven unique caller connection; no focused-pane substitution.' }
+        else { $backend='terminal';[Console]::Error.WriteLine('child-session: no proven herdr caller connection; using terminal') }
+    }
+    if ($backend -eq 'terminal') {
         $script:Terminal=(Get-Command wt.exe -ErrorAction Stop).Source
         # Windows Terminal receives only fixed native bootstrap tokens below.
     }
@@ -194,7 +221,6 @@ function Get-ChildSessionCapabilities {
 function Assert-ChildSessionPane {
     param($Record)
     if ($Record.backend -ne 'herdr') { throw 'Screen/input control unavailable; use the visible terminal directly.' }
-    if ($env:HERDR_WORKSPACE_ID -cne $Record.workspace) { throw 'Recorded herdr workspace mismatch.' }
     $script:Herdr=(Get-Command herdr.exe -ErrorAction Stop).Source
     $result=Invoke-ChildSessionNative $script:Herdr @('pane','list','--workspace',$Record.workspace) $script:Runtime
     if ($result.ExitCode -ne 0) { throw 'Recorded herdr workspace unavailable.' }
@@ -239,7 +265,7 @@ function Start-ChildSession {
     }
     $cli.Add('Read the brief at '+$brief+' completely and carry it out.')
     $launch=[Guid]::NewGuid().ToString('N')+[Guid]::NewGuid().ToString('N')
-    $r=[pscustomobject]@{name=$name;backend=$backend;launch_id=$launch;runtime=$script:Runtime;checkout=$cwd;workspace=$env:HERDR_WORKSPACE_ID;window='';pane='';launcher=$null;agent=$null;phase='starting';exit_code=$null;closed=$false;dialog_counts='not observable'}
+    $r=[pscustomobject]@{name=$name;backend=$backend;launch_id=$launch;runtime=$script:Runtime;checkout=$cwd;workspace=$script:HerdrWorkspace;window='';pane='';launcher=$null;agent=$null;phase='starting';exit_code=$null;closed=$false;dialog_counts='not observable'}
     $r | Add-Member -NotePropertyName supported_operations -NotePropertyValue (Get-ChildSessionCapabilities $r)
     $environment=@{}
     foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
@@ -265,18 +291,21 @@ function Start-ChildSession {
         if ($split) {
             $listed=Invoke-ChildSessionNative $script:Herdr @('pane','list','--workspace',$r.workspace) $script:Runtime
             $panes=(ConvertFrom-Json ($script:Utf8.GetString($listed.Stdout))).result.panes
-            $parent=@($panes | Where-Object { $_.pane_id -ceq $env:HERDR_PANE_ID })[0]
+            $parent=@($panes | Where-Object { $_.pane_id -ceq $script:HerdrPane })[0]
             if (@($panes | Where-Object { $_.tab_id -ceq $parent.tab_id }).Count -eq 1) { $direction=$split }
             else { [Console]::Error.WriteLine('child-session: opener tab already has another pane; opening a tab') }
         }
         if ($direction) {
-            $created=Invoke-ChildSessionNative $script:Herdr @('pane','split',$env:HERDR_PANE_ID,'--direction',$direction,'--cwd',$cwd,'--no-focus') $script:Runtime
+            $created=Invoke-ChildSessionNative $script:Herdr @('pane','split',$script:HerdrPane,'--direction',$direction,'--cwd',$cwd,'--no-focus') $script:Runtime
             $data=ConvertFrom-Json ($script:Utf8.GetString($created.Stdout));$r.pane=$data.result.pane.pane_id;$r.window=$parent.tab_id
         } else {
             $created=Invoke-ChildSessionNative $script:Herdr @('tab','create','--workspace',$r.workspace,'--cwd',$cwd,'--label',$name,'--no-focus') $script:Runtime
             $data=ConvertFrom-Json ($script:Utf8.GetString($created.Stdout));$r.pane=$data.result.root_pane.pane_id;$r.window=$data.result.tab.tab_id
         }
         if ($created.ExitCode -ne 0 -or -not $r.pane) { throw 'Native herdr did not create a proven owned pane.' }
+        $environment['HERDR_ENV']='1';$environment['HERDR_WORKSPACE_ID']=$r.workspace
+        $environment['HERDR_PANE_ID']=$r.pane;$environment['HERDR_TAB_ID']=$r.window
+        [IO.File]::WriteAllText($transport,(ConvertTo-Json -InputObject $request -Depth 12 -Compress),$script:Utf8)
         Write-ChildSessionRecord $r
         $ready=$false
         for ($n=0;$n -lt 30;$n++) {

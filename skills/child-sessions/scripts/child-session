@@ -11,6 +11,9 @@ BACKEND=${CHILD_SESSION_BACKEND:-}
 
 AGENT=${CHILD_SESSION_AGENT:-claude}
 WS=${HERDR_WORKSPACE_ID:-}
+CALLER_ID=${CODEX_THREAD_ID:-${CLAUDE_CODE_SESSION_ID:-}}
+CALLER_AGENT=claude
+[[ -z ${CODEX_THREAD_ID:-} ]] || CALLER_AGENT=codex
 RUNTIME_DIR=
 PYTHON=
 export LANG=${LANG:-C.UTF-8}
@@ -74,7 +77,8 @@ select_json_reader() {
     if [[ ${OSTYPE:-} == darwin* && $candidate == /usr/bin/python* ]]; then continue; fi
     if "$candidate" -c 'import json' >/dev/null 2>&1; then PYTHON=$candidate; return; fi
   done
-  die 'no installed runtime for herdr JSON; use an available tmux/terminal path'
+  printf '%s\n' 'child-session: no installed runtime for herdr JSON; use an available tmux/terminal path' >&2
+  return 1
 }
 # The NUL-separated owner-local record is data, never sourced/evaluated. Fields
 # are appended in one small write; the most recent value wins. Only this launch
@@ -153,7 +157,9 @@ record_matches_scope() {
     [[ -n $(record_field "$file" session) && $(record_field "$file" session) == "$S" ]] &&
       tmux_scope_gone "$recorded" && record_survives "$file"
   elif [[ $backend == herdr ]]; then
-    [[ $(record_field "$file" workspace) == "$WS" ]]
+    # The private record owns its workspace; an app-server's inherited opener
+    # IDs may be stale. Duplicate names across workspaces still fail in find.
+    return 0
   else [[ $backend == terminal ]]; fi
 }
 runtime_op() {
@@ -239,7 +245,7 @@ runtime_op() {
   esac
 }
 json_op() {
-  [[ -n $PYTHON ]] || select_json_reader
+  [[ -n $PYTHON ]] || select_json_reader || die 'herdr JSON reader unavailable'
   "$PYTHON" -c '
 import json,sys
 op=sys.argv[1]; data=json.loads(sys.argv[2]); args=sys.argv[3:]
@@ -250,6 +256,15 @@ elif op=="pane":
     rows=data["result"]["panes"]; selected=[r for r in rows if r.get(args[0])==args[1]]
     if len(args)>2 and args[2]=="count": print(len(selected))
     elif selected: print(selected[0].get(args[2],""))
+elif op=="caller":
+    rows=data["result"]["agents"]
+    found=[r for r in rows if r.get("agent_session",{}).get("agent")==args[0]
+           and r.get("agent_session",{}).get("kind")=="id"
+           and r.get("agent_session",{}).get("value")==args[1]]
+    if len(found)!=1: sys.exit(1)
+    values=[found[0].get(k,"") for k in ("workspace_id","pane_id","tab_id")]
+    if not all(isinstance(v,str) and v and not any(c.isspace() for c in v) for v in values): sys.exit(1)
+    print(*values)
 elif op=="find":
     tabs=data["tabs"]["result"]["tabs"]; panes=data["panes"]["result"]["panes"]; name=args[0]
     tabs=[r for r in tabs if r.get("label")==name]
@@ -276,26 +291,43 @@ initialize_runtime() {
   /bin/chmod 700 "$RUNTIME_DIR"
   export RUNTIME_DIR
 }
+herdr_connection() {
+  local panes agents found old_ws=$WS old_pane=${HERDR_PANE_ID:-}
+  command -v herdr >/dev/null || return 1
+  [[ -n $PYTHON ]] || select_json_reader || return 1
+  if [[ -n $CALLER_ID ]]; then
+    agents=$(herdr agent list 2>/dev/null) || return 1
+    found=$(json_op caller "$agents" "$CALLER_AGENT" "$CALLER_ID") || return 1
+    read -r WS HERDR_PANE_ID HERDR_TAB_ID <<< "$found"
+  fi
+  [[ -n $WS ]] || return 1
+  panes=$(herdr pane list --workspace "$WS" 2>/dev/null) || return 1
+  if [[ -n ${HERDR_PANE_ID:-} ]]; then
+    [[ -n $(json_op pane "$panes" pane_id "$HERDR_PANE_ID" tab_id) ]] || return 1
+  else
+    [[ ${HERDR_ENV:-} == 1 && -z $CALLER_ID ]] || return 1
+  fi
+  if [[ $WS != "$old_ws" || ${HERDR_PANE_ID:-} != "$old_pane" ]]; then
+    printf 'child-session: recovered current %s caller in herdr workspace %s, pane %s\n' "$CALLER_AGENT" "$WS" "$HERDR_PANE_ID" >&2
+  fi
+}
 backend_probe() {
-  local panes
+  local explicit=$BACKEND
   if [[ -z $BACKEND ]]; then
     if [[ ${HERDR_ENV:-} == 1 ]]; then BACKEND=herdr
     elif command -v tmux >/dev/null; then BACKEND=tmux
     else BACKEND=terminal; fi
   fi
   if [[ $BACKEND == herdr ]]; then
-    command -v herdr >/dev/null || die 'herdr is required for the selected backend'
-    [[ -n $WS ]] || die 'HERDR_WORKSPACE_ID is required for herdr'
-    [[ -n $PYTHON ]] || select_json_reader
-    panes=$(herdr pane list --workspace "$WS") || die "could not prove connected herdr workspace $WS"
-    if [[ -n ${HERDR_PANE_ID:-} ]]; then
-      [[ -n $(json_op pane "$panes" pane_id "$HERDR_PANE_ID" tab_id) ]] || die "pane $HERDR_PANE_ID not found in herdr workspace $WS"
-    elif [[ ${HERDR_ENV:-} != 1 ]]; then
-      die 'HERDR_ENV=1 with a live workspace is required to prove the current connection'
+    if ! herdr_connection; then
+      [[ -z $explicit ]] || die 'herdr is required with a proven caller: verify HERDR_WORKSPACE_ID/HERDR_PANE_ID or the unique live caller session; no focused-pane substitution'
+      if command -v tmux >/dev/null; then BACKEND=tmux; else BACKEND=terminal; fi
+      printf 'child-session: no proven herdr caller connection; using %s\n' "$BACKEND" >&2
     fi
-  elif [[ $BACKEND == tmux ]]; then
+  fi
+  if [[ $BACKEND == tmux ]]; then
     command -v tmux >/dev/null || die 'tmux is required for the selected backend'
-  else
+  elif [[ $BACKEND == terminal ]]; then
     terminal_probe
   fi
 }
@@ -339,7 +371,7 @@ resolve() {
   PREFIX=${found%%$'\n'*}; record=${found#*$'\n'}
   W=$(record_field "$record" backend)
   if [[ $W == herdr ]]; then
-    [[ $(record_field "$record" workspace) == "$WS" ]] || die 'owned herdr workspace mismatch'
+    WS=$(record_field "$record" workspace)
     H_PANE=$(record_field "$record" pane); H_TAB=$(record_field "$record" window)
     [[ -n $H_PANE && -n $H_TAB ]] || die 'owned herdr pane/tab identity unavailable'
     [[ $(record_field "$record" split) == true ]] && H_SPLIT=1 || H_SPLIT=0
@@ -427,7 +459,7 @@ h_open() {
     fi
   done
   (( ready )) || die "shell in window $name did not accept input within 60 s; inspect with child-session peek $name"
-  herdr pane run "$H_PANE" "clear; bash --noprofile --norc $(printf '%q' "$launcher")" >/dev/null
+  herdr pane run "$H_PANE" "clear; HERDR_ENV=1 HERDR_WORKSPACE_ID=$(printf '%q' "$WS") HERDR_PANE_ID=$(printf '%q' "$H_PANE") HERDR_TAB_ID=$(printf '%q' "$H_TAB") bash --noprofile --norc $(printf '%q' "$launcher")" >/dev/null
 }
 
 # Decide before creating anything whether --split can open a pane: only in
@@ -505,6 +537,9 @@ cmd_open() {
     # A terminal server must receive the complete caller environment, not its stale copy.
     for variable in $(compgen -e); do
       [[ $variable == TMUX || $variable == TMUX_PANE ]] && continue
+      if [[ $BACKEND == herdr ]]; then
+        case $variable in HERDR_ENV|HERDR_WORKSPACE_ID|HERDR_PANE_ID|HERDR_TAB_ID) continue ;; esac
+      fi
       printf 'export %s=%q\n' "$variable" "${!variable}"
     done
     printf 'cd -- %q || exit 2\n' "$cwd"
