@@ -56,7 +56,7 @@ For the dual assignment, the dual review's [Complete suite](../independent-revie
 
 ## 3. Request independent review
 
-Obtain each attempt from independent-review with the round's target row and order, under `--auto` with `--auto` too, so its prompt says `Auto: yes`. Each round gets a fresh round directory beside the loop record, which holds the round's attempt directories. Give its name a random part (`mktemp -d "<record dir>/round-<n>-XXXXXX"` on POSIX, a random directory name on PowerShell): a window reviewer's name is built from it and must differ from every other loop's. Carry requirements/rules/checks, previous verdict, and the full finding ledger with evidence and disposition basis. Select the target and order:
+Obtain each attempt from independent-review with the round's target row and order, under `--auto` with `--auto` too, so its prompt says `Auto: yes`. Each round gets a fresh round directory beside the loop record, which holds the round's attempt directories. Give its name a random part (`mktemp -d "<record dir>/round-<n>-XXXXXX"` on POSIX, a random directory name on PowerShell): the round directory separates attempt artifacts; independent-review separately allocates and persists its random `window-run-token`, reused on resume with phase/attempt suffixes, to name reviewer windows. Carry requirements/rules/checks, previous verdict, and the full finding ledger with evidence and disposition basis. Select the target and order:
 
 | Review | Target and order |
 | --- | --- |
@@ -71,7 +71,9 @@ In a dual assignment each review in the table, final pass and disposition rounds
 
 ## 4. Validate and decide
 
-Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>` or `checkout changed`, with its `result.md`; copy those facts into the round's "Result validity/completion" field. A result not obtained from independent-review on a recorded commit, such as a review taken on uncommitted changes, is an invalid attempt of the pending round and never a completed round.
+Each attempt comes back validated by independent-review (its **Validate** section) as `valid`, `invalid: <reason>`, `checkout changed` or shutdown-unconfirmed `blocked`, with its `result.md`; copy those facts into the round's "Result validity/completion" field. A result not obtained from independent-review on a recorded commit, such as a review taken on uncommitted changes, is an invalid attempt of the pending round and never a completed round.
+
+A shutdown-unconfirmed `blocked` return leaves the round pending: preserve its ownership records, before evidence and spent budget; do not start another reviewer, suite or fix while its stopped-process barrier is unresolved. Report the blocked reason and resume only through the same recovery gates.
 
 Apply independent-review’s [Phase recovery and resume](../independent-review/references/checkout-state.md#phase-recovery-and-resume) to suite evidence, single attempts and retries. Failed pre-capture launches nothing/spends no attempt; unavailable post-capture spends the existing budget and retains its pre-phase baseline for recovery comparison. Unavailability alone is not a write. Capture errors persist alongside any proven difference.
 

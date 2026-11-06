@@ -334,7 +334,16 @@ backend_probe() {
 
 # Keep user configuration, but never inherit parent-agent session metadata.
 strip_variable() {
-  [[ $1 =~ ^(CLAUDE|CODEX_COMPANION_|CODEX_) && $1 != CLAUDE_CONFIG_DIR && $1 != CODEX_HOME ]]
+  case "$1" in
+    CLAUDECODE|CLAUDE_CODE_SESSION_ID|\
+    CLAUDE_CODE_CHILD_SESSION|CLAUDE_CODE_MESSAGING_SOCKET|\
+    CLAUDE_CODE_MESSAGING_TOKEN|CLAUDE_EFFORT|\
+    CODEX_THREAD_ID|CODEX_COMPANION_SESSION_ID|\
+    CODEX_COMPANION_TRANSCRIPT_PATH|CODEX_SESSION_ID|\
+    CODEX_TOOL_CALL_ID|CLAUDE_PID|\
+    CLAUDE_CODE_SESSION_ATTENDED|CLAUDE_CODE_ENTRYPOINT) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 for variable in $(compgen -e); do
   if strip_variable "$variable"; then unset "$variable"; fi

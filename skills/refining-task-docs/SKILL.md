@@ -16,15 +16,14 @@ Under `--auto` read child-sessions' [auto.md](../child-sessions/references/auto.
 
 ## Input
 
-1. The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout (under `--auto`, routed by [auto.md](../child-sessions/references/auto.md#deciding)). Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Resolve applicable project rules. Resolve each given path to an absolute path, read it completely and recognise it:
-   - **Plan**: it carries the superpowers plan header (`> **For agentic workers:** REQUIRED SUB-SKILL:`) or lies in a `plans/` directory of a superpowers docs dir (`docs/superpowers/plans/`) and is not a `*-follow-ups.md` or `*-tails.md` file.
-   - **Spec**: named `*-design.md` or lying in a `specs/` directory.
+1. The project checkout is the top level of the current repository. When that top level is a separate docs repository (a `docs/superpowers` directory with its own repository), the project checkout is `git -C <docs-top>/../.. rev-parse --show-toplevel`; when that fails, ask the user for the project checkout (under `--auto`, routed by [auto.md](../child-sessions/references/auto.md#deciding)). Project-relative paths such as `**Spec:**` headers resolve against the project checkout, never the docs repository. Resolve applicable project rules. Resolve each given path to an absolute path, read it completely and recognise it by [task document paths](../planning-task-docs/references/document-paths.md):
+   - **Plan**: a plan by that reference; follow-ups and tails are refused.
+   - **Spec**: a spec by that reference.
 
    Anything else is refused before any window: only specs and plans are reviewed. Two plans or two specs are refused too.
 2. A single plan: find its spec by the matching rules; a single spec is reviewed alone, its plans are not added. Matching rules, in order:
-   1. Naming pair: `specs/YYYY-MM-DD-<slug>-design.md` with `plans/YYYY-MM-DD-<slug>.md` in the same docs dir.
-   2. Else the plan's `**Spec:**` header line (path relative to the project checkout).
-   3. Else ask the user which spec belongs to the plan. Never guess a pairing. Under `--auto` the question is routed by [auto.md](../child-sessions/references/auto.md#deciding), and no session answers it by guessing: without a task or document of its own that names the spec, it reaches the user.
+   1. Plan to spec in task document paths: same-directory, mirrored naming pair, then `**Spec:**` header.
+   2. Else ask the user which spec belongs to the plan. Never guess a pairing. Under `--auto` the question is routed by [auto.md](../child-sessions/references/auto.md#deciding), and no session answers it by guessing: without a task or document of its own that names the spec, it reaches the user.
 3. Docs repository = `git -C <document-dir> rev-parse --show-toplevel`; every document of the run must lie in the same one. Run the own-paths gate on the docs repository over every document of the run, those to review and the context documents alike; a hit stops, naming the path. Record the docs repository's full HEAD as `<base-sha>`.
 4. Classify each document fresh or stale per [review-mark.md](references/review-mark.md#freshness), `rel` relative to the docs repository, and show each to the user: fresh with verdict, reviewer and date; stale with the failing condition. Stale documents are the documents to review; fresh ones are context only. None stale: report "nothing to review" with each document's mark and stop; no window opens.
 

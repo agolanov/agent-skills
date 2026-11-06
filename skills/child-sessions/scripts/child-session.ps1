@@ -2,9 +2,34 @@
 # with a literal string array; direct -File calls use the same grammar.
 $script:ChildSessionOwner=$PSCommandPath
 $script:Utf8=New-Object Text.UTF8Encoding($false,$true)
+function Test-ChildSessionParentMetadata {
+    param([string]$Name)
+    # Windows environment names are case-insensitive; preserve all other names.
+    return $Name -in @(
+        'CLAUDECODE',
+        'CLAUDE_CODE_SESSION_ID',
+        'CLAUDE_CODE_CHILD_SESSION',
+        'CLAUDE_CODE_MESSAGING_SOCKET',
+        'CLAUDE_CODE_MESSAGING_TOKEN',
+        'CLAUDE_EFFORT',
+        'CODEX_THREAD_ID',
+        'CODEX_COMPANION_SESSION_ID',
+        'CODEX_COMPANION_TRANSCRIPT_PATH',
+        'CODEX_SESSION_ID',
+        'CODEX_TOOL_CALL_ID',
+        'CLAUDE_PID',
+        'CLAUDE_CODE_SESSION_ATTENDED',
+        'CLAUDE_CODE_ENTRYPOINT'
+    )
+}
 function Get-ChildSessionProcessStart {
     param([int]$ProcessId)
-    try { $p=Get-Process -Id $ProcessId -ErrorAction Stop; if (-not $p.HasExited) { return $p.StartTime.ToUniversalTime().Ticks.ToString() } } catch { return $null }
+    try { $p=Get-Process -Id $ProcessId -ErrorAction Stop }
+    catch {
+        if ($_.CategoryInfo.Category -eq [Management.Automation.ErrorCategory]::ObjectNotFound) { return $null }
+        throw
+    }
+    if (-not $p.HasExited) { return $p.StartTime.ToUniversalTime().Ticks.ToString() }
 }
 function Stop-ChildSessionProcess {
     param($Identity)
@@ -134,7 +159,8 @@ function Test-ChildSessionAlive {
     # The agent may outlive its launcher; input also needs the launcher.
     $ids=@($Record.agent);if ($Control) { $ids+=$Record.launcher }
     foreach ($id in $ids) {
-        if (-not $id -or -not $id.start -or (Get-ChildSessionProcessStart ([int]$id.pid)) -cne $id.start) { return $false }
+        if (-not $id -or -not $id.pid -or -not $id.start) { throw 'Process identity inconclusive; liveness unknown and session preserved.' }
+        if ((Get-ChildSessionProcessStart ([int]$id.pid)) -cne $id.start) { return $false }
     }
     return $true
 }
@@ -269,7 +295,7 @@ function Start-ChildSession {
     $r | Add-Member -NotePropertyName supported_operations -NotePropertyValue (Get-ChildSessionCapabilities $r)
     $environment=@{}
     foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
-        if ($entry.Key -imatch '^(CLAUDE|CODEX_COMPANION_|CODEX_)' -and $entry.Key -inotmatch '^(CLAUDE_CONFIG_DIR|CODEX_HOME)$') { continue }
+        if (Test-ChildSessionParentMetadata $entry.Key) { continue }
         $environment[$entry.Key]=$entry.Value
     }
     $transport=Join-Path $script:Runtime ($name+'-'+$launch+'.transport.json')
@@ -332,7 +358,7 @@ function Invoke-ChildSessionLauncher {
         foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) { Remove-Item -LiteralPath ('Env:'+$entry.Key) -ErrorAction SilentlyContinue }
         foreach ($entry in $request.environment.psobject.Properties) { [Environment]::SetEnvironmentVariable($entry.Name,[string]$entry.Value,'Process') }
         foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
-            if ($entry.Key -imatch '^(CLAUDE|CODEX_COMPANION_|CODEX_)' -and $entry.Key -inotmatch '^(CLAUDE_CONFIG_DIR|CODEX_HOME)$') { Remove-Item -LiteralPath ('Env:'+$entry.Key) -ErrorAction SilentlyContinue }
+            if (Test-ChildSessionParentMetadata $entry.Key) { Remove-Item -LiteralPath ('Env:'+$entry.Key) -ErrorAction SilentlyContinue }
         }
         [IO.File]::Delete($Transport)
         Set-Location -LiteralPath $request.cwd
