@@ -39,6 +39,8 @@ One minimum holds for every spec, whatever its author decides: **behaviour, one 
 
 GREEN runs again only after a failed GREEN, once the failure is fixed; fixes made later by a cross review trigger no further GREEN. A change that alters only wording, with no change in what the agent does, needs neither run, and its spec says why the change is wording only.
 
+**Follow-ups batches.** A batch of follow-ups fixes made by `delivering-task-follow-ups` has no spec. Its minimum is one RED and one GREEN for each skill whose behaviour the batch changes, both run after all fixes of the batch and before its commit: RED on the skill text at HEAD, GREEN on the edited text, each a fresh subagent on a copied fixture, their results appended to `tests/<name>/baseline-notes.md` and `green-notes.md`. One scenario per skill covers all of that skill's behaviour changes in the batch; a skill changed only in wording gets neither. Each changed skill directory also gets structural validation and the scripted suites under `tests/` that exist for it. The batch's review is the skill's own `review-fix-loop`, and fixes made by that review trigger no further RED or GREEN.
+
 Further checks a spec may name, each because a named risk needs it:
 
 - Structural validation (below) of each changed skill directory.

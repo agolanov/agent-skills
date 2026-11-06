@@ -29,8 +29,7 @@ Settle the findings left after a delivered task.
 
 | Skill | Description |
 |-------|-------------|
-| `triaging-task-follow-ups` | Recheck follow-ups files against the current code, fix the small findings directly in the current session, group the findings that need design into task briefs, and remove settled findings from the files. |
-| `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation: triage them, then plan, review and deliver each resulting task brief to the main branch. |
+| `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation: fix the localized findings directly on the main branch in one batch, checked once, committed and reviewed with `review-fix-loop`, drop resolved ones, and plan, review and deliver only the findings that need design. |
 
 ### Review and refinement
 
@@ -70,8 +69,9 @@ Each skill picks its default: a window where the worker talks to the user or wor
 | `delivering-task` | the implementer of each task | `window` | `inline`, `subagent`, `background`; with several documents these run the tasks one at a time in queue order, and `--parallel` applies to `window` only |
 | `review-fix-loop` | the loop owner, which fixes | `inline`: the session that did the work fixes it | `subagent`, `background`, `window` |
 | `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `subagent`, `window`; `inline` is refused, since reviewing one's own work is not independent |
-| `triaging-task-follow-ups`, `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
-| `delivering-spec-stages`, `delivering-task-follow-ups` | the orchestrator itself | `inline`; its nested skills run in subagents | `background`, `window` |
+| `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
+| `delivering-spec-stages` | the orchestrator itself | `inline`; its nested skills run in subagents | `background`, `window` |
+| `delivering-task-follow-ups` | the fixer, which fixes the batch and runs the chain for the findings that need design | `inline`; the chain's skills run in subagents | `background`, `window` |
 
 A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
 

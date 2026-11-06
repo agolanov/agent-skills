@@ -14,8 +14,8 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | xhigh |
 | inline implementer | `delivering-task` child in `inline` mode (one document or each unit of its queue), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `delivering-task` Execution mode |
 | reviewer | `independent-review` reviewer in every place; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
-| triager | `triaging-task-follow-ups` worker outside `inline` | latest available Opus | latest available Sol | high |
-| orchestrator | `delivering-spec-stages` and `delivering-task-follow-ups` outside `inline` | latest available Opus | latest available Sol | high |
+| follow-ups fixer | `delivering-task-follow-ups` worker outside `inline`, which fixes the batch and runs the chain | latest available Opus | latest available Sol | high |
+| orchestrator | `delivering-spec-stages` outside `inline` | latest available Opus | latest available Sol | high |
 
 The root chooses between the two implementer roles by the execution mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
 
@@ -48,7 +48,7 @@ Verify the model/effort pair is supported and permitted for that concrete model 
 
 Resolve once per run, record the concrete values with their source and discovery evidence, and reuse the record for every later launch of that role in the run. When changing system or launch method, re-resolve incompatible recorded values.
 
-Child sessions (planner, splitter, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root, and so does the child of every other worker role outside `inline` (the loop owner, the `consolidating-plans` worker, triager, orchestrator) in its [run-contract](../../child-sessions/references/run-contract.md#brief) brief, after the identity lines:
+Child sessions (planner, splitter, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root, and so does the child of every other worker role outside `inline` (the loop owner, the `consolidating-plans` worker, follow-ups fixer, orchestrator) in its [run-contract](../../child-sessions/references/run-contract.md#brief) brief, after the identity lines:
 
 ```text
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
@@ -104,7 +104,7 @@ Every opening of the window in the run has its own record, and each is checked.
 When:
 
 1. **Early check:** at the first return of the foreground `wait` after each `open`. Only a mismatch acts: the root stops the wait loop, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. A record not yet found or not yet unique, or a found record without the fields yet, is left to the final check. `delivering-task`'s queue runs this check in its own Wait loop.
-2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, triager, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting. A window reviewer runs final settings validation only after its [stop, confirm, capture, validate](window-reviewers.md#stop-confirm-capture-validate) barrier, with reviewer invalidation replacing the child question.
+2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, follow-ups fixer, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting. A window reviewer runs final settings validation only after its [stop, confirm, capture, validate](window-reviewers.md#stop-confirm-capture-validate) barrier, with reviewer invalidation replacing the child question.
 
 Outcomes:
 

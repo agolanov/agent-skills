@@ -25,4 +25,4 @@ A brief is the input `planning-task-docs <brief>` turns into a spec and plan: on
 - <each design decision the finding lines or the recheck leave open, as a question for the planner to settle with the user; `None` when there is none>
 ```
 
-The source follow-ups file may be deleted by this triage, once its last finding is settled: its path and section heading name the record in Git history. The finding lines stay verbatim, with their `<where>` as recorded: the `Now:` line carries where the code is today. Leave out designs and solutions of your own: choosing them is the planner's brainstorming with the user.
+The source follow-ups file may be deleted by this run, once its last finding is settled: its path and section heading name the record in Git history. The finding lines stay verbatim, with their `<where>` as recorded: the `Now:` line carries where the code is today. Leave out designs and solutions of your own: choosing them is the planner's brainstorming with the user.

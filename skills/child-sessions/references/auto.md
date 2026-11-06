@@ -27,7 +27,7 @@ A session that receives a question under `--auto`:
 
 **`CLEAN EXCEPT DISPUTED`.** Accepting it belongs to the first session alone: a child passes it up by step 2. The first session reads both positions of every disputed finding and accepts only when it judges none of them a defect; otherwise it asks the user.
 
-The consents a skill asks of the user are routed the same way: a commit (the triage's commit question, `review-fix-loop`'s commit consent), accepting `CLEAN EXCEPT DISPUTED`, accepting a launch-settings mismatch, dropping a dependency outside the run or skipping its unit, choosing among a spec's plans. A skill sentence such as "The user decides; never choose for them" reads, under `--auto`, as "the first session decides by these steps".
+The consents a skill asks of the user are routed the same way: a commit (`review-fix-loop`'s commit consent), accepting `CLEAN EXCEPT DISPUTED`, accepting a launch-settings mismatch, dropping a dependency outside the run or skipping its unit, choosing among a spec's plans. A skill sentence such as "The user decides; never choose for them" reads, under `--auto`, as "the first session decides by these steps".
 
 An answer chooses among the options the skill offers and adds none: no push, no force, nothing outside the paths and branches the skill already works on.
 
