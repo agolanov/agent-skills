@@ -22,6 +22,7 @@ Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>)
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 Reviewer run: <background|subagent|window> (<default | explicit>)
 Git checks: <absolute installed independent-review/references/checkout-state.md>. Read it for each clean/path gate and continuation: verify checkout/branch/HEAD, record the four ordinary Git commands with actual exits/raw outputs, and compare exact repository-relative paths. Use ordinary Git for other read-only checks with GIT_OPTIONAL_LOCKS=0. Failed evidence blocks. Carry its ignored/untracked-content, Git flags/normalization, nested-repository and transient-write limits; the legacy Python helper is optional.
+Suite evidence: records <absolute directory outside every checked tree>; retained suite records <absolute paths | None>. Before the first complete suite, read and apply the Git checks reference's Run and hand off a suite recipe, including implementation checks before review-fix-loop starts. Return actual suite-record paths in Checks.
 
 Ownership: you are the only implementation writer in this checkout. The root owns integration, cleanup and any follow-ups the Follow-ups line leaves to it.
 

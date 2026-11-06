@@ -24,7 +24,7 @@ HEAD: <full SHA>
 <git log --oneline <base>..HEAD>
 
 ## Checks
-<command → result>
+<command → actual result; required evidence paths>
 
 ## Review
 <role-dependent result: implementer's final refine verdict, reviewer's raw verdict, or caller-defined cross-check outcome; actual progress/reason when blocked or failed>
@@ -45,6 +45,8 @@ HEAD: <full SHA>
 Two sections are optional, otherwise omitted: `## Artifacts`, present only when the calling task asks for it, lists files the child created or changed, one absolute path per line; `## Decisions`, present when the child or its children decided anything without the user under `--auto`, lists those decisions as [auto.md](auto.md#decisions) says.
 
 Keep every field and section except the optional `## Artifacts` and `## Decisions`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
+
+When the task requests reusable suite evidence, `Checks` links each absolute suite-record path, including partial or failed runs. The caller applies the [suite handoff acceptance step](../../independent-review/references/checkout-state.md#run-and-hand-off-a-suite) before claiming reuse; the root still preserves the child's report unchanged.
 
 ## Role-dependent results
 
