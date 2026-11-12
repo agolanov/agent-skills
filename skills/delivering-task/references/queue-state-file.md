@@ -38,3 +38,24 @@ Header: `# list`, or for a directory `# directory <absolute dir>`; then one `# d
 On a rerun with an identical header, `delivered <sha7>` units are done and every other state is a candidate again, its dependencies re-evaluated (Input 2).
 
 Nothing is committed: the state file is the run's only record, and the final report carries the table.
+
+
+## Queue record
+
+Only queue phase agents write `<runtime>/<queue-slug>-handoff.md`, atomically, in the [handoff format](../../child-sessions/references/handoff-record.md#format) with these readings: `Run: <queue-slug>`; `Worker brief: None`; `Status file: None`; Place is the run's place; Checkout is the project main checkout. Reopen and Return to worker stay `unused` (each unit's record counts its own). Openings holds `None`. Waiting holds one `Launch:` line per unit whose agent is working, then the action; a recipe appears only in a one-at-a-time place. A queue performed by one root writes no queue record.
+
+Facts holds exactly these labelled lines, one Unit per unit in queue order:
+
+```text
+State file: <absolute path>
+Agent: <claude|codex>
+Parallel: <N>
+Merge: <merge|no-merge>
+Hold: <None|unit>
+Drain end: <none|pending>
+Unit: <unit> | depends on: <units, comma-separated|none> | mode: <mode> (<rule|explicit|recorded>); <reason> | settings: <model M (source), effort E (source)|recorded> | result: <-|merged <sha7>; follow-ups <path|-> <count|->|branch ready; follow-ups <path|-> <count|->>
+```
+
+Report carries retains Preflight 4's count lines and what Input 3 listed. Decisions and Told the user work as in every handoff record. Hold and Drain end retain the hold and the pending drain end of queue Finish half across agents; each result cell retains the unit's final report data for End.
+
+**Authority.** For this queue record use these checks in place of the per-worker record's checks: its units and order equal the state file's header; a unit it or the state file calls merged has that merge on main (queue Input 3's search); a started unit has its registered worktree and branch, or the branch it kept. Apply each unit's own record checks when acting on that unit. A disagreement stops, naming both values and retaining the files. Merge authority comes from the phase brief alone; neither this record nor the state file grants it.
