@@ -70,8 +70,8 @@ Each skill picks its default: a window where the worker talks to the user or wor
 | `review-fix-loop` | the loop owner, which fixes | `inline`: the session that did the work fixes it | `subagent`, `background`, `window` |
 | `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `subagent`, `window`; `inline` is refused, since reviewing one's own work is not independent |
 | `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
-| `delivering-spec-stages` | the orchestrator itself | `inline`; its nested skills run in subagents | `background`, `window` |
-| `delivering-task-follow-ups` | the fixer, which fixes the batch and runs the chain for the findings that need design | `inline`; the chain's skills run in subagents | `background`, `window` |
+| `delivering-spec-stages` | the orchestrator itself | `inline`; nested skills run as phase agents while the orchestrator waits | `background`, `window` |
+| `delivering-task-follow-ups` | the fixer, which fixes the batch and runs the chain for the findings that need design | `inline`; chain skills run as phase agents while the orchestrator waits | `background`, `window` |
 
 A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
 
