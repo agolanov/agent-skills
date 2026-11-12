@@ -34,6 +34,8 @@ Use the [handoff record format](../child-sessions/references/handoff-record.md#f
 
 **Accept reads:** the record, worker brief's labelled lines, status file, child-sessions status-file.md and handoff-record.md; launch-settings Child settings check and Places; checkout-state Direct-use preflight; review-mark.md Freshness and this shell's native recipe for Verify 5; child-sessions Locate and open (Startup), Dialogs and Recover a silent exit only for a reopen or a `send`; run-contract Questions and continuation under `subagent` or `background`; auto.md under `--auto`. Accept reads no document through, refiner-brief.md, stages-section.md or document-paths.md; it resolves no launch settings again.
 
+Extract the worker brief's identity lines with this anchored label list: `^(Checkout|Docs repository|Base SHA|Agent|Place|Auto|Launch settings|Reviewer settings|Reviewer run|Window name|Documents to review|Context documents|Review mark rules|Stage convention|Git checks|Status file|Opened): `. Keep each matching line's value as written. In review-mark.md Native freshness recipes, select the common preamble and only the current shell's fenced recipe (Bash or PowerShell).
+
 **Facts for this skill:** `Docs repository HEAD at start: <base-sha>`, a copy of the worker brief's `Base SHA:` to compare before using it. Other run values remain on the worker brief's labelled lines.
 
 ## Input
