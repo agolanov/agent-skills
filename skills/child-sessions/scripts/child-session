@@ -28,6 +28,27 @@ child-session key <name> <key>         Send one key without Enter: Escape, Up, D
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
+child-session wait --watch [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]... [seconds]
+  Watches the set until its first event, checked each round with launches in set order: a valid first
+  status line (printed, exit 0), the deadline (TIMEOUT, exit 124, default 43200 s), a launch gone
+  (EXITED, exit 3), a herdr or tmux launch whose visible screen has not changed for --stall seconds
+  (STALLED, exit 4, default 180). A launch named by --rearm takes its first screen as a baseline and
+  stalls only after its screen has differed from it. A screen with the waiting notice among its last
+  12 non-blank lines never stalls; a session prints that notice before it ends its turn on a free wait:
+    [child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.
+  with " A draft left in the input holds the wake." appended when a wake line will be typed into its
+  pane. Command errors exit 2. Claims <runtime-dir>/<name>.watcher for every launch and refuses a
+  launch that already has a live watcher. Writes <runtime-dir>/<first name>.result with the lines
+  launch, status_file, exit, line, watcher and launches.
+child-session wake [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]... [seconds]
+  Proves the caller's own herdr or tmux pane (never by title, focus or cwd) and refuses the terminal
+  backend, an unproven pane, an input it cannot classify and a launch with a live watcher. Then runs
+  the same watch detached, prints WAKE: watcher <pid> result <runtime-dir>/<first name>.result and
+  exits 0. When the watch ends, it types one line with its Enter into that pane, only while the pane's
+  input is empty (a draft holds the wake), and appends "wake: typed" or "wake: caller pane gone" to
+  the record:
+    child-session wake: <launch>; result record <path>
+  <launch> is the event's launch, or the watched names joined by "," after a deadline or an error.
 child-session close <name>
 child-session list
 
@@ -42,7 +63,9 @@ Argument overrides are whitespace-separated words, without shell evaluation.
 USAGE
 }
 
-die() { printf 'child-session: %s\n' "$*" >&2; exit 2; }
+# The message stays readable by an EXIT trap (a watcher records it).
+DIE_MESSAGE=
+die() { DIE_MESSAGE="$*"; printf 'child-session: %s\n' "$*" >&2; exit 2; }
 valid_name() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]] || die 'window names must match [A-Za-z0-9_-]+'; }
 # tmux also parses a trailing semicolon in an argv element as a separator.
 # Every call here is one command, so escape that extra parser boundary.
@@ -712,6 +735,732 @@ cmd_wait() {
     sleep "$delay"
   done
 }
+
+# Set watcher (wait --watch). Its state is global, so the EXIT trap and other
+# operations that run the same pieces (claims, loop, record) can read it.
+WATCH_NAMES=() WATCH_FILES=() WATCH_REARM=() WATCH_CLAIMED=()
+WATCH_SECONDS=43200 WATCH_STALL=180
+WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
+WATCH_CLAIM_TEXT='' WATCH_CLAIM_ERROR='' CLAIM_LINE=''
+WATCH_RECORDING=0 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
+WATCH_END_MESSAGE='' WATCH_SLEEP_PID=''
+# The operation named by parse errors (wake and wake-run set their own).
+WATCH_COMMAND='wait --watch'
+# [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]...
+# [seconds]: after the options, an odd count makes the last argument the deadline.
+parse_watch_args() {
+  local stall_given=0 seen=' ' name
+  WATCH_NAMES=() WATCH_FILES=() WATCH_REARM=() WATCH_SECONDS=43200 WATCH_STALL=180
+  while [[ $# -gt 0 && $1 == --* ]]; do
+    [[ $# -ge 2 ]] || die "$1: a value is required"
+    case $1 in
+      --stall)
+        (( ! stall_given )) || die '--stall is given twice'
+        [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 > 0 )) || die '--stall must be a positive integer'
+        WATCH_STALL=$((10#$2)); stall_given=1 ;;
+      --rearm) valid_name "$2"; WATCH_REARM+=("$2") ;;
+      *) die "unknown option $1" ;;
+    esac
+    shift 2
+  done
+  [[ $# -ge 2 ]] || die "$WATCH_COMMAND needs at least one <name> <status-file> pair"
+  if (( $# % 2 )); then
+    [[ ${!#} =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
+    WATCH_SECONDS=$((10#${!#}))
+    (( WATCH_SECONDS >= 0 )) || die 'wait seconds must be a nonnegative integer'
+  fi
+  while [[ $# -ge 2 ]]; do
+    # An option after the set is no launch name.
+    [[ $1 != -* ]] || die "$1 is not a launch name: options come before the watched launches"
+    valid_name "$1"
+    [[ $seen != *" $1 "* ]] || die "launch $1 is watched twice"
+    # The record keeps one line per key.
+    [[ -n $2 && $2 != *$'\n'* && $2 != *$'\r'* ]] || die 'a watched status file must be a nonempty one-line path'
+    WATCH_NAMES+=("$1")
+    WATCH_FILES+=("$2")
+    seen="$seen$1 "
+    shift 2
+  done
+  for name in ${WATCH_REARM[@]+"${WATCH_REARM[@]}"}; do
+    [[ $seen == *" $name "* ]] || die "--rearm $name names no watched launch"
+  done
+}
+
+# Claim <runtime-dir>/<name>.watcher holds "<pid> <process start identity>"; the
+# identity may contain spaces (macOS lstart), so the PID is the first word.
+claim_holder_live() { # <claim text>: status 0 while its PID keeps that start identity
+  local pid=${1%% *} identity=${1#* } now result=0
+  [[ $pid =~ ^[0-9]+$ && $1 == *' '* && -n $identity ]] || return 1
+  now=$(process_identity "$pid") || result=$?
+  # Unavailable evidence never frees a claim that may be live.
+  (( result != 2 )) || return 0
+  (( result == 0 )) && [[ $now == "$identity" ]]
+}
+read_claim_line() { # <path>: CLAIM_LINE is its first line, '' when present but unreadable; status 1 when absent
+  if CLAIM_LINE=$(head -n 1 -- "$1" 2>/dev/null); then return 0; fi
+  CLAIM_LINE=''
+  [[ -e $1 || -L $1 ]]
+}
+claim_key() { # <claim text>: every byte outside [A-Za-z0-9] becomes _, the first 32 kept; an empty text gives none
+  local keep=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 key
+  if [[ -z $1 ]]; then printf 'none'; return 0; fi
+  (LC_ALL=C; key=${1//[!$keep]/_}; printf '%s' "${key:0:32}")
+}
+irregular_path() { [[ -L $1 || ( -e $1 && ! -f $1 ) ]]; }
+# A stale claim is removed only by the watcher holding the marker
+# .<name>.watcher-after-<key of its text>, created exclusively. That is safe: the
+# claim's owner is dead and never releases it, no claim is created while one
+# exists, and only that marker's holder removes a claim with that text, so a claim
+# that still reads the text under the marker cannot change before it is removed.
+# Every other watcher looks again; no watcher moves or removes a claim at any other
+# point. A marker whose holder is dead is passed through the marker named after
+# that holder (at most 3 links); a killed marker holder leaves its marker behind.
+# Marker names are bounded: the launch-name part is the name's first 64
+# characters and every key its first 32, so the deepest marker basename is
+# 1 + 64 + 15 + 32 + 3 x 33 = 211 bytes, under the 255-byte name limit. Two stale
+# texts, or two launches sharing 64 characters, may then share a marker; that only
+# serializes them, since the holder removes a claim only when it reads the full
+# text again and a chain level is entered only past a dead holder. The cut is
+# deterministic, so every watcher reading one dead holder chains to the same marker.
+claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim is removed under its marker
+  local name=$1 prepared=$2 target=$RUNTIME_DIR/$1.watcher text='' marker='' links=0 attempt
+  for ((attempt = 0; attempt < 10; attempt++)); do
+    if [[ -z $marker ]]; then
+      if [[ -d $target && ! -L $target ]]; then WATCH_CLAIM_ERROR="claim $target is a directory"; return 1; fi
+      if ln -n -- "$prepared" "$target" 2>/dev/null; then WATCH_CLAIMED+=("$name"); return 0; fi
+      # A FIFO there would block the read for good.
+      if [[ -e $target && ! -f $target ]]; then WATCH_CLAIM_ERROR="claim $target is not a regular file"; return 1; fi
+      read_claim_line "$target" || continue
+      text=$CLAIM_LINE
+      if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
+      marker=$RUNTIME_DIR/.${name:0:64}.watcher-after-$(claim_key "$text") links=0
+    fi
+    # ln would put the link inside a directory at the marker path.
+    if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
+    if ln -n -- "$prepared" "$marker" 2>/dev/null; then
+      if [[ -e $target && ! -f $target ]]; then
+        rm -f -- "$marker" 2>/dev/null || true
+        WATCH_CLAIM_ERROR="claim $target is not a regular file"; return 1
+      fi
+      if read_claim_line "$target" && [[ $CLAIM_LINE == "$text" ]]; then rm -f -- "$target" 2>/dev/null || true; fi
+      rm -f -- "$marker" 2>/dev/null || true
+      marker=''
+      continue
+    fi
+    if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
+    # A vanished marker is tried again.
+    read_claim_line "$marker" || continue
+    if claim_holder_live "$CLAIM_LINE"; then sleep 1; marker=''; continue; fi
+    links=$((links + 1))
+    (( links <= 3 )) || break
+    marker=$marker-$(claim_key "$CLAIM_LINE")
+  done
+  WATCH_CLAIM_ERROR="the claim on launch $name kept changing"
+  return 1
+}
+# Claims every watched launch for this process. On a refusal it releases the
+# claims it took and returns 1 with the message in WATCH_CLAIM_ERROR.
+claim_launches() {
+  local identity prepared name
+  WATCH_CLAIM_ERROR='' WATCH_CLAIMED=()
+  if ! identity=$(process_identity "$$"); then WATCH_CLAIM_ERROR='watcher start identity unavailable'; return 1; fi
+  WATCH_CLAIM_TEXT="$$ $identity"
+  prepared=$RUNTIME_DIR/.watcher-claim-$$-$RANDOM
+  if ! (set -o noclobber; printf '%s\n' "$WATCH_CLAIM_TEXT" > "$prepared") 2>/dev/null; then
+    WATCH_CLAIM_ERROR='watcher claim could not be prepared'; return 1
+  fi
+  for name in "${WATCH_NAMES[@]}"; do
+    if ! claim_one "$name" "$prepared"; then rm -f -- "$prepared"; release_claims; return 1; fi
+  done
+  rm -f -- "$prepared"
+}
+release_claims() { # only claims this process took and that still hold its own text
+  local name
+  for name in ${WATCH_CLAIMED[@]+"${WATCH_CLAIMED[@]}"}; do
+    [[ $(head -n 1 -- "$RUNTIME_DIR/$name.watcher" 2>/dev/null) != "$WATCH_CLAIM_TEXT" ]] ||
+      rm -f -- "$RUNTIME_DIR/$name.watcher"
+  done
+  WATCH_CLAIMED=()
+}
+
+# Result record <runtime-dir>/<first name>.result. The text stays in
+# WATCH_RESULT_TEXT, so a later rewrite works from memory, never from the file.
+store_result() { # <text>: atomic replacement through a temporary file in the same directory
+  # The temporary name keeps the first name's first 64 characters, as marker names do.
+  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]:0:64}.result-$$-$RANDOM
+  # mv would put the record inside a directory, or a link to one, at its path.
+  if (set -o noclobber; printf '%s' "$1" > "$temporary") 2>/dev/null && [[ ! -d $target ]] && mv -f -- "$temporary" "$target"; then
+    [[ -d $target ]] || return 0
+    rm -f -- "$target/${temporary##*/}"
+    return 1
+  fi
+  rm -f -- "$temporary"
+  return 1
+}
+write_result() { # <launch> <status file> <exit> <line>
+  local IFS=' ' line=$4
+  line=${line//$'\r'/ }; line=${line//$'\n'/ }
+  printf -v WATCH_RESULT_TEXT 'launch: %s\nstatus_file: %s\nexit: %s\nline: %s\nwatcher: %s\nlaunches: %s\n' \
+    "$1" "$2" "$3" "$line" "$$" "${WATCH_NAMES[*]}"
+  WATCH_RESULT_WRITTEN=1
+  store_result "$WATCH_RESULT_TEXT"
+}
+start_result() { # after all claims: the old record goes, and every end writes a new one; status 1 with WATCH_CLAIM_ERROR when it cannot
+  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result
+  if [[ -d $target ]]; then WATCH_CLAIM_ERROR="result record $target is a directory"; return 1; fi
+  WATCH_RECORDING=1 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
+  rm -f -- "$target" || { WATCH_CLAIM_ERROR="old result record $target could not be removed"; return 1; }
+}
+
+strip_csi() { # stdin -> the same text with its CSI sequences (SGR included) removed
+  local esc=$'\033'
+  LC_ALL=C sed -e "s#${esc}\[[0-?]*[ -/]*[@-~]##g"
+}
+# A child waiting for free ends its turn with the waiting notice:
+#   [child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.
+screen_waiting() { # stdin: a screen; status 0 when one of its last 12 non-blank lines holds the notice
+  local text line visible nbsp=$'\xc2\xa0' count=0 index
+  local -a kept=()
+  text=$(strip_csi) || return 1
+  while IFS= read -r line; do
+    visible=${line//$nbsp/}; visible=${visible//[[:space:]]/}
+    [[ -n $visible ]] || continue
+    kept[count]=$line; count=$((count + 1))
+  done <<< "$text"
+  for ((index = count > 12 ? count - 12 : 0; index < count; index++)); do
+    [[ ${kept[index]} != *'[child-session waiting]'* ]] || return 0
+  done
+  return 1
+}
+launch_screen() { # <name>: prints the visible screen of a resolved launch; nonzero when unavailable
+  resolve "$1" || return 1
+  case $W in
+    herdr) herdr pane read "$H_PANE" --source visible ;;
+    tmux) tmux_call capture-pane -p -t "$OWN_PANE" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Stall state per launch, indexed like WATCH_NAMES: stall-watched (its recorded
+# backend shows a screen), re-armed, has a first capture, armed, the last capture
+# and since when (SECONDS) it is unchanged, and a re-armed launch's baseline.
+WATCH_SCREEN_ON=() WATCH_REARMED=() WATCH_SAMPLED=() WATCH_ARMED=()
+WATCH_LAST=() WATCH_SINCE=() WATCH_BASELINE=() WATCH_STALL_CAP=0
+stall_start() { # sets the state of every launch, and the sleep cap while any launch is stall-watched
+  local count=${#WATCH_NAMES[@]} index name found backend
+  WATCH_SCREEN_ON=() WATCH_REARMED=() WATCH_SAMPLED=() WATCH_ARMED=()
+  WATCH_LAST=() WATCH_SINCE=() WATCH_BASELINE=() WATCH_STALL_CAP=0
+  for ((index = 0; index < count; index++)); do
+    WATCH_SCREEN_ON[index]=0 WATCH_REARMED[index]=0 WATCH_SAMPLED[index]=0 WATCH_ARMED[index]=0
+    WATCH_LAST[index]='' WATCH_SINCE[index]=0 WATCH_BASELINE[index]=''
+    for name in ${WATCH_REARM[@]+"${WATCH_REARM[@]}"}; do
+      [[ $name != "${WATCH_NAMES[index]}" ]] || WATCH_REARMED[index]=1
+    done
+    found=$(runtime_op find "${WATCH_NAMES[index]}" 2>/dev/null) || continue
+    backend=$(record_field "${found#*$'\n'}" backend) || backend=''
+    if [[ $backend == herdr || $backend == tmux ]]; then
+      WATCH_SCREEN_ON[index]=1
+      WATCH_STALL_CAP=$((WATCH_STALL / 3))
+      (( WATCH_STALL_CAP >= 1 )) || WATCH_STALL_CAP=1
+    fi
+  done
+}
+# Samples the screen of the launch at <index>: status 0 when it has stalled. A
+# capture equal to the last one stalls an armed launch after WATCH_STALL seconds
+# unless it is a waiting screen; a changed, waiting or failed capture restarts
+# the time. A re-armed launch is armed only by a capture that differs from its
+# first one.
+screen_sample() {
+  local index=$1 screen now
+  (( WATCH_SCREEN_ON[index] )) || return 1
+  # The x keeps trailing newlines, so captures compare as exact text. A failed
+  # capture never ends the watcher by itself.
+  if ! screen=$(launch_screen "${WATCH_NAMES[index]}" 2>/dev/null && printf x); then
+    WATCH_SINCE[index]=$SECONDS
+    return 1
+  fi
+  screen=${screen%x} now=$SECONDS
+  if (( ! WATCH_SAMPLED[index] )); then
+    WATCH_SAMPLED[index]=1 WATCH_LAST[index]=$screen WATCH_SINCE[index]=$now WATCH_ARMED[index]=1
+    if (( WATCH_REARMED[index] )); then WATCH_ARMED[index]=0 WATCH_BASELINE[index]=$screen; fi
+    return 1
+  fi
+  if [[ $screen != "${WATCH_LAST[index]}" ]]; then
+    WATCH_LAST[index]=$screen WATCH_SINCE[index]=$now
+    if (( ! WATCH_ARMED[index] )) && [[ $screen != "${WATCH_BASELINE[index]}" ]]; then WATCH_ARMED[index]=1; fi
+    return 1
+  fi
+  if screen_waiting <<< "$screen"; then
+    WATCH_SINCE[index]=$now
+    return 1
+  fi
+  (( WATCH_ARMED[index] && now - WATCH_SINCE[index] >= WATCH_STALL ))
+}
+watch_event() { # <launch> <status file> <line>: the event that ends the watch
+  WATCH_LAUNCH=$1 WATCH_STATUS_FILE=$2 WATCH_LINE=$3
+  printf '%s\n' "$3"
+}
+watch_sleep() { # <seconds>; a trapped signal interrupts wait, so it ends the watcher at once
+  # The sleep never holds the caller's pipes open.
+  sleep "$1" </dev/null >/dev/null 2>&1 &
+  WATCH_SLEEP_PID=$!
+  wait "$WATCH_SLEEP_PID" || true
+  WATCH_SLEEP_PID=''
+}
+# Each round: every status in set order, then the deadline, then every launch's
+# liveness (plain wait's rule, per launch), then stalls. Prints the event line
+# and returns its exit; a failed liveness check returns its own code. Plain
+# wait's cadence, its sleep capped at max(1, stall / 3) s while any launch is
+# stall-watched.
+watch_loop() {
+  local count=${#WATCH_NAMES[@]} started=$SECONDS elapsed remaining delay first_line index alive_result stall_ready=0
+  local -a seen_alive=()
+  for ((index = 0; index < count; index++)); do seen_alive[index]=0; done
+  WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
+  while true; do
+    for ((index = 0; index < count; index++)); do
+      first_line=''
+      if [[ -f ${WATCH_FILES[index]} ]]; then first_line=$(head -n 1 -- "${WATCH_FILES[index]}" 2>/dev/null) || first_line=''; fi
+      if [[ $first_line =~ ^STATUS:\ (done|blocked|failed)$ ]]; then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "$first_line"
+        return 0
+      fi
+    done
+    elapsed=$((SECONDS - started))
+    if (( elapsed >= WATCH_SECONDS )); then
+      watch_event '' '' "TIMEOUT: $WATCH_SECONDS s without status"
+      return 124
+    fi
+    for ((index = 0; index < count; index++)); do
+      alive_result=0
+      cmd_alive "${WATCH_NAMES[index]}" || alive_result=$?
+      if (( alive_result == 0 )); then
+        seen_alive[index]=1
+      elif (( alive_result != 1 )); then
+        WATCH_LINE="alive check of window ${WATCH_NAMES[index]} failed with exit $alive_result"
+        printf 'child-session: %s\n' "$WATCH_LINE" >&2
+        return "$alive_result"
+      elif (( seen_alive[index] || elapsed >= 120 )); then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "EXITED: agent in window ${WATCH_NAMES[index]} is gone, no status"
+        return 3
+      fi
+    done
+    # Prepared at the first stall check, so a status already present returns at once.
+    (( stall_ready )) || { stall_start; stall_ready=1; }
+    for ((index = 0; index < count; index++)); do
+      if screen_sample "$index"; then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "STALLED: screen of window ${WATCH_NAMES[index]} unchanged for $WATCH_STALL s"
+        return 4
+      fi
+    done
+    elapsed=$((SECONDS - started))
+    remaining=$((WATCH_SECONDS - elapsed))
+    (( remaining > 0 )) || continue
+    if (( elapsed < 120 )); then
+      delay=5
+      (( delay <= 120 - elapsed )) || delay=$((120 - elapsed))
+    else delay=30; fi
+    if (( WATCH_STALL_CAP && delay > WATCH_STALL_CAP )); then delay=$WATCH_STALL_CAP; fi
+    (( delay <= remaining )) || delay=$remaining
+    watch_sleep "$delay"
+  done
+}
+
+watch_signal() { # <signal> <exit>
+  WATCH_END_MESSAGE="watcher stopped by signal $1"
+  exit "$2"
+}
+# Any end after start_result that has not written the record (die, a signal)
+# writes it; claims this process still holds are released.
+watch_exit() {
+  local code=$?
+  if [[ -n $WATCH_SLEEP_PID ]]; then kill "$WATCH_SLEEP_PID" 2>/dev/null || true; fi
+  if (( WATCH_RECORDING && ! WATCH_RESULT_WRITTEN )); then
+    # Without an event the end is never a status.
+    (( code != 0 )) || code=2
+    write_result '' '' "$code" "${DIE_MESSAGE:-${WATCH_END_MESSAGE:-watcher ended without an event}}" || true
+  fi
+  # wake-run ended by an error (not a signal) still wakes its caller before it
+  # releases its claims; a signal now ends it with its claims released.
+  if (( WAKE_PENDING )) && [[ -z $WATCH_END_MESSAGE ]]; then
+    trap 'release_claims; exit 130' INT
+    trap 'release_claims; exit 143' TERM
+    wake_finish || true
+  fi
+  release_claims || true
+  exit "$code"
+}
+watch_traps() {
+  trap watch_exit EXIT
+  trap 'watch_signal HUP 129' HUP
+  trap 'watch_signal INT 130' INT
+  trap 'watch_signal TERM 143' TERM
+}
+cmd_watch() {
+  parse_watch_args "$@"
+  watch_traps
+  claim_launches || die "$WATCH_CLAIM_ERROR"
+  start_result || die "$WATCH_CLAIM_ERROR"
+  local code=0
+  watch_loop || code=$?
+  write_result "$WATCH_LAUNCH" "$WATCH_STATUS_FILE" "$code" "$WATCH_LINE" || die 'result record could not be written'
+  release_claims
+  return "$code"
+}
+
+# The wake operation. wake proves the caller's own pane and classifies its input,
+# then starts wake-run detached; wake-run runs the same watch, writes the record,
+# types one line into that pane while its input is empty, and releases its
+# claims last. The caller reaches wake-run only as its arguments.
+CALLER_BACKEND='' CALLER_PANE='' CALLER_PANE_PID='' CALLER_WORKSPACE=''
+# WAKE_PENDING: wake-run has acknowledged its start and not yet begun typing, so
+# any end but a signal still runs the typing loop (watch_exit).
+WAKE_NONCE='' WAKE_ACK='' WAKE_PENDING=0
+process_parent() { # <pid>: prints its parent PID
+  local stat
+  local -a fields
+  [[ $1 =~ ^[0-9]+$ ]] || return 1
+  if [[ ${OSTYPE:-} == linux* ]]; then
+    { IFS= read -r stat < "/proc/$1/stat"; } 2>/dev/null || return 1
+    stat=${stat##*) }
+    read -r -a fields <<< "$stat"
+    stat=${fields[1]-}
+  else
+    stat=$(ps -o ppid= -p "$1" 2>/dev/null) || return 1
+    stat=${stat//[[:space:]]/}
+  fi
+  [[ $stat =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$stat"
+}
+descends_from() { # <pid> <ancestor>: status 0 when <pid> is <ancestor> or below it through parent links
+  local pid=$1 steps
+  for ((steps = 0; steps < 256; steps++)); do
+    [[ $pid != "$2" ]] || return 0
+    (( pid > 1 )) || return 1
+    pid=$(process_parent "$pid") || return 1
+  done
+  return 1
+}
+# Sets CALLER_BACKEND and CALLER_PANE, with CALLER_WORKSPACE (herdr) or
+# CALLER_PANE_PID (tmux), or dies with a fixed refusal. Title, focus and cwd
+# never select a pane.
+caller_pane() {
+  local panes pane pid
+  CALLER_BACKEND='' CALLER_PANE='' CALLER_PANE_PID='' CALLER_WORKSPACE=''
+  [[ $BACKEND != terminal ]] || die 'wake: the terminal backend cannot type'
+  if [[ ${HERDR_ENV:-} == 1 ]] && herdr_connection && [[ -n ${HERDR_PANE_ID:-} ]]; then
+    CALLER_BACKEND=herdr CALLER_PANE=$HERDR_PANE_ID CALLER_WORKSPACE=$WS
+    return 0
+  fi
+  if [[ -n ${TMUX_PANE:-} ]] && command -v tmux >/dev/null; then
+    panes=$(tmux_call list-panes -a -F '#{pane_id} #{pane_pid}' 2>/dev/null) || panes=''
+    while read -r pane pid; do
+      [[ $pane == "$TMUX_PANE" && $pid =~ ^[0-9]+$ ]] || continue
+      if descends_from "$$" "$pid"; then
+        CALLER_BACKEND=tmux CALLER_PANE=$pane CALLER_PANE_PID=$pid
+        return 0
+      fi
+    done <<< "$panes"
+  fi
+  die 'wake: no proven caller pane'
+}
+caller_screen() { # prints an ANSI capture of the caller pane
+  case $CALLER_BACKEND in
+    herdr) herdr pane read "$CALLER_PANE" --source visible --format ansi ;;
+    tmux) tmux_call capture-pane -e -p -t "$CALLER_PANE" ;;
+    *) return 1 ;;
+  esac
+}
+# Reads one SGR parameter list as operations from left to right and updates the
+# caller's dim: an empty list, 0 (an empty element is 0) or 22 clears it, 2 sets
+# it; 38, 48 and 58 consume their operands (5;<n> or 2;<r>;<g>;<b>), so the 2 of
+# a truecolour selector is no dim; an element holding ':' is one colour
+# operation; any other element leaves dim as it is. Status 1 for an extended
+# colour without its operands.
+sgr_dim() {
+  local count index part selector
+  local -a parts=()
+  if [[ -z $1 ]]; then dim=0; return 0; fi
+  # read drops a trailing empty field; the appended ';' ends the last element, so
+  # every written element survives (2; is 2 then an empty element, a reset).
+  IFS=';' read -r -a parts <<< "$1;"
+  count=${#parts[@]}
+  for ((index = 0; index < count; index++)); do
+    part=${parts[index]}
+    [[ $part != *:* ]] || continue
+    while [[ $part == 0?* ]]; do part=${part#0}; done
+    case $part in
+      '' | 0 | 22) dim=0 ;;
+      2) dim=1 ;;
+      38 | 48 | 58)
+        selector=${parts[index + 1]-}
+        while [[ $selector == 0?* ]]; do selector=${selector#0}; done
+        case $selector in
+          5) (( index + 2 < count )) || return 1; index=$((index + 2)) ;;
+          2) (( index + 4 < count )) || return 1; index=$((index + 4)) ;;
+          *) return 1 ;;
+        esac ;;
+    esac
+  done
+}
+# One form of the capture in raw[]: <marker line> <marker character> <input end
+# line>; prints empty, draft or unknown. Dim state carries across lines (tmux
+# re-emits attributes only on change), so SGR is read from the top, dim off at
+# the start. The marker is the first visible character of its line, so its first
+# occurrence in the raw line is the marker itself.
+input_form_state() {
+  local marker=$1 marker_char=$2 input_end=$3 index rest chunk params intermediate final text='' dim=0
+  local esc=$'\033' nbsp=$'\302\240'
+  local csi_re=$'^\033\\[([0-?]*)([ -/]*)([@-~])' sgr_re='^[0-9:;]*$'
+  for ((index = 0; index <= input_end; index++)); do
+    rest=${raw[index]-}
+    (( index != marker )) || rest=${rest/"$marker_char"/}
+    chunk=''
+    while [[ -n $rest ]]; do
+      if [[ $rest == "$esc["* && $rest =~ $csi_re ]]; then
+        chunk=${BASH_REMATCH[0]} params=${BASH_REMATCH[1]} intermediate=${BASH_REMATCH[2]} final=${BASH_REMATCH[3]}
+        rest=${rest:${#chunk}}
+        if [[ $final == m && -z $intermediate && $params =~ $sgr_re ]]; then
+          sgr_dim "$params" || { printf 'unknown\n'; return 0; }
+        fi
+        continue
+      fi
+      if [[ $rest == "$esc"* ]]; then chunk=$esc; else chunk=${rest%%"$esc"*}; fi
+      rest=${rest:${#chunk}}
+      (( dim || index < marker )) || text+=$chunk
+    done
+  done
+  text=${text//$nbsp/}
+  text=${text//[[:space:]]/}
+  if [[ -n $text ]]; then printf 'draft\n'; else printf 'empty\n'; fi
+}
+# stdin: an ANSI capture of a caller pane; prints empty, draft or unknown. The
+# Claude Code form is the input between its last two rule lines, the Codex form
+# the input from its › marker down to the footer at the bottom. Both forms are
+# looked for, and each one found is read on its own: characters drawn dim (a
+# suggestion, a placeholder) and the marker are no input. No form found gives
+# unknown, one form its state; with both, draft if either is a draft, else
+# unknown if either is unknown, else empty. So it errs toward draft or unknown,
+# never empty.
+input_state() {
+  local LC_ALL=C
+  local capture visible line count=0 last index seen states=''
+  local lower=-1 upper=-1 claude_marker=-1 claude_end=-1 codex_marker=-1 codex_end=-1 footer=-1
+  local nbsp=$'\302\240' rule=$'\342\224\200' claude=$'\342\235\257' codex=$'\342\200\272'
+  local context_re='Context [0-9]+% used'
+  local -a raw=() vis=()
+  capture=$(cat) || capture=''
+  # Visible text: CSI sequences removed, \r dropped, NBSP counted as a space.
+  visible=$(strip_csi <<< "$capture") || visible=''
+  while IFS= read -r line; do raw[count]=${line//$'\r'/}; count=$((count + 1)); done <<< "$capture"
+  count=0
+  while IFS= read -r line; do line=${line//$'\r'/}; vis[count]=${line//$nbsp/ }; count=$((count + 1)); done <<< "$visible"
+  last=$((count - 1))
+  while (( last >= 0 )) && [[ -z ${vis[last]//[[:space:]]/} ]]; do last=$((last - 1)); done
+  if (( last < 0 )); then printf 'unknown\n'; return 0; fi
+  # Claude Code: the last two lines of ten or more ─ and nothing else, the lower
+  # one among the last 6 non-blank lines, the first line between them ❯ after spaces.
+  for ((index = last; index >= 0; index--)); do
+    # Trailing whitespace (a padded row) is no part of a rule line.
+    line=${vis[index]}
+    line=${line%"${line##*[![:space:]]}"}
+    [[ ${#line} -ge 30 && -z ${line//$rule/} ]] || continue
+    if (( lower < 0 )); then lower=$index; else upper=$index; break; fi
+  done
+  if (( upper >= 0 && upper + 1 < lower )); then
+    seen=0
+    for ((index = lower; index <= last; index++)); do [[ -z ${vis[index]//[[:space:]]/} ]] || seen=$((seen + 1)); done
+    line=${vis[upper + 1]}
+    line=${line#"${line%%[![:space:]]*}"}
+    if (( seen <= 6 )) && [[ $line == "$claude"* ]]; then claude_marker=$((upper + 1)) claude_end=$((lower - 1)); fi
+  fi
+  # Codex: the footer fixed at the bottom (a Context line, or a Context line above
+  # "? for shortcuts"); the marker the last line, among the last 6 non-blank lines
+  # above it, whose first column is › followed by a space or the line end. The
+  # input runs from the marker to the footer, blank lines included.
+  line=${vis[last]}
+  if [[ $line =~ $context_re ]]; then
+    footer=$last
+  elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} == '? for shortcuts' ]]; then
+    for ((index = last - 1; index >= 0; index--)); do [[ -z ${vis[index]//[[:space:]]/} ]] || break; done
+    if (( index >= 0 )) && [[ ${vis[index]} =~ $context_re ]]; then footer=$index; fi
+  fi
+  seen=0
+  for ((index = footer - 1; footer >= 0 && index >= 0 && seen < 6; index--)); do
+    line=${vis[index]}
+    [[ -n ${line//[[:space:]]/} ]] || continue
+    seen=$((seen + 1))
+    if [[ $line == "$codex" || $line == "$codex "* ]]; then codex_marker=$index codex_end=$((footer - 1)); break; fi
+  done
+  if (( claude_marker >= 0 )); then states+=" $(input_form_state "$claude_marker" "$claude" "$claude_end")"; fi
+  if (( codex_marker >= 0 )); then states+=" $(input_form_state "$codex_marker" "$codex" "$codex_end")"; fi
+  case $states in
+    '') printf 'unknown\n' ;;
+    *draft*) printf 'draft\n' ;;
+    *unknown*) printf 'unknown\n' ;;
+    *) printf 'empty\n' ;;
+  esac
+}
+wake_nonce() { # a fresh ^[A-Za-z0-9]{16,}$ value; od reads a fixed count, so no pipe can break
+  local nonce part index hex_re='^[0-9a-f]{24}$'
+  nonce=$(od -An -N12 -tx1 /dev/urandom 2>/dev/null) || nonce=''
+  nonce=${nonce//[[:space:]]/}
+  if [[ ! $nonce =~ $hex_re ]]; then
+    nonce=$$
+    for ((index = 0; index < 6; index++)); do printf -v part '%04x' "$RANDOM"; nonce+=$part; done
+  fi
+  printf '%s\n' "$nonce"
+}
+wake_ack() { # <text>: <runtime-dir>/<first>.wake-ack-<nonce>, written atomically; wake-run never removes it
+  # The temporary name keeps the first name's first 64 characters, as marker names do.
+  local temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]:0:64}.wake-ack-$WAKE_NONCE-$$-$RANDOM
+  if (set -o noclobber; printf '%s\n' "$1" > "$temporary") 2>/dev/null && mv -f -- "$temporary" "$WAKE_ACK"; then return 0; fi
+  rm -f -- "$temporary"
+  return 1
+}
+# Status 0 when a listing shows the caller pane (tmux: the same pane id with the
+# same pane PID; herdr: the pane id in its workspace), 1 when a listing succeeds
+# without it, 2 when the listing call fails or its output cannot be read.
+caller_listed() {
+  local panes pane pid count
+  if [[ $CALLER_BACKEND == herdr ]]; then
+    [[ -n $PYTHON ]] || select_json_reader || return 2
+    panes=$(herdr pane list --workspace "$CALLER_WORKSPACE" 2>/dev/null) || return 2
+    count=$(json_op pane "$panes" pane_id "$CALLER_PANE" count 2>/dev/null) || return 2
+    [[ $count =~ ^[0-9]+$ ]] || return 2
+    (( count > 0 )) || return 1
+  else
+    panes=$(tmux_call list-panes -a -F '#{pane_id} #{pane_pid}' 2>/dev/null) || return 2
+    while read -r pane pid; do
+      [[ $pane != "$CALLER_PANE" || $pid != "$CALLER_PANE_PID" ]] || return 0
+    done <<< "$panes"
+    return 1
+  fi
+}
+wake_type() { # <line>: typed with its Enter in one backend call
+  if [[ $CALLER_BACKEND == herdr ]]; then
+    herdr pane run "$CALLER_PANE" "$1" >/dev/null
+  else
+    # One tmux invocation; its ';' is an argument of its own, so not through tmux_call.
+    command tmux send-keys -t "$CALLER_PANE" -l -- "$1" ';' send-keys -t "$CALLER_PANE" Enter
+  fi
+}
+wake_note() { # <line>: appended by rewriting the record from this process's own copy, never from the file
+  WATCH_RESULT_TEXT+="$1"$'\n'
+  store_result "$WATCH_RESULT_TEXT" || printf 'child-session: result record could not be written\n' >&2
+}
+# Every 2 s: a listing without the caller pane, or three failed listing calls in
+# a row, gives the record "wake: caller pane gone"; a failed listing call alone
+# types nothing and looks again. Only in a round whose listing shows the pane is
+# an empty input typed, once; a draft or an unknown input keeps looking. A failed
+# typing call is tried again in the next round.
+wake_typing() { # <line>
+  local screen listed failures=0
+  while true; do
+    listed=0
+    caller_listed || listed=$?
+    if (( listed == 1 )); then wake_note 'wake: caller pane gone'; return 0; fi
+    if (( listed == 2 )); then
+      failures=$((failures + 1))
+      if (( failures >= 3 )); then wake_note 'wake: caller pane gone'; return 0; fi
+    else
+      failures=0
+      screen=$(caller_screen 2>/dev/null) || screen=''
+      if [[ $(input_state <<< "$screen") == empty ]] && wake_type "$1"; then wake_note 'wake: typed'; return 0; fi
+    fi
+    watch_sleep 2
+  done
+}
+# The line comes from this process's own event and arguments, never from the
+# record: the event's launch, or for a deadline or an error the watched names
+# joined by ",". The claims go only after the typing loop, so no second watcher
+# or wake starts over a launch whose wake is pending.
+wake_finish() {
+  local launch=$WATCH_LAUNCH name
+  WAKE_PENDING=0
+  if [[ -z $launch ]]; then for name in "${WATCH_NAMES[@]}"; do launch+=${launch:+,}$name; done; fi
+  wake_typing "child-session wake: $launch; result record $RUNTIME_DIR/${WATCH_NAMES[0]}.result"
+  release_claims
+}
+cmd_wake() {
+  local name claim text screen state directory=. self log attempt reply pid
+  local -a handoff
+  WATCH_COMMAND=wake
+  parse_watch_args "$@"
+  caller_pane
+  screen=$(caller_screen 2>/dev/null) || screen=''
+  state=$(input_state <<< "$screen") || state=unknown
+  [[ $state == empty || $state == draft ]] || die 'wake: caller input cannot be classified'
+  for name in "${WATCH_NAMES[@]}"; do
+    claim=$RUNTIME_DIR/$name.watcher
+    [[ -e $claim || -L $claim ]] || continue
+    # A FIFO there would block the read for good.
+    [[ ! -e $claim || -f $claim ]] || die "claim $claim is not a regular file"
+    text=$(head -n 1 -- "$claim" 2>/dev/null) || text=''
+    ! claim_holder_live "$text" || die "launch $name already has a live watcher"
+  done
+  WAKE_NONCE=$(wake_nonce)
+  if [[ $CALLER_BACKEND == tmux ]]; then handoff=("$WAKE_NONCE" tmux "$CALLER_PANE" "$CALLER_PANE_PID" -- "$@")
+  else handoff=("$WAKE_NONCE" herdr "$CALLER_PANE" "$CALLER_WORKSPACE" -- "$@"); fi
+  [[ $0 != */* ]] || directory=${0%/*}
+  self=$(cd -P -- "${directory:-/}" && pwd) || die 'wake: helper path unavailable'
+  self=$self/${0##*/}
+  log=$RUNTIME_DIR/${WATCH_NAMES[0]}.wake.log
+  WAKE_ACK=$RUNTIME_DIR/${WATCH_NAMES[0]}.wake-ack-$WAKE_NONCE
+  if command -v setsid >/dev/null; then
+    setsid -f "$self" wake-run "${handoff[@]}" </dev/null >>"$log" 2>&1 || die 'wake: detached watcher did not start'
+  else
+    # Without setsid (macOS, unverified): nohup and disown keep it from the caller's hangup.
+    nohup "$self" wake-run "${handoff[@]}" </dev/null >>"$log" 2>&1 &
+    disown
+  fi
+  for ((attempt = 0; attempt < 100; attempt++)); do
+    [[ ! -e $WAKE_ACK && ! -L $WAKE_ACK ]] || break
+    sleep 0.1
+  done
+  [[ -e $WAKE_ACK || -L $WAKE_ACK ]] || die 'wake: detached watcher did not start'
+  [[ ! -L $WAKE_ACK && -f $WAKE_ACK ]] || die 'wake: the acknowledgement is not a regular file'
+  reply=''
+  IFS= read -r reply < "$WAKE_ACK" || true
+  rm -f -- "$WAKE_ACK"
+  case $reply in
+    'started '*)
+      pid=${reply#started }
+      [[ $pid =~ ^[0-9]+$ ]] || die 'wake: unreadable acknowledgement'
+      printf 'WAKE: watcher %s result %s\n' "$pid" "$RUNTIME_DIR/${WATCH_NAMES[0]}.result" ;;
+    'refused '*) die "${reply#refused }" ;;
+    *) die 'wake: unreadable acknowledgement' ;;
+  esac
+}
+# wake-run <nonce> tmux <pane_id> <pane_pid> -- <watch options and set>
+# wake-run <nonce> herdr <pane_id> <workspace_id> -- <watch options and set>
+cmd_wake_run() {
+  local code=0 valid=0
+  local nonce_re='^[A-Za-z0-9]{16,}$' tmux_re='^%[0-9]+$' id_re='^[A-Za-z0-9_][A-Za-z0-9_:.-]*$'
+  [[ $# -ge 5 && $5 == -- && $1 =~ $nonce_re ]] || die 'wake-run: malformed handoff'
+  WAKE_NONCE=$1 CALLER_BACKEND=$2 CALLER_PANE=$3
+  if [[ $2 == tmux && $3 =~ $tmux_re && $4 =~ ^[0-9]+$ ]]; then CALLER_PANE_PID=$4 valid=1
+  elif [[ $2 == herdr && $3 =~ $id_re && $4 =~ $id_re ]]; then CALLER_WORKSPACE=$4 valid=1; fi
+  shift 5
+  WATCH_COMMAND=wake-run
+  parse_watch_args "$@"
+  WAKE_ACK=$RUNTIME_DIR/${WATCH_NAMES[0]}.wake-ack-$WAKE_NONCE
+  if (( ! valid )); then wake_ack 'refused wake: malformed caller pane in the handoff' || true; exit 2; fi
+  watch_traps
+  # The caller's terminal may close while the wake waits.
+  trap '' HUP
+  # A refused claim writes no record and removes none (the EXIT trap records only after start_result).
+  claim_launches || { wake_ack "refused $WATCH_CLAIM_ERROR" || true; exit 2; }
+  start_result || { wake_ack "refused $WATCH_CLAIM_ERROR" || true; exit 2; }
+  # Before the watch loop, so a status already present cannot outrun it.
+  wake_ack "started $$" || die 'wake: the acknowledgement could not be written'
+  # From here an error end (die) still records, types and only then releases.
+  WAKE_PENDING=1
+  watch_loop || code=$?
+  write_result "$WATCH_LAUNCH" "$WATCH_STATUS_FILE" "$code" "$WATCH_LINE" || die 'result record could not be written'
+  wake_finish
+  return "$code"
+}
 cmd_close() {
   local prefix record result=0
   resolve "$1" || result=$?
@@ -852,7 +1601,11 @@ case ${1:-} in
   key) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_key "$2" "$3" ;;
   peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
   alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
-  wait) [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}" ;;
+  wait)
+    if [[ ${2:-} == --watch ]]; then shift 2; cmd_watch "$@"
+    else [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}"; fi ;;
+  wake) shift; cmd_wake "$@" ;;
+  wake-run) shift; cmd_wake_run "$@" ;;
   close) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_close "$2" ;;
   runtime-dir) [[ $# == 1 ]] || die 'runtime-dir takes no arguments'; printf '%s\n' "$RUNTIME_DIR" ;;
   capabilities) [[ $# == 2 ]] || die 'capabilities requires a name'; valid_name "$2"; cmd_capabilities "$2" ;;
