@@ -93,7 +93,7 @@ Codex example:
 
 Codex's `exec_command.yield_time_ms` (up to 30000 ms) controls when the tool yields; it is **not an execution timeout**. If it returns `session_id`, poll that same foreground command with `write_stdin` in intervals of at most 60 seconds until it exits. A tool yield is not exit 124. Only after the command exits, handle its actual code:
 
-The watcher of Free wait is the only background job a wait may use; hooks, wakeup tools, manual sleep polling and any other background job are still no wait. If the host unexpectedly backgrounds a wait, retain its original task handle and diagnostics, settle that owned wait through a supported host mechanism, and report the capability failure. Start no competing waiter. Use an orchestrator's existing `cannot hold the call` fallback only where already authorized; a call that left live resources is not rerun.
+The watcher of Free wait is the only background job a wait may use; hooks, wakeup tools, manual sleep polling and any other background job are still no wait. If the host unexpectedly backgrounds a wait, retain its original task handle and diagnostics, settle that owned wait through a supported host mechanism, and report the capability failure. Start no competing waiter.
 
 Over a set use one foreground `wait --watch <name> <status-file> [<name> <status-file>]... <seconds>` per turn, 150 seconds on Claude Code or 240 on Codex, with no `--stall`, in place of plain `wait`.
 

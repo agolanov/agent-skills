@@ -2,7 +2,7 @@
 
 The child writes this file at the absolute path in its brief when finished or stuck. The root reads it and never edits its contents. Before answering `blocked`, the root renames it to `<file>-blocked-<n>` with an unused number; the child writes a new report at the original path.
 
-The first line is exactly one of:
+For a worker, the first line is exactly one of:
 
 ```text
 STATUS: done
@@ -11,6 +11,8 @@ STATUS: failed
 ```
 
 No leading text, indentation, trailing text, or combined alternatives. `wait` exits 0 for any of these three lines; the root must distinguish them. A missing or invalid line is not completion.
+
+An orchestrator's phase agent may also write `STATUS: waiting`: a worker runs or is to be started or continued. This line belongs to phase agents only and is not a terminal line for `wait`. Its entire status is exactly its last message: `STATUS: waiting`, then `Handoff record: <absolute path>`, then the record's `## Waiting` block verbatim; none of the sections below. See [Nested calls](run-contract.md#nested-calls) for phase endings.
 
 Use the following fields and sections in this order. Replace the first line with one of the three exact lines above; `<...>` describes the section content, not literal output.
 

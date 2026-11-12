@@ -77,7 +77,7 @@ Write one `Launch: <name> | <status file>` line for each worker still working, t
 
 For `start` and `continue`, follow the action with `Action brief: <absolute path>`, `Action checkout: <absolute path>`, `Action settings: model <M|cli-default>, effort <E|cli-default>`, and `Action permissions: <run contract Permissions arguments; none for a subagent>`. For `continue`, add `Action session: <recorded session or agent ID>` and `Action message: <one line, or the absolute path of a file>`.
 
-The wait holder performs the action as written and decides nothing in it. It records the actual launch or continuation identity, adds `Opened:` and the matching Openings line for a fresh child only, runs any early check due after the start, changes the action to `none`, and rewrites facts it changes. The calling skill supplies question/dialog handling and the return to a phase; this file grants no launch or permission by itself.
+Under an orchestrator the wait holder is the orchestrator. It acts on the Waiting block as its phase agent's last message gave it, takes nothing from this file, and writes the record only where this section tells the holder to. The wait holder performs the action as written and decides nothing in it. It records the actual launch or continuation identity, adds `Opened:` and the matching Openings line for a fresh child only, runs any early check due after the start, changes the action to `none`, and rewrites facts it changes. The calling skill supplies question/dialog handling and the return to a phase; this file grants no launch or permission by itself.
 
 ## Authority
 

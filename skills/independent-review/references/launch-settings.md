@@ -135,6 +135,6 @@ The child settings check covers every opening in every place. The `Opened:` line
 
 ## Nested agents
 
-A launched agent's settings govern that session only. Agents it starts itself (for example subagents of `superpowers:subagent-driven-development`) follow the skill and host that start them; this policy does not set or verify them. An orchestrator's nested-call subagents ([run contract](../../child-sessions/references/run-contract.md#nested-calls)) are such agents: they take the host's default, the orchestrator session's model, neither set nor verified, and the nested skill's own workers take their roles as above.
+A launched agent's settings govern that session only. Agents it starts itself (for example subagents of `superpowers:subagent-driven-development`) follow the skill and host that start them; this policy does not set or verify them. An orchestrator's phase agents ([run contract](../../child-sessions/references/run-contract.md#nested-calls)) are such agents: this policy neither sets nor verifies their host-default settings. Workers they prepare take their roles whoever starts them: the wait holder runs the early check and Accept the final one. An inline place performed as a subagent worker under a caller has both fields `cli-default`.
 
 Sources: [Codex model discovery](https://learn.chatgpt.com/docs/app-server#list-models-modellist), [Claude model configuration](https://code.claude.com/docs/en/model-config).
