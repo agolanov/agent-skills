@@ -1346,7 +1346,8 @@ wake_type() { # <line>: typed with its Enter in one backend call
     herdr pane run "$CALLER_PANE" "$1" >/dev/null
   else
     # One tmux invocation; its ';' is an argument of its own, so not through tmux_call.
-    command tmux send-keys -t "$CALLER_PANE" -l -- "$1" ';' send-keys -t "$CALLER_PANE" Enter
+    # Let the terminal client finish its paste burst before Enter submits the line.
+    command tmux send-keys -t "$CALLER_PANE" -l -- "$1" ';' run-shell 'sleep 0.3' ';' send-keys -t "$CALLER_PANE" Enter
   fi
 }
 wake_note() { # <line>: appended by rewriting the record from this process's own copy, never from the file
