@@ -34,6 +34,8 @@ Use the [handoff record format](../child-sessions/references/handoff-record.md#f
 
 **Accept reads:** the record, worker brief's labelled lines, status file, child-sessions status-file.md and handoff-record.md; launch-settings Child settings check and Places; checkout-state Direct-use preflight; child-sessions Locate and open (Startup), Dialogs and Recover a silent exit only for a reopen or a `send`; run-contract Questions and continuation under `subagent` or `background`; auto.md under `--auto`. Accept reads no input document, document-paths.md, stages-section.md or planner-brief.md; it resolves no launch settings again.
 
+Extract the worker brief's identity lines with this anchored label list: `^(Checkout|Docs repository|Docs directory|Document paths|Base SHA|Authority|Git evidence directory|Agent|Place|Auto|Launch settings|Window name|Spec|Brief|Follow-ups file|Stage|Stage scope|Stage done when|Plan path|Earlier stages|Status file|Git checks|Opened): `. Keep each matching line's value as written.
+
 **Facts for this skill:** `Input: <follow-ups file|spec|staged spec|brief|task text> <absolute path, or "task text">`; `Input SHA-256: <hash|None>` (`None` for task text); `Project HEAD: <full SHA|None>` (the project HEAD when the docs repository is separate, otherwise `None`). The docs base HEAD and other run values remain on the worker brief's labelled lines.
 
 ## Input
