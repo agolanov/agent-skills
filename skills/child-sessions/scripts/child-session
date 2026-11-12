@@ -1131,7 +1131,9 @@ sgr_dim() {
   local count index part selector
   local -a parts=()
   if [[ -z $1 ]]; then dim=0; return 0; fi
-  IFS=';' read -r -a parts <<< "$1"
+  # read drops a trailing empty field; the appended ';' ends the last element, so
+  # every written element survives (2; is 2 then an empty element, a reset).
+  IFS=';' read -r -a parts <<< "$1;"
   count=${#parts[@]}
   for ((index = 0; index < count; index++)); do
     part=${parts[index]}
