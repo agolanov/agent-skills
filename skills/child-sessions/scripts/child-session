@@ -801,10 +801,10 @@ read_claim_line() { # <path>: CLAIM_LINE is its first line, '' when present but 
   CLAIM_LINE=''
   [[ -e $1 || -L $1 ]]
 }
-claim_key() { # <claim text>: every byte outside [A-Za-z0-9] becomes _; an empty text gives none
-  local keep=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+claim_key() { # <claim text>: every byte outside [A-Za-z0-9] becomes _, the first 32 kept; an empty text gives none
+  local keep=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 key
   if [[ -z $1 ]]; then printf 'none'; return 0; fi
-  (LC_ALL=C; printf '%s' "${1//[!$keep]/_}")
+  (LC_ALL=C; key=${1//[!$keep]/_}; printf '%s' "${key:0:32}")
 }
 irregular_path() { [[ -L $1 || ( -e $1 && ! -f $1 ) ]]; }
 # A stale claim is removed only by the watcher holding the marker
@@ -815,6 +815,13 @@ irregular_path() { [[ -L $1 || ( -e $1 && ! -f $1 ) ]]; }
 # Every other watcher looks again; no watcher moves or removes a claim at any other
 # point. A marker whose holder is dead is passed through the marker named after
 # that holder (at most 3 links); a killed marker holder leaves its marker behind.
+# Marker names are bounded: the launch-name part is the name's first 64
+# characters and every key its first 32, so the deepest marker basename is
+# 1 + 64 + 15 + 32 + 3 x 33 = 211 bytes, under the 255-byte name limit. Two stale
+# texts, or two launches sharing 64 characters, may then share a marker; that only
+# serializes them, since the holder removes a claim only when it reads the full
+# text again and a chain level is entered only past a dead holder. The cut is
+# deterministic, so every watcher reading one dead holder chains to the same marker.
 claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim is removed under its marker
   local name=$1 prepared=$2 target=$RUNTIME_DIR/$1.watcher text='' marker='' links=0 attempt
   for ((attempt = 0; attempt < 10; attempt++)); do
@@ -824,7 +831,7 @@ claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim
       read_claim_line "$target" || continue
       text=$CLAIM_LINE
       if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
-      marker=$RUNTIME_DIR/.$name.watcher-after-$(claim_key "$text") links=0
+      marker=$RUNTIME_DIR/.${name:0:64}.watcher-after-$(claim_key "$text") links=0
     fi
     # ln would put the link inside a directory at the marker path.
     if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
@@ -873,7 +880,8 @@ release_claims() { # only claims this process took and that still hold its own t
 # Result record <runtime-dir>/<first name>.result. The text stays in
 # WATCH_RESULT_TEXT, so a later rewrite works from memory, never from the file.
 store_result() { # <text>: atomic replacement through a temporary file in the same directory
-  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]}.result-$$-$RANDOM
+  # The temporary name keeps the first name's first 64 characters, as marker names do.
+  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]:0:64}.result-$$-$RANDOM
   # mv would put the record inside a directory, or a link to one, at its path.
   if (set -o noclobber; printf '%s' "$1" > "$temporary") 2>/dev/null && [[ ! -d $target ]] && mv -f -- "$temporary" "$target"; then
     [[ -d $target ]] || return 0
@@ -1283,7 +1291,8 @@ wake_nonce() { # a fresh ^[A-Za-z0-9]{16,}$ value; od reads a fixed count, so no
   printf '%s\n' "$nonce"
 }
 wake_ack() { # <text>: <runtime-dir>/<first>.wake-ack-<nonce>, written atomically; wake-run never removes it
-  local temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]}.wake-ack-$WAKE_NONCE-$$-$RANDOM
+  # The temporary name keeps the first name's first 64 characters, as marker names do.
+  local temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]:0:64}.wake-ack-$WAKE_NONCE-$$-$RANDOM
   if (set -o noclobber; printf '%s\n' "$1" > "$temporary") 2>/dev/null && mv -f -- "$temporary" "$WAKE_ACK"; then return 0; fi
   rm -f -- "$temporary"
   return 1

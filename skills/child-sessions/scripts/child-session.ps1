@@ -149,7 +149,7 @@ function Read-ChildSessionRecord {
 function Write-ChildSessionRecord {
     param($Record)
     $path=Join-Path $script:Runtime ($Record.name+'.json')
-    $temp=$path+'.'+[Guid]::NewGuid().ToString('N')
+    $temp=Join-Path $script:Runtime ((Get-ChildSessionNamePart $Record.name)+'.json.'+[Guid]::NewGuid().ToString('N'))
     [IO.File]::WriteAllText($temp,(ConvertTo-Json -InputObject $Record -Depth 12 -Compress),$script:Utf8)
     if ([IO.File]::Exists($path)) { [IO.File]::Replace($temp,$path,[NullString]::Value) }
     else { [IO.File]::Move($temp,$path) }
@@ -461,11 +461,20 @@ function Test-ChildSessionClaimLive {
     try { $now=Get-ChildSessionProcessStart $number } catch { return $true }
     return [string]::Equals([string]$now,$identity,[StringComparison]::Ordinal)
 }
+function Get-ChildSessionNamePart {
+    param([string]$Name)
+    # A launch name inside a marker or temporary file name: its first 64 characters,
+    # so a long name keeps those names under the 255-character limit.
+    if ($Name.Length -gt 64) { return $Name.Substring(0,64) }
+    return $Name
+}
 function Get-ChildSessionClaimKey {
     param([string]$Text)
-    # Every character outside [A-Za-z0-9] becomes _; an empty text gives none.
+    # Every character outside [A-Za-z0-9] becomes _, the first 32 kept; an empty text gives none.
     if (-not $Text) { return 'none' }
-    return [regex]::Replace($Text,'[^A-Za-z0-9]','_')
+    $key=[regex]::Replace($Text,'[^A-Za-z0-9]','_')
+    if ($key.Length -gt 32) { $key=$key.Substring(0,32) }
+    return $key
 }
 function Test-ChildSessionIrregularPath {
     param([string]$Path)
@@ -498,10 +507,18 @@ function Read-ChildSessionClaimLine {
 # Every other watcher looks again; no watcher moves or removes a claim at any other
 # point. A marker whose holder is dead is passed through the marker named after
 # that holder (at most 3 links); a killed marker holder leaves its marker behind.
+# Marker names are bounded: the launch-name part is the name's first 64
+# characters and every key its first 32, so the deepest marker name is
+# 1 + 64 + 15 + 32 + 3 x 33 = 211 characters, under the 255-character name limit.
+# Two stale texts, or two launches sharing 64 characters, may then share a marker;
+# that only serializes them, since the holder removes a claim only when it reads
+# the full text again and a chain level is entered only past a dead holder. The
+# cut is deterministic, so every watcher reading one dead holder chains to the
+# same marker.
 function Request-ChildSessionClaim {
     param($Watch,[string]$Name)
     $target=Join-Path $script:Runtime ($Name+'.watcher')
-    $text='';$marker=$null;$links=0
+    $text='';$marker=$null;$links=0;$part=Get-ChildSessionNamePart $Name
     for ($attempt=0;$attempt -lt 10;$attempt++) {
         if ($null -eq $marker) {
             if ([IO.Directory]::Exists($target)) { $Watch.ClaimError='claim '+$target+' is a directory';return $false }
@@ -511,7 +528,7 @@ function Request-ChildSessionClaim {
             $text=Read-ChildSessionClaimLine $target
             if ($null -eq $text) { continue }
             if (Test-ChildSessionClaimLive $text) { $Watch.ClaimError='launch '+$Name+' already has a live watcher';return $false }
-            $marker=Join-Path $script:Runtime ('.'+$Name+'.watcher-after-'+(Get-ChildSessionClaimKey $text));$links=0
+            $marker=Join-Path $script:Runtime ('.'+$part+'.watcher-after-'+(Get-ChildSessionClaimKey $text));$links=0
         }
         $placed=Add-ChildSessionClaimFile $Watch $marker
         if ($null -eq $placed) { return $false }
@@ -559,7 +576,7 @@ function Remove-ChildSessionClaims {
 function Save-ChildSessionResultText {
     param($Watch,[string]$Text)
     $first=$Watch.Names[0]
-    return (Save-ChildSessionFile (Join-Path $script:Runtime ($first+'.result')) (Join-Path $script:Runtime ('.'+$first+'.result-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))) $Text)
+    return (Save-ChildSessionFile (Join-Path $script:Runtime ($first+'.result')) (Join-Path $script:Runtime ('.'+(Get-ChildSessionNamePart $first)+'.result-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))) $Text)
 }
 function Write-ChildSessionResult {
     param($Watch,[string]$Launch,[string]$StatusFile,[int]$Exit,[string]$Line)
@@ -823,7 +840,10 @@ function Find-ChildSessionWakeCaller {
 function Write-ChildSessionWakeAck {
     param([string]$Path,[string]$Text)
     # <runtime>/<first>.wake-ack-<nonce>, written atomically; wake-run never removes it.
-    return (Save-ChildSessionFile $Path (Join-Path $script:Runtime ('.'+[IO.Path]::GetFileName($Path)+'-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))) ($Text+"`n"))
+    # Names hold no dot, so the name part ends at the first one.
+    $file=[IO.Path]::GetFileName($Path);$dot=$file.IndexOf('.')
+    if ($dot -gt 0) { $file=(Get-ChildSessionNamePart $file.Substring(0,$dot))+$file.Substring($dot) }
+    return (Save-ChildSessionFile $Path (Join-Path $script:Runtime ('.'+$file+'-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))) ($Text+"`n"))
 }
 function Test-ChildSessionCallerListed {
     param($Caller)
