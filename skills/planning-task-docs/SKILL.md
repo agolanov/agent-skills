@@ -24,7 +24,7 @@ A session performs Prepare, Wait and Accept in order as one root. A session whos
 | Wait | The single root, or the phase agents' caller | Wait | child-sessions SKILL.md Wait and Dialogs; launch-settings Child settings check and Places for a subagent first status |
 | Accept | The single root, or the Accept agent | Events, Verify, Report | The Accept list below |
 
-Read each phase's references when reaching that phase. Prepare alone launches a `window` worker (open, Startup, early settings check); for `subagent` or `background` it starts nothing, writes `Action: start` and ends. Accept alone ends after a return to the worker or a reopen, writing Waiting (a non-window return as `Action: continue`) instead of waiting.
+Read each phase's references when reaching that phase. Prepare alone launches a `window` worker (open, Startup, early settings check); for `subagent` or `background` it starts nothing, writes `Action: start` and ends. Accept alone ends after a return to the worker or a reopen, writing Waiting (a non-window return as `Action: continue`) instead of waiting. Prepare alone starts no non-window worker, so it does not apply Preflight's refusal for this session being itself a subagent: judge that combination for the caller, which is never a subagent because both orchestrators refuse `--run subagent`; a worker start the host refuses is `launch failure`. Every other refusal stays Prepare's, including an implementer subagent that would itself start subagents.
 
 A phase continuing from a record (`State: … asked …`, the same `Run:` and brief) takes that run's live window and runtime files as its own. Continue at the recorded question with the answer in your context; do not write a new brief or open a second worker. Preflight's live-window refusal and leftover renaming apply only to a new run.
 
@@ -114,6 +114,8 @@ Accept starts from evidence: read the record, the status file's exact first line
 - **`failed`:** show the failure and stop, keeping the window/status or status/run directories; the report says no spec and plan were produced and lists any commits the status names.
 - **Silent exit:** the window worker is gone or the child ended, with no valid first status line. Follow Reopen below. A launch failure gets no restart: stop with its diagnostics and artifacts preserved.
 - **`blocked`, a deadline or a stall:** handled by Wait, not as successful completion.
+
+For **Accept alone**, the caller may report three further events. `Event: deadline`: take the evidence above first; a valid status takes its own row, and `alive` exit `1` is Silent exit. A live worker without a status adds `<launch>: no status at the wait's deadline, still working` to Report carries, leaves Waiting as it is and ends `waiting`. `Event: dead before send`: apply Before every send's dead branch with the phase brief's `Line to send:`, then end `waiting` after a successful reopen; its existing stop still applies when the shared reopen is spent. `Event: launch failure`: stop by this skill's launch-failure rule with the phase brief's Diagnostics, preserve the artifacts and end `failed`.
 
 **Reopen.** Read `Reopen:` from the record. With `unused`, for a window `peek plan-<slug> 40` when supported and show diagnostics. Append this continuation line to the brief:
 
