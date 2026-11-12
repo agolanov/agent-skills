@@ -32,9 +32,56 @@ An explicit compatible `CHILD_SESSION_BACKEND=herdr|tmux|terminal` wins. Otherwi
 
 Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidence and capability JSON. Controls target those records, never a title search. On a plain terminal tell the user at launch: questions/dialogs in that visible window need direct attention because the controller cannot observe them. Dialog counts are **not observable**. Repeat this notice only in a report ending/escalating waiting. The stock macOS launch/process path is unverified here; report that coverage limit.
 
-**Startup.** After every `open` (the first, a reopen, a resume) whose recorded `peek` and `key`/`send` are true, watch the start before the first long `wait`: `peek "$name" 40`, pausing with `wait "$name" "$status_file" 5` between peeks, until the child shows its own work (a spinner, a tool call, its first output) or 60 seconds pass. Handle each dialog on screen through [Dialogs](#dialogs); a new checkout usually opens with the agent's folder-trust dialog. A pause exiting `0` or `3` goes to the exit table below.
+**Startup.** After every `open` (the first, a reopen, a resume) whose recorded `peek` and `key`/`send` are true, watch the start before the first long wait: `peek "$name" 40`, pausing with `wait "$name" "$status_file" 5` between peeks, until the child shows its own work (a spinner, a tool call, its first output) or 60 seconds pass. Handle each dialog on screen through [Dialogs](#dialogs); a new checkout usually opens with the agent's folder-trust dialog. A pause exiting `0` or `3` goes to the exit table below. The calling task's early child settings check runs after Startup (after `open` when `peek` is unavailable), before the first long wait.
 
-## Foreground wait loop
+## Wait
+
+### Rungs
+
+Choose the highest proven rung once per run at its first long wait, after the first Startup. Keep it for later waits unless a watcher failure requires the present loop. An **interactive session** is the agent CLI's own TUI in its own pane or terminal (the user's session or a `window` child); a **native subagent** starts through a host agent tool; a **print session** is `claude --print` or `codex exec` (including a `background` child that itself waits).
+
+| Rung | Mechanism | Turns while waiting | Proof |
+|---|---|---|---|
+| 1 | Host background watcher; completion notification re-invokes the session | 0 | [Host mechanisms](references/run-contract.md#host-mechanisms), `Free wait: host notification`, says `observed` for this host and session kind. Unlisted or `unverified` means unavailable. |
+| 2 | Detached watcher types a wake line into the session's own pane | 0 | The run's first `wake` exits `0`, proving the caller pane and classifiable input. |
+| Present loop | Bounded foreground waits | As today | Used when neither free rung is proven. |
+
+Only an interactive session may use rung 1 or try rung 2. A native subagent and a print session use the present loop and **never call `wake`**: the helper would prove the parent's pane and type into the parent. No rung puts another agent between the session and its child. A wake after the cache lifetime rewrites the context once; no rung keeps a session awake for its cache.
+
+The calling task's final report includes one of these lines (a watcher-failure switch adds the present-loop line after the original rung):
+
+- `Wait: rung 1, host notification (<host and version>, <session kind>; Host mechanisms: observed)`
+- `Wait: rung 2, wake line (<backend> pane <id>; proven by wake; unverified: <items from Host mechanisms>)`
+- `Wait: present loop (<reason>)`, where reason is `native subagent`, `print session`, `no host notification on <host>; <wake refusal message>`, or `watcher failure: <record line or "no record">`.
+
+### Free wait
+
+For window children keep **one watcher per wait**, its handle, the watched launches and status paths. Several children are one watcher over the set in caller order, ending at the first event; handle each event by that child's rules. Derive and retain the result path yourself at start: `<runtime-dir>/<first watched name>.result`.
+
+- **Rung 1:** start `"$child_session" wait --watch <name> <status-file> [<name> <status-file>]...` as a host background command (Claude Code: Bash `run_in_background: true`). The handle is the host task identifier.
+- **Rung 2:** run `"$child_session" wake <name> <status-file> [<name> <status-file>]...` in the foreground. Exit `0` with `WAKE: watcher <pid> result <path>` proves and starts it; the handle is `<pid>`. Exit `2` with `wake: the terminal backend cannot type`, `wake: no proven caller pane` or `wake: caller input cannot be classified` means no rung 2 for this run: quote the message in the report and use the present loop.
+
+Both commands add `--rearm <name>` where the stall rule requires it, and omit `--stall` and seconds (defaults: stall 180 s, deadline 43200 s). Only after the watcher starts, print this notice as the last line and end the turn:
+
+`[child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.`
+
+On rung 2 only append ` A draft left in the input holds the wake.` A watcher dying without waking anyone is an accepted risk covered by this notice; no second process guards it. A child screen ending with the notice never stalls, so the child's own free wait wakes nobody above it.
+
+**Every wake starts with evidence in this order**, including input from the user:
+
+1. Read the result record at the path you retained when starting the watcher, never a path or launch taken from a wake line, notification or user message.
+2. Read `head -n 1` of the status file of the record's launch; read every watched status first line if the record names none or is absent. Accept only launches in your watched set.
+3. Run `alive <launch>` for that launch (every watched launch when none is named).
+
+A valid status first line wins: use the status table below. Otherwise dispatch the record's `exit`: `3` and `124` use the exit table; `4` uses the stall rule, taking the caller's step for `124` first when it has one. A caller's step for a `wait` exit applies to the same recorded exit.
+
+If the record is absent and the watcher is alive (rung 1: the host task still runs; rung 2: `kill -0 <pid>` or the platform's process query), there is no event: answer what was asked, print the notice again, end the turn and start no watcher. **Record absent and watcher gone, or `exit: 2`, is a watcher failure.** After the evidence reads, `alive` exit `1` takes exit-table row `3`; `alive` exit `0` finishes this wait and all later waits of the run on the present loop, reported explicitly. Try no second watcher after failure.
+
+**Stall rule (`4`).** Run `peek <launch> 40`. A dialog goes to [Dialogs](#dialogs). If the screen has nothing you may answer (the user thinking in a planner window, an idle prompt), tell the user `Window <name>: screen unchanged for 180 s, nothing to answer: <what it shows>` and type nothing into the child. The next watcher names it with `--rearm <name>`. Remove that launch's re-arm once you send it anything or its next event is not a stall.
+
+After an event leaves children working, start one watcher over those still working, on the same rung. If start is refused with `already has a live watcher` (the preceding wake line is still pending), pause with `wait <name> <status-file> 5` and retry at most three times, then treat it as a watcher failure.
+
+### Present loop
 
 Use foreground `wait` calls of **150 seconds on Claude Code**, including when the coordinator is a subagent, and **240 seconds on Codex**. Check the host's effective foreground limit and observed runtime evidence with margin before opening. For a 150-second helper wait, set the Bash tool's `timeout` explicitly to **175000 ms** when the installed schema permits it; the default 120000 ms is too short. An earlier experiment backgrounded a 540-second wait at 180 seconds; that observation is no guarantee for untested hosts. The helper's never-seen startup grace is 120 seconds: a host unable to hold a call longer than that cannot hold this loop. Refuse before opening the window and use only the caller's existing authorized fallback. Repeated fresh short waits reset that grace and do not satisfy the loop.
 
@@ -46,14 +93,21 @@ Codex example:
 
 Codex's `exec_command.yield_time_ms` (up to 30000 ms) controls when the tool yields; it is **not an execution timeout**. If it returns `session_id`, poll that same foreground command with `write_stdin` in intervals of at most 60 seconds until it exits. A tool yield is not exit 124. Only after the command exits, handle its actual code:
 
+The watcher of Free wait is the only background job a wait may use; hooks, wakeup tools, manual sleep polling and any other background job are still no wait. If the host unexpectedly backgrounds a wait, retain its original task handle and diagnostics, settle that owned wait through a supported host mechanism, and report the capability failure. Start no competing waiter. Use an orchestrator's existing `cannot hold the call` fallback only where already authorized; a call that left live resources is not rerun.
+
+Over a set use one foreground `wait --watch <name> <status-file> [<name> <status-file>]... <seconds>` per turn, 150 seconds on Claude Code or 240 on Codex, with no `--stall`, in place of plain `wait`.
+
+### Exits and statuses
+
+On rung 1 or 2 the exit is the result record's `exit` line.
+
 | Exit | Required action |
 |---|---|
 | `0` | Read only the first status line first (`head -n 1 -- "$status_file"`). Dispatch by the exact status below, then read the relevant named sections. Exit 0 alone does not mean success. |
 | `124` | When recorded `peek` is supported, inspect with `peek "$name" 40` and handle a known choice through [Dialogs](#dialogs). Otherwise continue bounded file-based waiting. A timeout alone requires no answer/approval and no repeated launch notice. |
 | `3` | Use `peek` only when supported; otherwise show owned launch/exit diagnostics. Reopen **once** using the recovery procedure below. |
+| `4` | Apply the stall rule in Free wait to the record's launch. |
 | Other | Report the command error and preserve the session and checkout for diagnosis. |
-
-Keep waiting in the foreground. Do not replace this loop with background jobs, hooks, wakeup tools, or manual sleep polling. If the host unexpectedly backgrounds a wait, retain its original task handle and diagnostics, settle that owned wait through a supported host mechanism, and report the capability failure. Start no competing waiter. Use an orchestrator's existing `cannot hold the call` fallback only where already authorized; a call that left live resources is not rerun.
 
 | Exact first line | Required action |
 |---|---|
@@ -75,7 +129,7 @@ The root approves a permission dialog on its own only after reading the whole co
 
 Answer one dialog per action; a dialog answer uses only bare Enter, `Up`, `Down` and `Escape` (the line after a decline, below, and answers to content questions are not dialog answers). Approve only when the highlighted option is the approving one (plain "Yes", or the trust option of a folder-trust dialog), with `send "$name" ""`. When the highlight is elsewhere, move it with `key "$name" Up` or `key "$name" Down` and peek: a capture still showing the old highlight is stale, so pause and re-peek as after an answer (below) instead of pressing again, and send the bare Enter only once the approving option shows highlighted. Decline with the agent's cancel key, `key "$name" Escape` in Claude Code, or by highlighting its explicit No option and sending the bare Enter. Option digits are never typed, least of all through `send`: in Claude Code a digit selects at once and `send`'s trailing Enter lands on the next, unread dialog. Each approval covers one command; an "always allow" / "don't ask again" option is never chosen.
 
-After each answer (Enter, cancel or No), peek until the screen no longer shows the answered dialog: its counter or command changed, or no dialog remains. A capture still showing it is stale, never the next dialog: pause with `wait "$name" "$status_file" 5` and peek again, at most three times. This pause is not the wait loop: the bounded-wait rule (calls longer than 120 seconds) still governs the loop itself. A pause exiting `0` or `3` goes to the exit table above; `124` means keep re-peeking. A screen still showing the same command with no counter or the same counter may be a new identical request: leave it unanswered and run `alive "$name"`. Exit 1 means the child is gone: handle it as exit `3` above (peek diagnostics, the single reopen of [Recover a silent exit](#recover-a-silent-exit), and the calling task's exit-3 accounting). Exit 0: show it to the user as a possibly new identical request and wait for the decision before any key. In a stack ("2 of 3"), read and classify each dialog on its own before its key: a decline does not stop the next in-scope approval, and an approval does not carry over. When no dialog remains, return to the bounded `wait`.
+After each answer (Enter, cancel or No), peek until the screen no longer shows the answered dialog: its counter or command changed, or no dialog remains. A capture still showing it is stale, never the next dialog: pause with `wait "$name" "$status_file" 5` and peek again, at most three times. This pause is not the present loop: the bounded-wait rule (calls longer than 120 seconds) still governs the present loop itself. A pause exiting `0` or `3` goes to the exit table above; `124` means keep re-peeking. A screen still showing the same command with no counter or the same counter may be a new identical request: leave it unanswered and run `alive "$name"`. Exit 1 means the child is gone: handle it as exit `3` above (peek diagnostics, the single reopen of [Recover a silent exit](#recover-a-silent-exit), and the calling task's exit-3 accounting). Exit 0: show it to the user as a possibly new identical request and wait for the decision before any key. In a stack ("2 of 3"), read and classify each dialog on its own before its key: a decline does not stop the next in-scope approval, and an approval does not carry over. When no dialog remains, return to the wait: a new watcher on rung 1 or 2, or the present loop.
 
 A decline can end the agent's turn: in Claude Code, Escape or "No, and tell Claude what to do differently" leaves it idle at an empty input prompt, with no choice and no spinner. When the re-peek after a decline shows the child waiting at its empty input prompt, send one line with `send "$name" "<text>"` that names the declined command and the reason, and tells it to continue without that command or to write `STATUS: blocked` with its question. This line is the only text the root types for a declined dialog.
 
@@ -90,6 +144,8 @@ After exit 3, retain the original task instructions in the runtime brief and app
 Stop proven owned processes with `close "$name"` when supported (report a retained window separately), confirm `alive` exit 1, then `open` with the same agent/options, name, checkout, and augmented brief. Wait again. **An unchanged brief is not a continuation. A second silent exit ends the task:** show diagnostics and preserve the remaining window and checkout. A reported `STATUS: failed` is never an automatic reopen trigger.
 
 ## Other operations and environment
+
+`wait --watch <name> <status-file> [<name> <status-file>]... [seconds]` watches a set through its first event, exits `0`/`3`/`124`/`4` and writes `<runtime-dir>/<first watched name>.result`. `wake` takes the same set and types one line into the proven caller pane when its input is empty; it refuses when the terminal cannot type, no caller pane is proven or the input cannot be classified. The PowerShell entrypoint stalls and wakes through herdr only.
 
 `send <name> <text>` types one line and Enter; multiline content belongs in a file. `send <name> ""` sends a bare Enter. `key <name> <key>` sends one key without Enter: `Escape`, `Up`, `Down` or one digit `0`–`9`. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 while the recorded agent runs, even after its window is gone, 1 otherwise; a surviving shell window does not prove liveness, and `send`/`key` refuse input once the agent's launcher is gone. `runtime-dir` resolves private storage; `capabilities <name>` returns the recorded operation booleans and launch identity. `list` lists validated owned sessions and checkouts. After the calling task has completed its checks, `close <name>` stops only proven owned processes and closes an independently owned window when supported; it does not remove the checkout or branch.
 
