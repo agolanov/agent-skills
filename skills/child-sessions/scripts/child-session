@@ -28,6 +28,12 @@ child-session key <name> <key>         Send one key without Enter: Escape, Up, D
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
+child-session wait --watch <name> <status-file> [<name> <status-file>]... [seconds]
+  Watches the set until its first event, checked each round with launches in set order: a valid first
+  status line (printed, exit 0), the deadline (TIMEOUT, exit 124, default 43200 s), a launch gone
+  (EXITED, exit 3). Command errors exit 2. Claims <runtime-dir>/<name>.watcher for every launch and
+  refuses a launch that already has a live watcher. Writes <runtime-dir>/<first name>.result with the
+  lines launch, status_file, exit, line, watcher and launches.
 child-session close <name>
 child-session list
 
@@ -42,7 +48,9 @@ Argument overrides are whitespace-separated words, without shell evaluation.
 USAGE
 }
 
-die() { printf 'child-session: %s\n' "$*" >&2; exit 2; }
+# The message stays readable by an EXIT trap (a watcher records it).
+DIE_MESSAGE=
+die() { DIE_MESSAGE="$*"; printf 'child-session: %s\n' "$*" >&2; exit 2; }
 valid_name() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]] || die 'window names must match [A-Za-z0-9_-]+'; }
 # tmux also parses a trailing semicolon in an argv element as a separator.
 # Every call here is one command, so escape that extra parser boundary.
@@ -712,6 +720,231 @@ cmd_wait() {
     sleep "$delay"
   done
 }
+
+# Set watcher (wait --watch). Its state is global, so the EXIT trap and other
+# operations that run the same pieces (claims, loop, record) can read it.
+WATCH_NAMES=() WATCH_FILES=() WATCH_REARM=() WATCH_CLAIMED=()
+WATCH_SECONDS=43200 WATCH_STALL=180
+WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
+WATCH_CLAIM_TEXT='' WATCH_CLAIM_ERROR=''
+WATCH_RECORDING=0 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
+WATCH_END_MESSAGE='' WATCH_SLEEP_PID=''
+# [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]...
+# [seconds]: after the options, an odd count makes the last argument the deadline.
+parse_watch_args() {
+  local stall_given=0 seen=' ' name
+  WATCH_NAMES=() WATCH_FILES=() WATCH_REARM=() WATCH_SECONDS=43200 WATCH_STALL=180
+  while [[ $# -gt 0 && $1 == --* ]]; do
+    [[ $# -ge 2 ]] || die "$1: a value is required"
+    case $1 in
+      --stall)
+        (( ! stall_given )) || die '--stall is given twice'
+        [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 > 0 )) || die '--stall must be a positive integer'
+        WATCH_STALL=$((10#$2)); stall_given=1 ;;
+      --rearm) valid_name "$2"; WATCH_REARM+=("$2") ;;
+      *) die "unknown option $1" ;;
+    esac
+    shift 2
+  done
+  [[ $# -ge 2 ]] || die 'wait --watch needs at least one <name> <status-file> pair'
+  if (( $# % 2 )); then
+    [[ ${!#} =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
+    WATCH_SECONDS=$((10#${!#}))
+    (( WATCH_SECONDS >= 0 )) || die 'wait seconds must be a nonnegative integer'
+  fi
+  while [[ $# -ge 2 ]]; do
+    valid_name "$1"
+    [[ $seen != *" $1 "* ]] || die "launch $1 is watched twice"
+    # The record keeps one line per key.
+    [[ -n $2 && $2 != *$'\n'* && $2 != *$'\r'* ]] || die 'a watched status file must be a nonempty one-line path'
+    WATCH_NAMES+=("$1")
+    WATCH_FILES+=("$2")
+    seen="$seen$1 "
+    shift 2
+  done
+  for name in ${WATCH_REARM[@]+"${WATCH_REARM[@]}"}; do
+    [[ $seen == *" $name "* ]] || die "--rearm $name names no watched launch"
+  done
+}
+
+# Claim <runtime-dir>/<name>.watcher holds "<pid> <process start identity>"; the
+# identity may contain spaces (macOS lstart), so the PID is the first word.
+claim_holder_live() { # <claim text>: status 0 while its PID keeps that start identity
+  local pid=${1%% *} identity=${1#* } now result=0
+  [[ $pid =~ ^[0-9]+$ && $1 == *' '* && -n $identity ]] || return 1
+  now=$(process_identity "$pid") || result=$?
+  # Unavailable evidence never frees a claim that may be live.
+  (( result != 2 )) || return 0
+  (( result == 0 )) && [[ $now == "$identity" ]]
+}
+claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim is replaced
+  local name=$1 prepared=$2 target=$RUNTIME_DIR/$1.watcher text grave attempt
+  for ((attempt = 0; attempt < 10; attempt++)); do
+    if [[ -d $target && ! -L $target ]]; then WATCH_CLAIM_ERROR="claim $target is a directory"; return 1; fi
+    if ln -n -- "$prepared" "$target" 2>/dev/null; then WATCH_CLAIMED+=("$name"); return 0; fi
+    if ! text=$(head -n 1 -- "$target" 2>/dev/null); then
+      [[ -e $target || -L $target ]] || continue
+      text=''
+    fi
+    if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
+    # Move the stale claim aside, then check it is the one just read: a
+    # concurrent watcher may have replaced it meanwhile, and that claim goes back.
+    grave=$RUNTIME_DIR/.$name.watcher-stale-$$-$RANDOM
+    mv -f -- "$target" "$grave" 2>/dev/null || continue
+    if [[ $(head -n 1 -- "$grave" 2>/dev/null) != "$text" ]]; then ln -n -- "$grave" "$target" 2>/dev/null || true; fi
+    rm -f -- "$grave"
+  done
+  WATCH_CLAIM_ERROR="the claim on launch $name kept changing"
+  return 1
+}
+# Claims every watched launch for this process. On a refusal it releases the
+# claims it took and returns 1 with the message in WATCH_CLAIM_ERROR.
+claim_launches() {
+  local identity prepared name
+  WATCH_CLAIM_ERROR='' WATCH_CLAIMED=()
+  if ! identity=$(process_identity "$$"); then WATCH_CLAIM_ERROR='watcher start identity unavailable'; return 1; fi
+  WATCH_CLAIM_TEXT="$$ $identity"
+  prepared=$RUNTIME_DIR/.watcher-claim-$$-$RANDOM
+  if ! (set -o noclobber; printf '%s\n' "$WATCH_CLAIM_TEXT" > "$prepared") 2>/dev/null; then
+    WATCH_CLAIM_ERROR='watcher claim could not be prepared'; return 1
+  fi
+  for name in "${WATCH_NAMES[@]}"; do
+    if ! claim_one "$name" "$prepared"; then rm -f -- "$prepared"; release_claims; return 1; fi
+  done
+  rm -f -- "$prepared"
+}
+release_claims() { # only claims this process took and that still hold its own text
+  local name
+  for name in ${WATCH_CLAIMED[@]+"${WATCH_CLAIMED[@]}"}; do
+    [[ $(head -n 1 -- "$RUNTIME_DIR/$name.watcher" 2>/dev/null) != "$WATCH_CLAIM_TEXT" ]] ||
+      rm -f -- "$RUNTIME_DIR/$name.watcher"
+  done
+  WATCH_CLAIMED=()
+}
+
+# Result record <runtime-dir>/<first name>.result. The text stays in
+# WATCH_RESULT_TEXT, so a later rewrite works from memory, never from the file.
+store_result() { # <text>: atomic replacement through a temporary file in the same directory
+  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]}.result-$$-$RANDOM
+  if (set -o noclobber; printf '%s' "$1" > "$temporary") 2>/dev/null && mv -f -- "$temporary" "$target"; then return 0; fi
+  rm -f -- "$temporary"
+  return 1
+}
+write_result() { # <launch> <status file> <exit> <line>
+  local IFS=' ' line=$4
+  line=${line//$'\r'/ }; line=${line//$'\n'/ }
+  printf -v WATCH_RESULT_TEXT 'launch: %s\nstatus_file: %s\nexit: %s\nline: %s\nwatcher: %s\nlaunches: %s\n' \
+    "$1" "$2" "$3" "$line" "$$" "${WATCH_NAMES[*]}"
+  WATCH_RESULT_WRITTEN=1
+  store_result "$WATCH_RESULT_TEXT"
+}
+start_result() { # after all claims: the old record goes, and every end writes a new one
+  WATCH_RECORDING=1 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
+  rm -f -- "$RUNTIME_DIR/${WATCH_NAMES[0]}.result"
+}
+
+# Stall detection samples each launch's screen here: status 0 means the launch
+# at <index> has stalled. No screen is sampled yet, so no launch stalls.
+screen_sample() { return 1; }
+watch_event() { # <launch> <status file> <line>: the event that ends the watch
+  WATCH_LAUNCH=$1 WATCH_STATUS_FILE=$2 WATCH_LINE=$3
+  printf '%s\n' "$3"
+}
+watch_sleep() { # <seconds>; a trapped signal interrupts wait, so it ends the watcher at once
+  # The sleep never holds the caller's pipes open.
+  sleep "$1" </dev/null >/dev/null 2>&1 &
+  WATCH_SLEEP_PID=$!
+  wait "$WATCH_SLEEP_PID" || true
+  WATCH_SLEEP_PID=''
+}
+# Each round: every status in set order, then the deadline, then every launch's
+# liveness (plain wait's rule, per launch), then stalls. Prints the event line
+# and returns its exit; a failed liveness check returns its own code.
+watch_loop() {
+  local count=${#WATCH_NAMES[@]} started=$SECONDS elapsed remaining delay first_line index alive_result
+  local -a seen_alive=()
+  for ((index = 0; index < count; index++)); do seen_alive[index]=0; done
+  WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
+  while true; do
+    for ((index = 0; index < count; index++)); do
+      first_line=''
+      if [[ -f ${WATCH_FILES[index]} ]]; then first_line=$(head -n 1 -- "${WATCH_FILES[index]}" 2>/dev/null) || first_line=''; fi
+      if [[ $first_line =~ ^STATUS:\ (done|blocked|failed)$ ]]; then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "$first_line"
+        return 0
+      fi
+    done
+    elapsed=$((SECONDS - started))
+    if (( elapsed >= WATCH_SECONDS )); then
+      watch_event '' '' "TIMEOUT: $WATCH_SECONDS s without status"
+      return 124
+    fi
+    for ((index = 0; index < count; index++)); do
+      alive_result=0
+      cmd_alive "${WATCH_NAMES[index]}" || alive_result=$?
+      if (( alive_result == 0 )); then
+        seen_alive[index]=1
+      elif (( alive_result != 1 )); then
+        WATCH_LINE="alive check of window ${WATCH_NAMES[index]} failed with exit $alive_result"
+        printf 'child-session: %s\n' "$WATCH_LINE" >&2
+        return "$alive_result"
+      elif (( seen_alive[index] || elapsed >= 120 )); then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "EXITED: agent in window ${WATCH_NAMES[index]} is gone, no status"
+        return 3
+      fi
+    done
+    for ((index = 0; index < count; index++)); do
+      if screen_sample "$index"; then
+        watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "STALLED: screen of window ${WATCH_NAMES[index]} unchanged for $WATCH_STALL s"
+        return 4
+      fi
+    done
+    elapsed=$((SECONDS - started))
+    remaining=$((WATCH_SECONDS - elapsed))
+    (( remaining > 0 )) || continue
+    if (( elapsed < 120 )); then
+      delay=5
+      (( delay <= 120 - elapsed )) || delay=$((120 - elapsed))
+    else delay=30; fi
+    (( delay <= remaining )) || delay=$remaining
+    watch_sleep "$delay"
+  done
+}
+
+watch_signal() { # <signal> <exit>
+  WATCH_END_MESSAGE="watcher stopped by signal $1"
+  exit "$2"
+}
+# Any end after start_result that has not written the record (die, a signal)
+# writes it; claims this process still holds are released.
+watch_exit() {
+  local code=$?
+  if [[ -n $WATCH_SLEEP_PID ]]; then kill "$WATCH_SLEEP_PID" 2>/dev/null || true; fi
+  if (( WATCH_RECORDING && ! WATCH_RESULT_WRITTEN )); then
+    # Without an event the end is never a status.
+    (( code != 0 )) || code=2
+    write_result '' '' "$code" "${DIE_MESSAGE:-${WATCH_END_MESSAGE:-watcher ended without an event}}" || true
+  fi
+  release_claims || true
+  exit "$code"
+}
+watch_traps() {
+  trap watch_exit EXIT
+  trap 'watch_signal HUP 129' HUP
+  trap 'watch_signal INT 130' INT
+  trap 'watch_signal TERM 143' TERM
+}
+cmd_watch() {
+  parse_watch_args "$@"
+  watch_traps
+  claim_launches || die "$WATCH_CLAIM_ERROR"
+  start_result
+  local code=0
+  watch_loop || code=$?
+  write_result "$WATCH_LAUNCH" "$WATCH_STATUS_FILE" "$code" "$WATCH_LINE" || die 'result record could not be written'
+  release_claims
+  return "$code"
+}
 cmd_close() {
   local prefix record result=0
   resolve "$1" || result=$?
@@ -852,7 +1085,9 @@ case ${1:-} in
   key) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_key "$2" "$3" ;;
   peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
   alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
-  wait) [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}" ;;
+  wait)
+    if [[ ${2:-} == --watch ]]; then shift 2; cmd_watch "$@"
+    else [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}"; fi ;;
   close) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_close "$2" ;;
   runtime-dir) [[ $# == 1 ]] || die 'runtime-dir takes no arguments'; printf '%s\n' "$RUNTIME_DIR" ;;
   capabilities) [[ $# == 2 ]] || die 'capabilities requires a name'; valid_name "$2"; cmd_capabilities "$2" ;;
