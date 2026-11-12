@@ -1248,6 +1248,9 @@ input_state() {
   local lower=-1 upper=-1 claude_marker=-1 claude_end=-1 codex_marker=-1 codex_end=-1 footer=-1
   local nbsp=$'\302\240' rule=$'\342\224\200' claude=$'\342\235\257' codex=$'\342\200\272'
   local context_re='Context [0-9]+% used'
+  local hints_re='(\? for shortcuts|← for agents[[:space:]]+·[[:space:]]+\? for shortcuts)'
+  local warning_re='⚠[[:space:]]+[0-9]+[[:space:]]+warnings?[[:space:]]+·[[:space:]]+f2 to view'
+  local footer_re="^($hints_re([[:space:]]+$warning_re)?|$warning_re)$"
   local -a raw=() vis=()
   capture=$(cat) || capture=''
   # Visible text: CSI sequences removed, \r dropped, NBSP counted as a space.
@@ -1274,14 +1277,15 @@ input_state() {
     line=${line#"${line%%[![:space:]]*}"}
     if (( seen <= 6 )) && [[ $line == "$claude"* ]]; then claude_marker=$((upper + 1)) claude_end=$((lower - 1)); fi
   fi
-  # Codex: the footer fixed at the bottom (a Context line, or a Context line above
-  # "? for shortcuts"); the marker the last line, among the last 6 non-blank lines
+  # Codex: the footer fixed at the bottom (a Context line, optionally followed by
+  # known shortcut hints and/or a warning indicator); the marker the last line,
+  # among the last 6 non-blank lines
   # above it, whose first column is › followed by a space or the line end. The
   # input runs from the marker to the footer, blank lines included.
   line=${vis[last]}
   if [[ $line =~ $context_re ]]; then
     footer=$last
-  elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} == '? for shortcuts' ]]; then
+  elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} =~ $footer_re ]]; then
     for ((index = last - 1; index >= 0; index--)); do [[ -z ${vis[index]//[[:space:]]/} ]] || break; done
     if (( index >= 0 )) && [[ ${vis[index]} =~ $context_re ]]; then footer=$index; fi
   fi

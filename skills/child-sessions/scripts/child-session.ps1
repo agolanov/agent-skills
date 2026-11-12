@@ -684,6 +684,9 @@ function Get-ChildSessionInputState {
     # is unknown, else empty. So it errs toward draft or unknown, never empty.
     if ($null -eq $Ansi) { $Ansi='' }
     $space=[char[]]@(32,9,10,11,12,13);$blank='\A[ \t\n\v\f\r]*\z';$context='Context [0-9]+% used'
+    $hints='(\? for shortcuts|← for agents[ \t]+·[ \t]+\? for shortcuts)'
+    $warning='⚠[ \t]+[0-9]+[ \t]+warnings?[ \t]+·[ \t]+f2 to view'
+    $footerPattern='\A('+$hints+'([ \t]+'+$warning+')?|'+$warning+')\z'
     # Visible text: CSI sequences removed, CR dropped, NBSP counted as a space.
     $rawLines=$Ansi.Split([char]10);$visLines=([regex]::Replace($Ansi,'\x1b\[[0-?]*[ -/]*[@-~]','')).Split([char]10)
     $count=$rawLines.Count;$raw=New-Object string[] $count;$vis=New-Object string[] $count
@@ -706,13 +709,14 @@ function Get-ChildSessionInputState {
         $line=$vis[$upper+1].TrimStart($space)
         if ($seen -le 6 -and $line.Length -gt 0 -and [int]$line[0] -eq 0x276F) { $claudeMarker=$upper+1;$claudeEnd=$lower-1 }
     }
-    # Codex: the footer fixed at the bottom (a Context line, or a Context line above
-    # "? for shortcuts", trailing whitespace aside); the marker the last line, among
+    # Codex: the footer fixed at the bottom (a Context line, optionally followed by
+    # known shortcut hints and/or a warning indicator, trailing whitespace aside);
+    # the marker the last line, among
     # the last 6 non-blank lines above it, whose first column is U+203A followed by a
     # space or the line end. The input runs from the marker to the footer, blank lines included.
     $footer=-1
     if ($vis[$last] -cmatch $context) { $footer=$last }
-    elseif ([string]::Equals($vis[$last].Trim($space),'? for shortcuts',[StringComparison]::Ordinal)) {
+    elseif ($vis[$last].Trim($space) -cmatch $footerPattern) {
         $i=$last-1
         while ($i -ge 0 -and $vis[$i] -cmatch $blank) { $i-- }
         if ($i -ge 0 -and $vis[$i] -cmatch $context) { $footer=$i }
