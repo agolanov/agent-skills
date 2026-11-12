@@ -741,7 +741,7 @@ cmd_wait() {
 WATCH_NAMES=() WATCH_FILES=() WATCH_REARM=() WATCH_CLAIMED=()
 WATCH_SECONDS=43200 WATCH_STALL=180
 WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
-WATCH_CLAIM_TEXT='' WATCH_CLAIM_ERROR=''
+WATCH_CLAIM_TEXT='' WATCH_CLAIM_ERROR='' CLAIM_LINE=''
 WATCH_RECORDING=0 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
 WATCH_END_MESSAGE='' WATCH_SLEEP_PID=''
 # The operation named by parse errors (wake and wake-run set their own).
@@ -796,22 +796,51 @@ claim_holder_live() { # <claim text>: status 0 while its PID keeps that start id
   (( result != 2 )) || return 0
   (( result == 0 )) && [[ $now == "$identity" ]]
 }
-claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim is replaced
-  local name=$1 prepared=$2 target=$RUNTIME_DIR/$1.watcher text grave attempt
+read_claim_line() { # <path>: CLAIM_LINE is its first line, '' when present but unreadable; status 1 when absent
+  if CLAIM_LINE=$(head -n 1 -- "$1" 2>/dev/null); then return 0; fi
+  CLAIM_LINE=''
+  [[ -e $1 || -L $1 ]]
+}
+claim_key() { # <claim text>: every byte outside [A-Za-z0-9] becomes _; an empty text gives none
+  local keep=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+  if [[ -z $1 ]]; then printf 'none'; return 0; fi
+  (LC_ALL=C; printf '%s' "${1//[!$keep]/_}")
+}
+irregular_path() { [[ -L $1 || ( -e $1 && ! -f $1 ) ]]; }
+# A stale claim is removed only by the watcher holding the marker
+# .<name>.watcher-after-<key of its text>, created exclusively. That is safe: the
+# claim's owner is dead and never releases it, no claim is created while one
+# exists, and only that marker's holder removes a claim with that text, so a claim
+# that still reads the text under the marker cannot change before it is removed.
+# Every other watcher looks again; no watcher moves or removes a claim at any other
+# point. A marker whose holder is dead is passed through the marker named after
+# that holder (at most 3 links); a killed marker holder leaves its marker behind.
+claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim is removed under its marker
+  local name=$1 prepared=$2 target=$RUNTIME_DIR/$1.watcher text='' marker='' links=0 attempt
   for ((attempt = 0; attempt < 10; attempt++)); do
-    if [[ -d $target && ! -L $target ]]; then WATCH_CLAIM_ERROR="claim $target is a directory"; return 1; fi
-    if ln -n -- "$prepared" "$target" 2>/dev/null; then WATCH_CLAIMED+=("$name"); return 0; fi
-    if ! text=$(head -n 1 -- "$target" 2>/dev/null); then
-      [[ -e $target || -L $target ]] || continue
-      text=''
+    if [[ -z $marker ]]; then
+      if [[ -d $target && ! -L $target ]]; then WATCH_CLAIM_ERROR="claim $target is a directory"; return 1; fi
+      if ln -n -- "$prepared" "$target" 2>/dev/null; then WATCH_CLAIMED+=("$name"); return 0; fi
+      read_claim_line "$target" || continue
+      text=$CLAIM_LINE
+      if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
+      marker=$RUNTIME_DIR/.$name.watcher-after-$(claim_key "$text") links=0
     fi
-    if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
-    # Move the stale claim aside, then check it is the one just read: a
-    # concurrent watcher may have replaced it meanwhile, and that claim goes back.
-    grave=$RUNTIME_DIR/.$name.watcher-stale-$$-$RANDOM
-    mv -f -- "$target" "$grave" 2>/dev/null || continue
-    if [[ $(head -n 1 -- "$grave" 2>/dev/null) != "$text" ]]; then ln -n -- "$grave" "$target" 2>/dev/null || true; fi
-    rm -f -- "$grave"
+    # ln would put the link inside a directory at the marker path.
+    if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
+    if ln -n -- "$prepared" "$marker" 2>/dev/null; then
+      if read_claim_line "$target" && [[ $CLAIM_LINE == "$text" ]]; then rm -f -- "$target" 2>/dev/null || true; fi
+      rm -f -- "$marker" 2>/dev/null || true
+      marker=''
+      continue
+    fi
+    if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
+    # A vanished marker is tried again.
+    read_claim_line "$marker" || continue
+    if claim_holder_live "$CLAIM_LINE"; then sleep 1; marker=''; continue; fi
+    links=$((links + 1))
+    (( links <= 3 )) || break
+    marker=$marker-$(claim_key "$CLAIM_LINE")
   done
   WATCH_CLAIM_ERROR="the claim on launch $name kept changing"
   return 1
@@ -845,7 +874,12 @@ release_claims() { # only claims this process took and that still hold its own t
 # WATCH_RESULT_TEXT, so a later rewrite works from memory, never from the file.
 store_result() { # <text>: atomic replacement through a temporary file in the same directory
   local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result temporary=$RUNTIME_DIR/.${WATCH_NAMES[0]}.result-$$-$RANDOM
-  if (set -o noclobber; printf '%s' "$1" > "$temporary") 2>/dev/null && mv -f -- "$temporary" "$target"; then return 0; fi
+  # mv would put the record inside a directory, or a link to one, at its path.
+  if (set -o noclobber; printf '%s' "$1" > "$temporary") 2>/dev/null && [[ ! -d $target ]] && mv -f -- "$temporary" "$target"; then
+    [[ -d $target ]] || return 0
+    rm -f -- "$target/${temporary##*/}"
+    return 1
+  fi
   rm -f -- "$temporary"
   return 1
 }
@@ -857,9 +891,11 @@ write_result() { # <launch> <status file> <exit> <line>
   WATCH_RESULT_WRITTEN=1
   store_result "$WATCH_RESULT_TEXT"
 }
-start_result() { # after all claims: the old record goes, and every end writes a new one
+start_result() { # after all claims: the old record goes, and every end writes a new one; status 1 with WATCH_CLAIM_ERROR when it cannot
+  local target=$RUNTIME_DIR/${WATCH_NAMES[0]}.result
+  if [[ -d $target ]]; then WATCH_CLAIM_ERROR="result record $target is a directory"; return 1; fi
   WATCH_RECORDING=1 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
-  rm -f -- "$RUNTIME_DIR/${WATCH_NAMES[0]}.result"
+  rm -f -- "$target" || { WATCH_CLAIM_ERROR="old result record $target could not be removed"; return 1; }
 }
 
 strip_csi() { # stdin -> the same text with its CSI sequences (SGR included) removed
@@ -1050,7 +1086,7 @@ cmd_watch() {
   parse_watch_args "$@"
   watch_traps
   claim_launches || die "$WATCH_CLAIM_ERROR"
-  start_result
+  start_result || die "$WATCH_CLAIM_ERROR"
   local code=0
   watch_loop || code=$?
   write_result "$WATCH_LAUNCH" "$WATCH_STATUS_FILE" "$code" "$WATCH_LINE" || die 'result record could not be written'
@@ -1383,7 +1419,7 @@ cmd_wake_run() {
   trap '' HUP
   # A refused claim writes no record and removes none (the EXIT trap records only after start_result).
   claim_launches || { wake_ack "refused $WATCH_CLAIM_ERROR" || true; exit 2; }
-  start_result
+  start_result || { wake_ack "refused $WATCH_CLAIM_ERROR" || true; exit 2; }
   # Before the watch loop, so a status already present cannot outrun it.
   wake_ack "started $$" || die 'wake: the acknowledgement could not be written'
   # From here an error end (die) still records, types and only then releases.

@@ -461,25 +461,75 @@ function Test-ChildSessionClaimLive {
     try { $now=Get-ChildSessionProcessStart $number } catch { return $true }
     return [string]::Equals([string]$now,$identity,[StringComparison]::Ordinal)
 }
+function Get-ChildSessionClaimKey {
+    param([string]$Text)
+    # Every character outside [A-Za-z0-9] becomes _; an empty text gives none.
+    if (-not $Text) { return 'none' }
+    return [regex]::Replace($Text,'[^A-Za-z0-9]','_')
+}
+function Test-ChildSessionIrregularPath {
+    param([string]$Path)
+    # Something other than a regular file (a directory or a link) is at the path.
+    try { $attributes=[IO.File]::GetAttributes($Path) } catch { return $false }
+    return [bool]($attributes -band ([IO.FileAttributes]::Directory -bor [IO.FileAttributes]::ReparsePoint))
+}
+function Add-ChildSessionClaimFile {
+    param($Watch,[string]$Path)
+    # A move without replacement fails while the path exists: an exclusive create
+    # of a complete file holding this watcher's claim text. Null when the text
+    # cannot be prepared (ClaimError says so).
+    $prepared=Join-Path $script:Runtime ('.watcher-claim-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))
+    try { [IO.File]::WriteAllText($prepared,$Watch.ClaimText+"`n",$script:Utf8) }
+    catch { Remove-ChildSessionFile $prepared;$Watch.ClaimError='watcher claim could not be prepared';return $null }
+    try { [IO.File]::Move($prepared,$Path);return $true } catch { Remove-ChildSessionFile $prepared;return $false }
+}
+function Read-ChildSessionClaimLine {
+    param([string]$Path)
+    # Its first line; '' when present but unreadable, null when absent.
+    $line=Read-ChildSessionFirstLine $Path
+    if ($null -eq $line -and (Test-ChildSessionPathPresent $Path)) { $line='' }
+    return $line
+}
+# A stale claim is removed only by the watcher holding the marker
+# .<name>.watcher-after-<key of its text>, created exclusively. That is safe: the
+# claim's owner is dead and never releases it, no claim is created while one
+# exists, and only that marker's holder removes a claim with that text, so a claim
+# that still reads the text under the marker cannot change before it is removed.
+# Every other watcher looks again; no watcher moves or removes a claim at any other
+# point. A marker whose holder is dead is passed through the marker named after
+# that holder (at most 3 links); a killed marker holder leaves its marker behind.
 function Request-ChildSessionClaim {
     param($Watch,[string]$Name)
     $target=Join-Path $script:Runtime ($Name+'.watcher')
+    $text='';$marker=$null;$links=0
     for ($attempt=0;$attempt -lt 10;$attempt++) {
-        if ([IO.Directory]::Exists($target)) { $Watch.ClaimError='claim '+$target+' is a directory';return $false }
-        $prepared=Join-Path $script:Runtime ('.watcher-claim-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))
-        try { [IO.File]::WriteAllText($prepared,$Watch.ClaimText+"`n",$script:Utf8) }
-        catch { Remove-ChildSessionFile $prepared;$Watch.ClaimError='watcher claim could not be prepared';return $false }
-        # A move without replacement fails while the claim exists: an exclusive create of a complete file.
-        try { [IO.File]::Move($prepared,$target);$Watch.Claimed.Add($Name);return $true } catch { Remove-ChildSessionFile $prepared }
-        $text=Read-ChildSessionFirstLine $target
-        if ($null -eq $text) { if (-not (Test-ChildSessionPathPresent $target)) { continue };$text='' }
-        if (Test-ChildSessionClaimLive $text) { $Watch.ClaimError='launch '+$Name+' already has a live watcher';return $false }
-        # Move the stale claim aside, then check it is the one just read: a
-        # concurrent watcher may have replaced it meanwhile, and that claim goes back.
-        $grave=Join-Path $script:Runtime ('.'+$Name+'.watcher-stale-'+$PID+'-'+[Guid]::NewGuid().ToString('N'))
-        try { [IO.File]::Move($target,$grave) } catch { continue }
-        if (-not [string]::Equals([string](Read-ChildSessionFirstLine $grave),$text,[StringComparison]::Ordinal)) { try { [IO.File]::Move($grave,$target) } catch { } }
-        Remove-ChildSessionFile $grave
+        if ($null -eq $marker) {
+            if ([IO.Directory]::Exists($target)) { $Watch.ClaimError='claim '+$target+' is a directory';return $false }
+            $placed=Add-ChildSessionClaimFile $Watch $target
+            if ($null -eq $placed) { return $false }
+            if ($placed) { $Watch.Claimed.Add($Name);return $true }
+            $text=Read-ChildSessionClaimLine $target
+            if ($null -eq $text) { continue }
+            if (Test-ChildSessionClaimLive $text) { $Watch.ClaimError='launch '+$Name+' already has a live watcher';return $false }
+            $marker=Join-Path $script:Runtime ('.'+$Name+'.watcher-after-'+(Get-ChildSessionClaimKey $text));$links=0
+        }
+        $placed=Add-ChildSessionClaimFile $Watch $marker
+        if ($null -eq $placed) { return $false }
+        if ($placed) {
+            $now=Read-ChildSessionClaimLine $target
+            if ($null -ne $now -and [string]::Equals($now,$text,[StringComparison]::Ordinal)) { try { [IO.File]::Delete($target) } catch { } }
+            Remove-ChildSessionFile $marker
+            $marker=$null
+            continue
+        }
+        if (Test-ChildSessionIrregularPath $marker) { $Watch.ClaimError='claim marker '+$marker+' is not a regular file';return $false }
+        # A vanished marker is tried again.
+        $holder=Read-ChildSessionClaimLine $marker
+        if ($null -eq $holder) { continue }
+        if (Test-ChildSessionClaimLive $holder) { Start-Sleep -Milliseconds 200;$marker=$null;continue }
+        $links++
+        if ($links -gt 3) { break }
+        $marker=$marker+'-'+(Get-ChildSessionClaimKey $holder)
     }
     $Watch.ClaimError='the claim on launch '+$Name+' kept changing'
     return $false
@@ -814,6 +864,13 @@ function Invoke-ChildSessionWakeTyping {
         Start-Sleep -Seconds 2
     }
 }
+function Test-ChildSessionPathQualified {
+    param([string]$Path)
+    # Fully qualified: X:\ or X:/, \\ or // (UNC and device paths), and / on a
+    # host other than Windows. A drive-relative or root-relative path is not.
+    if ($Path -cmatch '\A[A-Za-z]:[\\/]' -or $Path -cmatch '\A[\\/]{2}') { return $true }
+    return ([IO.Path]::DirectorySeparatorChar -eq [char]47 -and $Path.StartsWith('/',[StringComparison]::Ordinal))
+}
 function Start-ChildSessionWake {
     param([AllowEmptyCollection()][string[]]$Vector)
     # Proves the caller pane, classifies its input and refuses a launch with a live
@@ -833,9 +890,10 @@ function Start-ChildSessionWake {
         if (Test-ChildSessionClaimLive ([string](Read-ChildSessionFirstLine $claim))) { throw ('launch '+$name+' already has a live watcher') }
     }
     # wake-run runs in the runtime directory, so it keeps no checkout directory in
-    # use; a relative status file is handed over as the absolute path it names here.
+    # use; a status file that is not fully qualified (relative, C:name, \name) is
+    # handed over as the full path it names here.
     $set=[string[]]$Vector.Clone()
-    foreach ($index in $watch.FileIndexes) { if (-not [IO.Path]::IsPathRooted($set[$index])) { $set[$index]=[IO.Path]::GetFullPath($set[$index]) } }
+    foreach ($index in $watch.FileIndexes) { if (-not (Test-ChildSessionPathQualified $set[$index])) { $set[$index]=[IO.Path]::GetFullPath($set[$index]) } }
     $nonce=[Guid]::NewGuid().ToString('N');$first=$watch.Names[0]
     $ack=Join-Path $script:Runtime ($first+'.wake-ack-'+$nonce)
     $arguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$script:ChildSessionOwner,'wake-run',$nonce,'herdr',$caller.pane,$caller.workspace,'--')+@($set)
