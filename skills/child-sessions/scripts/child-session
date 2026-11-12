@@ -828,6 +828,8 @@ claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim
     if [[ -z $marker ]]; then
       if [[ -d $target && ! -L $target ]]; then WATCH_CLAIM_ERROR="claim $target is a directory"; return 1; fi
       if ln -n -- "$prepared" "$target" 2>/dev/null; then WATCH_CLAIMED+=("$name"); return 0; fi
+      # A FIFO there would block the read for good.
+      if [[ -e $target && ! -f $target ]]; then WATCH_CLAIM_ERROR="claim $target is not a regular file"; return 1; fi
       read_claim_line "$target" || continue
       text=$CLAIM_LINE
       if claim_holder_live "$text"; then WATCH_CLAIM_ERROR="launch $name already has a live watcher"; return 1; fi
@@ -836,6 +838,10 @@ claim_one() { # <name> <prepared claim file>: exclusive hard link; a stale claim
     # ln would put the link inside a directory at the marker path.
     if irregular_path "$marker"; then WATCH_CLAIM_ERROR="claim marker $marker is not a regular file"; return 1; fi
     if ln -n -- "$prepared" "$marker" 2>/dev/null; then
+      if [[ -e $target && ! -f $target ]]; then
+        rm -f -- "$marker" 2>/dev/null || true
+        WATCH_CLAIM_ERROR="claim $target is not a regular file"; return 1
+      fi
       if read_claim_line "$target" && [[ $CLAIM_LINE == "$text" ]]; then rm -f -- "$target" 2>/dev/null || true; fi
       rm -f -- "$marker" 2>/dev/null || true
       marker=''
@@ -1197,17 +1203,51 @@ sgr_dim() {
     esac
   done
 }
+# One form of the capture in raw[]: <marker line> <marker character> <input end
+# line>; prints empty, draft or unknown. Dim state carries across lines (tmux
+# re-emits attributes only on change), so SGR is read from the top, dim off at
+# the start. The marker is the first visible character of its line, so its first
+# occurrence in the raw line is the marker itself.
+input_form_state() {
+  local marker=$1 marker_char=$2 input_end=$3 index rest chunk params intermediate final text='' dim=0
+  local esc=$'\033' nbsp=$'\302\240'
+  local csi_re=$'^\033\\[([0-?]*)([ -/]*)([@-~])' sgr_re='^[0-9:;]*$'
+  for ((index = 0; index <= input_end; index++)); do
+    rest=${raw[index]-}
+    (( index != marker )) || rest=${rest/"$marker_char"/}
+    chunk=''
+    while [[ -n $rest ]]; do
+      if [[ $rest == "$esc["* && $rest =~ $csi_re ]]; then
+        chunk=${BASH_REMATCH[0]} params=${BASH_REMATCH[1]} intermediate=${BASH_REMATCH[2]} final=${BASH_REMATCH[3]}
+        rest=${rest:${#chunk}}
+        if [[ $final == m && -z $intermediate && $params =~ $sgr_re ]]; then
+          sgr_dim "$params" || { printf 'unknown\n'; return 0; }
+        fi
+        continue
+      fi
+      if [[ $rest == "$esc"* ]]; then chunk=$esc; else chunk=${rest%%"$esc"*}; fi
+      rest=${rest:${#chunk}}
+      (( dim || index < marker )) || text+=$chunk
+    done
+  done
+  text=${text//$nbsp/}
+  text=${text//[[:space:]]/}
+  if [[ -n $text ]]; then printf 'draft\n'; else printf 'empty\n'; fi
+}
 # stdin: an ANSI capture of a caller pane; prints empty, draft or unknown. The
 # Claude Code form is the input between its last two rule lines, the Codex form
-# the input from its › marker down to the footer at the bottom. Characters drawn
-# dim (a suggestion, a placeholder) and the marker are no input. Anything it does
-# not recognise is unknown, so it errs toward draft or unknown, never empty.
+# the input from its › marker down to the footer at the bottom. Both forms are
+# looked for, and each one found is read on its own: characters drawn dim (a
+# suggestion, a placeholder) and the marker are no input. No form found gives
+# unknown, one form its state; with both, draft if either is a draft, else
+# unknown if either is unknown, else empty. So it errs toward draft or unknown,
+# never empty.
 input_state() {
   local LC_ALL=C
-  local capture visible line count=0 last index seen dim=0 rest chunk params intermediate final text=''
-  local lower=-1 upper=-1 marker=-1 marker_char='' input_end=-1 footer=-1
-  local esc=$'\033' nbsp=$'\302\240' rule=$'\342\224\200' claude=$'\342\235\257' codex=$'\342\200\272'
-  local csi_re=$'^\033\\[([0-?]*)([ -/]*)([@-~])' sgr_re='^[0-9:;]*$' context_re='Context [0-9]+% used'
+  local capture visible line count=0 last index seen states=''
+  local lower=-1 upper=-1 claude_marker=-1 claude_end=-1 codex_marker=-1 codex_end=-1 footer=-1
+  local nbsp=$'\302\240' rule=$'\342\224\200' claude=$'\342\235\257' codex=$'\342\200\272'
+  local context_re='Context [0-9]+% used'
   local -a raw=() vis=()
   capture=$(cat) || capture=''
   # Visible text: CSI sequences removed, \r dropped, NBSP counted as a space.
@@ -1232,53 +1272,34 @@ input_state() {
     for ((index = lower; index <= last; index++)); do [[ -z ${vis[index]//[[:space:]]/} ]] || seen=$((seen + 1)); done
     line=${vis[upper + 1]}
     line=${line#"${line%%[![:space:]]*}"}
-    if (( seen <= 6 )) && [[ $line == "$claude"* ]]; then marker=$((upper + 1)) marker_char=$claude input_end=$((lower - 1)); fi
+    if (( seen <= 6 )) && [[ $line == "$claude"* ]]; then claude_marker=$((upper + 1)) claude_end=$((lower - 1)); fi
   fi
   # Codex: the footer fixed at the bottom (a Context line, or a Context line above
   # "? for shortcuts"); the marker the last line, among the last 6 non-blank lines
   # above it, whose first column is › followed by a space or the line end. The
   # input runs from the marker to the footer, blank lines included.
-  if (( marker < 0 )); then
-    line=${vis[last]}
-    if [[ $line =~ $context_re ]]; then
-      footer=$last
-    elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} == '? for shortcuts' ]]; then
-      for ((index = last - 1; index >= 0; index--)); do [[ -z ${vis[index]//[[:space:]]/} ]] || break; done
-      if (( index >= 0 )) && [[ ${vis[index]} =~ $context_re ]]; then footer=$index; fi
-    fi
-    seen=0
-    for ((index = footer - 1; footer >= 0 && index >= 0 && seen < 6; index--)); do
-      line=${vis[index]}
-      [[ -n ${line//[[:space:]]/} ]] || continue
-      seen=$((seen + 1))
-      if [[ $line == "$codex" || $line == "$codex "* ]]; then marker=$index marker_char=$codex input_end=$((footer - 1)); break; fi
-    done
+  line=${vis[last]}
+  if [[ $line =~ $context_re ]]; then
+    footer=$last
+  elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} == '? for shortcuts' ]]; then
+    for ((index = last - 1; index >= 0; index--)); do [[ -z ${vis[index]//[[:space:]]/} ]] || break; done
+    if (( index >= 0 )) && [[ ${vis[index]} =~ $context_re ]]; then footer=$index; fi
   fi
-  if (( marker < 0 )); then printf 'unknown\n'; return 0; fi
-  # Dim state carries across lines (tmux re-emits attributes only on change), so
-  # SGR is read from the top. The marker is the first visible character of its
-  # line, so its first occurrence in the raw line is the marker itself.
-  for ((index = 0; index <= input_end; index++)); do
-    rest=${raw[index]-}
-    (( index != marker )) || rest=${rest/"$marker_char"/}
-    chunk=''
-    while [[ -n $rest ]]; do
-      if [[ $rest == "$esc["* && $rest =~ $csi_re ]]; then
-        chunk=${BASH_REMATCH[0]} params=${BASH_REMATCH[1]} intermediate=${BASH_REMATCH[2]} final=${BASH_REMATCH[3]}
-        rest=${rest:${#chunk}}
-        if [[ $final == m && -z $intermediate && $params =~ $sgr_re ]]; then
-          sgr_dim "$params" || { printf 'unknown\n'; return 0; }
-        fi
-        continue
-      fi
-      if [[ $rest == "$esc"* ]]; then chunk=$esc; else chunk=${rest%%"$esc"*}; fi
-      rest=${rest:${#chunk}}
-      (( dim || index < marker )) || text+=$chunk
-    done
+  seen=0
+  for ((index = footer - 1; footer >= 0 && index >= 0 && seen < 6; index--)); do
+    line=${vis[index]}
+    [[ -n ${line//[[:space:]]/} ]] || continue
+    seen=$((seen + 1))
+    if [[ $line == "$codex" || $line == "$codex "* ]]; then codex_marker=$index codex_end=$((footer - 1)); break; fi
   done
-  text=${text//$nbsp/}
-  text=${text//[[:space:]]/}
-  if [[ -n $text ]]; then printf 'draft\n'; else printf 'empty\n'; fi
+  if (( claude_marker >= 0 )); then states+=" $(input_form_state "$claude_marker" "$claude" "$claude_end")"; fi
+  if (( codex_marker >= 0 )); then states+=" $(input_form_state "$codex_marker" "$codex" "$codex_end")"; fi
+  case $states in
+    '') printf 'unknown\n' ;;
+    *draft*) printf 'draft\n' ;;
+    *unknown*) printf 'unknown\n' ;;
+    *) printf 'empty\n' ;;
+  esac
 }
 wake_nonce() { # a fresh ^[A-Za-z0-9]{16,}$ value; od reads a fixed count, so no pipe can break
   local nonce part index hex_re='^[0-9a-f]{24}$'
@@ -1373,6 +1394,8 @@ cmd_wake() {
   for name in "${WATCH_NAMES[@]}"; do
     claim=$RUNTIME_DIR/$name.watcher
     [[ -e $claim || -L $claim ]] || continue
+    # A FIFO there would block the read for good.
+    [[ ! -e $claim || -f $claim ]] || die "claim $claim is not a regular file"
     text=$(head -n 1 -- "$claim" 2>/dev/null) || text=''
     ! claim_holder_live "$text" || die "launch $name already has a live watcher"
   done

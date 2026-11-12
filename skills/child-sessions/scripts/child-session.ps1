@@ -641,65 +641,16 @@ function Update-ChildSessionSgrDim {
     }
     return $Dim
 }
-function Get-ChildSessionInputState {
-    param([string]$Ansi)
-    # An ANSI capture of a caller pane -> empty, draft or unknown. The Claude Code
-    # form is the input between its last two rule lines, the Codex form the input
-    # from its marker down to the footer at the bottom. Characters drawn dim (a
-    # suggestion, a placeholder) and the marker are no input. Anything it does not
-    # recognise is unknown, so it errs toward draft or unknown, never empty.
-    if ($null -eq $Ansi) { $Ansi='' }
-    $space=[char[]]@(32,9,10,11,12,13);$blank='\A[ \t\n\v\f\r]*\z';$context='Context [0-9]+% used'
-    # Visible text: CSI sequences removed, CR dropped, NBSP counted as a space.
-    $rawLines=$Ansi.Split([char]10);$visLines=([regex]::Replace($Ansi,'\x1b\[[0-?]*[ -/]*[@-~]','')).Split([char]10)
-    $count=$rawLines.Count;$raw=New-Object string[] $count;$vis=New-Object string[] $count
-    for ($i=0;$i -lt $count;$i++) { $raw[$i]=$rawLines[$i].Replace([string][char]13,'');$vis[$i]=$visLines[$i].Replace([string][char]13,'').Replace([string][char]0xA0,' ') }
-    $last=$count-1
-    while ($last -ge 0 -and $vis[$last] -cmatch $blank) { $last-- }
-    if ($last -lt 0) { return 'unknown' }
-    $marker=-1;$markerChar=[char]0x276F;$inputEnd=-1
-    # Claude Code: the last two lines of ten or more U+2500 and nothing else (trailing
-    # whitespace aside), the lower one among the last 6 non-blank lines, the first line
-    # between them U+276F after spaces.
-    $lower=-1;$upper=-1
-    for ($i=$last;$i -ge 0;$i--) {
-        if ($vis[$i].TrimEnd($space) -cnotmatch '\A─{10,}\z') { continue }
-        if ($lower -lt 0) { $lower=$i } else { $upper=$i;break }
-    }
-    if ($upper -ge 0 -and $upper+1 -lt $lower) {
-        $seen=0
-        for ($i=$lower;$i -le $last;$i++) { if ($vis[$i] -cnotmatch $blank) { $seen++ } }
-        $line=$vis[$upper+1].TrimStart($space)
-        if ($seen -le 6 -and $line.Length -gt 0 -and [int]$line[0] -eq 0x276F) { $marker=$upper+1;$inputEnd=$lower-1 }
-    }
-    # Codex: the footer fixed at the bottom (a Context line, or a Context line above
-    # "? for shortcuts", trailing whitespace aside); the marker the last line, among
-    # the last 6 non-blank lines above it, whose first column is U+203A followed by a
-    # space or the line end. The input runs from the marker to the footer, blank lines included.
-    if ($marker -lt 0) {
-        $footer=-1
-        if ($vis[$last] -cmatch $context) { $footer=$last }
-        elseif ([string]::Equals($vis[$last].Trim($space),'? for shortcuts',[StringComparison]::Ordinal)) {
-            $i=$last-1
-            while ($i -ge 0 -and $vis[$i] -cmatch $blank) { $i-- }
-            if ($i -ge 0 -and $vis[$i] -cmatch $context) { $footer=$i }
-        }
-        $seen=0
-        for ($i=$footer-1;$footer -ge 0 -and $i -ge 0 -and $seen -lt 6;$i--) {
-            $line=$vis[$i]
-            if ($line -cmatch $blank) { continue }
-            $seen++
-            if ([int]$line[0] -eq 0x203A -and ($line.Length -eq 1 -or [int]$line[1] -eq 32)) { $marker=$i;$markerChar=[char]0x203A;$inputEnd=$footer-1;break }
-        }
-    }
-    if ($marker -lt 0) { return 'unknown' }
-    # Dim state carries across lines (a capture re-emits attributes only on change),
-    # so SGR is read from the top. The marker is the first visible character of its
+function Get-ChildSessionFormState {
+    param([string[]]$Raw,[int]$Marker,[char]$MarkerChar,[int]$InputEnd)
+    # One form of the capture -> empty, draft or unknown. Dim state carries across
+    # lines (a capture re-emits attributes only on change), so SGR is read from the
+    # top, dim off at the start. The marker is the first visible character of its
     # line, so its first occurrence in the raw line is the marker itself.
     $dim=0;$text=New-Object Text.StringBuilder
-    for ($i=0;$i -le $inputEnd;$i++) {
-        $rest=$raw[$i]
-        if ($i -eq $marker) { $at=$rest.IndexOf($markerChar);if ($at -ge 0) { $rest=$rest.Remove($at,1) } }
+    for ($i=0;$i -le $InputEnd;$i++) {
+        $rest=$Raw[$i]
+        if ($i -eq $Marker) { $at=$rest.IndexOf($MarkerChar);if ($at -ge 0) { $rest=$rest.Remove($at,1) } }
         while ($rest.Length -gt 0) {
             if ([int]$rest[0] -eq 27) {
                 $csi=[regex]::Match($rest,'\A\x1b\[([0-?]*)([ -/]*)([@-~])')
@@ -716,10 +667,69 @@ function Get-ChildSessionInputState {
                 $at=$rest.IndexOf([char]27);if ($at -lt 0) { $chunk=$rest } else { $chunk=$rest.Substring(0,$at) }
             }
             $rest=$rest.Substring($chunk.Length)
-            if ($dim -eq 0 -and $i -ge $marker) { [void]$text.Append($chunk) }
+            if ($dim -eq 0 -and $i -ge $Marker) { [void]$text.Append($chunk) }
         }
     }
     if ([regex]::Replace($text.ToString(),'[ \t\n\v\f\r ]','').Length -gt 0) { return 'draft' }
+    return 'empty'
+}
+function Get-ChildSessionInputState {
+    param([string]$Ansi)
+    # An ANSI capture of a caller pane -> empty, draft or unknown. The Claude Code
+    # form is the input between its last two rule lines, the Codex form the input
+    # from its marker down to the footer at the bottom. Both forms are looked for,
+    # and each one found is read on its own: characters drawn dim (a suggestion, a
+    # placeholder) and the marker are no input. No form found gives unknown, one
+    # form its state; with both, draft if either is a draft, else unknown if either
+    # is unknown, else empty. So it errs toward draft or unknown, never empty.
+    if ($null -eq $Ansi) { $Ansi='' }
+    $space=[char[]]@(32,9,10,11,12,13);$blank='\A[ \t\n\v\f\r]*\z';$context='Context [0-9]+% used'
+    # Visible text: CSI sequences removed, CR dropped, NBSP counted as a space.
+    $rawLines=$Ansi.Split([char]10);$visLines=([regex]::Replace($Ansi,'\x1b\[[0-?]*[ -/]*[@-~]','')).Split([char]10)
+    $count=$rawLines.Count;$raw=New-Object string[] $count;$vis=New-Object string[] $count
+    for ($i=0;$i -lt $count;$i++) { $raw[$i]=$rawLines[$i].Replace([string][char]13,'');$vis[$i]=$visLines[$i].Replace([string][char]13,'').Replace([string][char]0xA0,' ') }
+    $last=$count-1
+    while ($last -ge 0 -and $vis[$last] -cmatch $blank) { $last-- }
+    if ($last -lt 0) { return 'unknown' }
+    $claudeMarker=-1;$claudeEnd=-1;$codexMarker=-1;$codexEnd=-1
+    # Claude Code: the last two lines of ten or more U+2500 and nothing else (trailing
+    # whitespace aside), the lower one among the last 6 non-blank lines, the first line
+    # between them U+276F after spaces.
+    $lower=-1;$upper=-1
+    for ($i=$last;$i -ge 0;$i--) {
+        if ($vis[$i].TrimEnd($space) -cnotmatch '\A─{10,}\z') { continue }
+        if ($lower -lt 0) { $lower=$i } else { $upper=$i;break }
+    }
+    if ($upper -ge 0 -and $upper+1 -lt $lower) {
+        $seen=0
+        for ($i=$lower;$i -le $last;$i++) { if ($vis[$i] -cnotmatch $blank) { $seen++ } }
+        $line=$vis[$upper+1].TrimStart($space)
+        if ($seen -le 6 -and $line.Length -gt 0 -and [int]$line[0] -eq 0x276F) { $claudeMarker=$upper+1;$claudeEnd=$lower-1 }
+    }
+    # Codex: the footer fixed at the bottom (a Context line, or a Context line above
+    # "? for shortcuts", trailing whitespace aside); the marker the last line, among
+    # the last 6 non-blank lines above it, whose first column is U+203A followed by a
+    # space or the line end. The input runs from the marker to the footer, blank lines included.
+    $footer=-1
+    if ($vis[$last] -cmatch $context) { $footer=$last }
+    elseif ([string]::Equals($vis[$last].Trim($space),'? for shortcuts',[StringComparison]::Ordinal)) {
+        $i=$last-1
+        while ($i -ge 0 -and $vis[$i] -cmatch $blank) { $i-- }
+        if ($i -ge 0 -and $vis[$i] -cmatch $context) { $footer=$i }
+    }
+    $seen=0
+    for ($i=$footer-1;$footer -ge 0 -and $i -ge 0 -and $seen -lt 6;$i--) {
+        $line=$vis[$i]
+        if ($line -cmatch $blank) { continue }
+        $seen++
+        if ([int]$line[0] -eq 0x203A -and ($line.Length -eq 1 -or [int]$line[1] -eq 32)) { $codexMarker=$i;$codexEnd=$footer-1;break }
+    }
+    $states=@()
+    if ($claudeMarker -ge 0) { $states+=Get-ChildSessionFormState $raw $claudeMarker ([char]0x276F) $claudeEnd }
+    if ($codexMarker -ge 0) { $states+=Get-ChildSessionFormState $raw $codexMarker ([char]0x203A) $codexEnd }
+    if ($states.Count -eq 0) { return 'unknown' }
+    if ($states -ccontains 'draft') { return 'draft' }
+    if ($states -ccontains 'unknown') { return 'unknown' }
     return 'empty'
 }
 function Set-ChildSessionWatchEvent {
