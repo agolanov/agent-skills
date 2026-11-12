@@ -28,12 +28,18 @@ child-session key <name> <key>         Send one key without Enter: Escape, Up, D
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
-child-session wait --watch <name> <status-file> [<name> <status-file>]... [seconds]
+child-session wait --watch [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]... [seconds]
   Watches the set until its first event, checked each round with launches in set order: a valid first
   status line (printed, exit 0), the deadline (TIMEOUT, exit 124, default 43200 s), a launch gone
-  (EXITED, exit 3). Command errors exit 2. Claims <runtime-dir>/<name>.watcher for every launch and
-  refuses a launch that already has a live watcher. Writes <runtime-dir>/<first name>.result with the
-  lines launch, status_file, exit, line, watcher and launches.
+  (EXITED, exit 3), a herdr or tmux launch whose visible screen has not changed for --stall seconds
+  (STALLED, exit 4, default 180). A launch named by --rearm takes its first screen as a baseline and
+  stalls only after its screen has differed from it. A screen with the waiting notice among its last
+  12 non-blank lines never stalls; a session prints that notice before it ends its turn on a free wait:
+    [child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.
+  with " A draft left in the input holds the wake." appended when a wake line will be typed into its
+  pane. Command errors exit 2. Claims <runtime-dir>/<name>.watcher for every launch and refuses a
+  launch that already has a live watcher. Writes <runtime-dir>/<first name>.result with the lines
+  launch, status_file, exit, line, watcher and launches.
 child-session close <name>
 child-session list
 
@@ -753,6 +759,8 @@ parse_watch_args() {
     (( WATCH_SECONDS >= 0 )) || die 'wait seconds must be a nonnegative integer'
   fi
   while [[ $# -ge 2 ]]; do
+    # An option after the set is no launch name.
+    [[ $1 != -* ]] || die "$1 is not a launch name: options come before the watched launches"
     valid_name "$1"
     [[ $seen != *" $1 "* ]] || die "launch $1 is watched twice"
     # The record keeps one line per key.
@@ -843,9 +851,90 @@ start_result() { # after all claims: the old record goes, and every end writes a
   rm -f -- "$RUNTIME_DIR/${WATCH_NAMES[0]}.result"
 }
 
-# Stall detection samples each launch's screen here: status 0 means the launch
-# at <index> has stalled. No screen is sampled yet, so no launch stalls.
-screen_sample() { return 1; }
+strip_csi() { # stdin -> the same text with its CSI sequences (SGR included) removed
+  local esc=$'\033'
+  LC_ALL=C sed -e "s#${esc}\[[0-?]*[ -/]*[@-~]##g"
+}
+# A child waiting for free ends its turn with the waiting notice:
+#   [child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.
+screen_waiting() { # stdin: a screen; status 0 when one of its last 12 non-blank lines holds the notice
+  local text line visible nbsp=$'\xc2\xa0' count=0 index
+  local -a kept=()
+  text=$(strip_csi) || return 1
+  while IFS= read -r line; do
+    visible=${line//$nbsp/}; visible=${visible//[[:space:]]/}
+    [[ -n $visible ]] || continue
+    kept[count]=$line; count=$((count + 1))
+  done <<< "$text"
+  for ((index = count > 12 ? count - 12 : 0; index < count; index++)); do
+    [[ ${kept[index]} != *'[child-session waiting]'* ]] || return 0
+  done
+  return 1
+}
+launch_screen() { # <name>: prints the visible screen of a resolved launch; nonzero when unavailable
+  resolve "$1" || return 1
+  case $W in
+    herdr) herdr pane read "$H_PANE" --source visible ;;
+    tmux) tmux_call capture-pane -p -t "$OWN_PANE" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Stall state per launch, indexed like WATCH_NAMES: stall-watched (its recorded
+# backend shows a screen), re-armed, has a first capture, armed, the last capture
+# and since when (SECONDS) it is unchanged, and a re-armed launch's baseline.
+WATCH_SCREEN_ON=() WATCH_REARMED=() WATCH_SAMPLED=() WATCH_ARMED=()
+WATCH_LAST=() WATCH_SINCE=() WATCH_BASELINE=() WATCH_STALL_CAP=0
+stall_start() { # sets the state of every launch, and the sleep cap while any launch is stall-watched
+  local count=${#WATCH_NAMES[@]} index name found backend
+  WATCH_SCREEN_ON=() WATCH_REARMED=() WATCH_SAMPLED=() WATCH_ARMED=()
+  WATCH_LAST=() WATCH_SINCE=() WATCH_BASELINE=() WATCH_STALL_CAP=0
+  for ((index = 0; index < count; index++)); do
+    WATCH_SCREEN_ON[index]=0 WATCH_REARMED[index]=0 WATCH_SAMPLED[index]=0 WATCH_ARMED[index]=0
+    WATCH_LAST[index]='' WATCH_SINCE[index]=0 WATCH_BASELINE[index]=''
+    for name in ${WATCH_REARM[@]+"${WATCH_REARM[@]}"}; do
+      [[ $name != "${WATCH_NAMES[index]}" ]] || WATCH_REARMED[index]=1
+    done
+    found=$(runtime_op find "${WATCH_NAMES[index]}" 2>/dev/null) || continue
+    backend=$(record_field "${found#*$'\n'}" backend) || backend=''
+    if [[ $backend == herdr || $backend == tmux ]]; then
+      WATCH_SCREEN_ON[index]=1
+      WATCH_STALL_CAP=$((WATCH_STALL / 3))
+      (( WATCH_STALL_CAP >= 1 )) || WATCH_STALL_CAP=1
+    fi
+  done
+}
+# Samples the screen of the launch at <index>: status 0 when it has stalled. A
+# capture equal to the last one stalls an armed launch after WATCH_STALL seconds
+# unless it is a waiting screen; a changed, waiting or failed capture restarts
+# the time. A re-armed launch is armed only by a capture that differs from its
+# first one.
+screen_sample() {
+  local index=$1 screen now
+  (( WATCH_SCREEN_ON[index] )) || return 1
+  # The x keeps trailing newlines, so captures compare as exact text. A failed
+  # capture never ends the watcher by itself.
+  if ! screen=$(launch_screen "${WATCH_NAMES[index]}" 2>/dev/null && printf x); then
+    WATCH_SINCE[index]=$SECONDS
+    return 1
+  fi
+  screen=${screen%x} now=$SECONDS
+  if (( ! WATCH_SAMPLED[index] )); then
+    WATCH_SAMPLED[index]=1 WATCH_LAST[index]=$screen WATCH_SINCE[index]=$now WATCH_ARMED[index]=1
+    if (( WATCH_REARMED[index] )); then WATCH_ARMED[index]=0 WATCH_BASELINE[index]=$screen; fi
+    return 1
+  fi
+  if [[ $screen != "${WATCH_LAST[index]}" ]]; then
+    WATCH_LAST[index]=$screen WATCH_SINCE[index]=$now
+    if (( ! WATCH_ARMED[index] )) && [[ $screen != "${WATCH_BASELINE[index]}" ]]; then WATCH_ARMED[index]=1; fi
+    return 1
+  fi
+  if screen_waiting <<< "$screen"; then
+    WATCH_SINCE[index]=$now
+    return 1
+  fi
+  (( WATCH_ARMED[index] && now - WATCH_SINCE[index] >= WATCH_STALL ))
+}
 watch_event() { # <launch> <status file> <line>: the event that ends the watch
   WATCH_LAUNCH=$1 WATCH_STATUS_FILE=$2 WATCH_LINE=$3
   printf '%s\n' "$3"
@@ -859,9 +948,11 @@ watch_sleep() { # <seconds>; a trapped signal interrupts wait, so it ends the wa
 }
 # Each round: every status in set order, then the deadline, then every launch's
 # liveness (plain wait's rule, per launch), then stalls. Prints the event line
-# and returns its exit; a failed liveness check returns its own code.
+# and returns its exit; a failed liveness check returns its own code. Plain
+# wait's cadence, its sleep capped at max(1, stall / 3) s while any launch is
+# stall-watched.
 watch_loop() {
-  local count=${#WATCH_NAMES[@]} started=$SECONDS elapsed remaining delay first_line index alive_result
+  local count=${#WATCH_NAMES[@]} started=$SECONDS elapsed remaining delay first_line index alive_result stall_ready=0
   local -a seen_alive=()
   for ((index = 0; index < count; index++)); do seen_alive[index]=0; done
   WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
@@ -893,6 +984,8 @@ watch_loop() {
         return 3
       fi
     done
+    # Prepared at the first stall check, so a status already present returns at once.
+    (( stall_ready )) || { stall_start; stall_ready=1; }
     for ((index = 0; index < count; index++)); do
       if screen_sample "$index"; then
         watch_event "${WATCH_NAMES[index]}" "${WATCH_FILES[index]}" "STALLED: screen of window ${WATCH_NAMES[index]} unchanged for $WATCH_STALL s"
@@ -906,6 +999,7 @@ watch_loop() {
       delay=5
       (( delay <= 120 - elapsed )) || delay=$((120 - elapsed))
     else delay=30; fi
+    if (( WATCH_STALL_CAP && delay > WATCH_STALL_CAP )); then delay=$WATCH_STALL_CAP; fi
     (( delay <= remaining )) || delay=$remaining
     watch_sleep "$delay"
   done
