@@ -21,7 +21,7 @@ A session performs Prepare, Wait and Accept in order as one root. A session whos
 | Phase | Who performs it | Sections to read and perform | References to read |
 |---|---|---|---|
 | Prepare | The single root, or the Prepare agent | Input, Preflight, Brief, Launch | The Prepare list below |
-| Wait | The single root, or the phase agents' caller | Wait | child-sessions SKILL.md Wait and Dialogs |
+| Wait | The single root, or the phase agents' caller | Wait | child-sessions SKILL.md Wait and Dialogs; launch-settings Child settings check and Places for a subagent first status |
 | Accept | The single root, or the Accept agent | Events, Verify, Report | The Accept list below |
 
 Read each phase's references when reaching that phase. Prepare alone launches a `window` worker (open, Startup, early settings check); for `subagent` or `background` it starts nothing, writes `Action: start` and ends. Accept alone ends after a return to the worker or a reopen, writing Waiting (a non-window return as `Action: continue`) instead of waiting.
@@ -85,7 +85,7 @@ Run the planner in the place Preflight 6 decided.
 For Prepare alone, do not start this worker: record the start recipe below as `Action: start <place>` in Waiting, with the brief, checkout, settings and permission arguments, then complete Launch Record and end. The caller records the actual opening and performs the start; a single root performs it here.
 
 1. Append the `Opened:` line of the [child settings check](../independent-review/references/launch-settings.md#child-settings-check) to the brief, then start the planner in the project checkout by run contract [Launch and wait](../child-sessions/references/run-contract.md#launch-and-wait): a `subagent` with the pair Preflight 7 resolved, set by the host's native controls; a `background` CLI with the brief's recorded Launch settings, omitting a field that is `cli-default`, and the permission arguments of run contract [Permissions](../child-sessions/references/run-contract.md#permissions), since the planner writes and commits. Each `background` start or resume writes its run directory at `<runtime>/plan-<slug>-run-<n>`, `n` the smallest unused number. Tell the user that the run owns the task's documents until it reports, as Launch Window 1 words it. The child works in the project checkout: no worktree, no branch of its own.
-2. For `background`, run the early child settings check after each start and before waiting; only a mismatch stops for the user's continue-or-stop question, routed by auto.md under `--auto`, and recorded as `State: prepare: asked settings mismatch`. For `subagent`, the early check runs at the first status of each opening (Events).
+2. For `background`, run the early child settings check after each start and before waiting; only a mismatch stops for the user's continue-or-stop question, routed by auto.md under `--auto`, and recorded as `State: prepare: asked settings mismatch`. For `subagent`, the early check runs at the first status of each opening (Wait for `blocked`, Events otherwise).
 
 ### Record
 
@@ -97,6 +97,8 @@ The single root holds the wait; for phase-alone agents their caller holds it. Fo
 
 Brainstorming with the user can take long: keep waiting; on a free rung each quiet stretch costs one stall wake.
 
+Before handling a `subagent` opening's first `blocked` status, the wait holder runs the early [child settings check](../independent-review/references/launch-settings.md#child-settings-check) and records its outcome in that opening's Openings entry. A mismatch stops before showing/answering Questions, archiving the status or continuing the child; use Launch's continue-or-stop question, auto.md routing and the record's Authority rule. An early check already completed and recorded for this opening is not repeated when a later status reaches Events; Verify's final check still applies.
+
 The wait holder handles these events without starting Accept:
 
 - **`blocked`:** show Questions verbatim with its options and recommendation and obtain the user's answer (under `--auto`, route it by auto.md's Deciding; without `send` the user only types it in, as Brief says). Archive the status to `<file>-blocked-<n>`. For a window, apply Events **Before every send**, send one line or an absolute answer-file instruction, then wait for a fresh status. A dead worker before that send goes to Events **Reopen**, carrying the line to send. For `subagent` or `background`, continue the same child by run-contract Questions and continuation, or its fresh-child fallback with a new `Opened:` line; update Openings and Waiting, then wait again.
@@ -106,7 +108,7 @@ Everything else goes to Events. Other command errors stop with artifacts preserv
 
 ## Events
 
-Accept starts from evidence: read the record, the status file's exact first line, then `alive plan-<slug>` for a window (the child/producer completion evidence otherwise). Then validate the record against the brief's labelled lines and runtime evidence by its Authority rule, even when the caller supplied an event description. For a `subagent`, run the early child settings check at the first status of each opening before dispatch, with the same mismatch question and Authority rule as Launch.
+Accept starts from evidence: read the record, the status file's exact first line, then `alive plan-<slug>` for a window (the child/producer completion evidence otherwise). Then validate the record against the brief's labelled lines and runtime evidence by its Authority rule, even when the caller supplied an event description. For a `subagent` whose first status reaches Events, run and record its early child settings check before dispatch, with the same mismatch question and Authority rule as Launch. Use an early check already completed in Wait for that opening instead of repeating it.
 
 - **`done`:** proceed to Verify.
 - **`failed`:** show the failure and stop, keeping the window/status or status/run directories; the report says no spec and plan were produced and lists any commits the status names.
