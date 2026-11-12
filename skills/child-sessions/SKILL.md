@@ -44,7 +44,7 @@ Choose the highest proven rung once per run at its first long wait, after the fi
 |---|---|---|---|
 | 1 | Host background watcher; completion notification re-invokes the session | 0 | [Host mechanisms](references/run-contract.md#host-mechanisms), `Free wait: host notification`, says `observed` for this host and session kind. Unlisted or `unverified` means unavailable. |
 | 2 | Detached watcher types a wake line into the session's own pane | 0 | The run's first `wake` exits `0`, proving the caller pane and classifiable input. |
-| Present loop | Bounded foreground waits | As today | Used when neither free rung is proven. |
+| Present loop | Bounded calls in the foreground | As today | Used when neither free rung is proven. |
 
 Only an interactive session may use rung 1 or try rung 2. A native subagent and a print session use the present loop and **never call `wake`**: the helper would prove the parent's pane and type into the parent. No rung puts another agent between the session and its child. A wake after the cache lifetime rewrites the context once; no rung keeps a session awake for its cache.
 
