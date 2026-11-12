@@ -744,6 +744,8 @@ WATCH_LAUNCH='' WATCH_STATUS_FILE='' WATCH_LINE=''
 WATCH_CLAIM_TEXT='' WATCH_CLAIM_ERROR=''
 WATCH_RECORDING=0 WATCH_RESULT_WRITTEN=0 WATCH_RESULT_TEXT=''
 WATCH_END_MESSAGE='' WATCH_SLEEP_PID=''
+# The operation named by parse errors (wake and wake-run set their own).
+WATCH_COMMAND='wait --watch'
 # [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]...
 # [seconds]: after the options, an odd count makes the last argument the deadline.
 parse_watch_args() {
@@ -761,7 +763,7 @@ parse_watch_args() {
     esac
     shift 2
   done
-  [[ $# -ge 2 ]] || die 'wait --watch needs at least one <name> <status-file> pair'
+  [[ $# -ge 2 ]] || die "$WATCH_COMMAND needs at least one <name> <status-file> pair"
   if (( $# % 2 )); then
     [[ ${!#} =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
     WATCH_SECONDS=$((10#${!#}))
@@ -1028,6 +1030,13 @@ watch_exit() {
     (( code != 0 )) || code=2
     write_result '' '' "$code" "${DIE_MESSAGE:-${WATCH_END_MESSAGE:-watcher ended without an event}}" || true
   fi
+  # wake-run ended by an error (not a signal) still wakes its caller before it
+  # releases its claims; a signal now ends it with its claims released.
+  if (( WAKE_PENDING )) && [[ -z $WATCH_END_MESSAGE ]]; then
+    trap 'release_claims; exit 130' INT
+    trap 'release_claims; exit 143' TERM
+    wake_finish || true
+  fi
   release_claims || true
   exit "$code"
 }
@@ -1054,7 +1063,9 @@ cmd_watch() {
 # types one line into that pane while its input is empty, and releases its
 # claims last. The caller reaches wake-run only as its arguments.
 CALLER_BACKEND='' CALLER_PANE='' CALLER_PANE_PID='' CALLER_WORKSPACE=''
-WAKE_NONCE='' WAKE_ACK=''
+# WAKE_PENDING: wake-run has acknowledged its start and not yet begun typing, so
+# any end but a signal still runs the typing loop (watch_exit).
+WAKE_NONCE='' WAKE_ACK='' WAKE_PENDING=0
 process_parent() { # <pid>: prints its parent PID
   local stat
   local -a fields
@@ -1164,7 +1175,9 @@ input_state() {
   # Claude Code: the last two lines of ten or more ─ and nothing else, the lower
   # one among the last 6 non-blank lines, the first line between them ❯ after spaces.
   for ((index = last; index >= 0; index--)); do
+    # Trailing whitespace (a padded row) is no part of a rule line.
     line=${vis[index]}
+    line=${line%"${line##*[![:space:]]}"}
     [[ ${#line} -ge 30 && -z ${line//$rule/} ]] || continue
     if (( lower < 0 )); then lower=$index; else upper=$index; break; fi
   done
@@ -1183,7 +1196,7 @@ input_state() {
     line=${vis[last]}
     if [[ $line =~ $context_re ]]; then
       footer=$last
-    elif [[ ${line#"${line%%[![:space:]]*}"} == '? for shortcuts' ]]; then
+    elif line=${line#"${line%%[![:space:]]*}"}; [[ ${line%"${line##*[![:space:]]}"} == '? for shortcuts' ]]; then
       for ((index = last - 1; index >= 0; index--)); do [[ -z ${vis[index]//[[:space:]]/} ]] || break; done
       if (( index >= 0 )) && [[ ${vis[index]} =~ $context_re ]]; then footer=$index; fi
     fi
@@ -1237,15 +1250,19 @@ wake_ack() { # <text>: <runtime-dir>/<first>.wake-ack-<nonce>, written atomicall
   rm -f -- "$temporary"
   return 1
 }
-caller_listed() { # status 0 while tmux lists the same pane id with the same pane PID, or herdr the pane id in its workspace
+# Status 0 when a listing shows the caller pane (tmux: the same pane id with the
+# same pane PID; herdr: the pane id in its workspace), 1 when a listing succeeds
+# without it, 2 when the listing call fails or its output cannot be read.
+caller_listed() {
   local panes pane pid count
   if [[ $CALLER_BACKEND == herdr ]]; then
-    [[ -n $PYTHON ]] || select_json_reader || return 1
-    panes=$(herdr pane list --workspace "$CALLER_WORKSPACE" 2>/dev/null) || return 1
-    count=$(json_op pane "$panes" pane_id "$CALLER_PANE" count 2>/dev/null) || return 1
-    [[ $count =~ ^[0-9]+$ ]] && (( count > 0 ))
+    [[ -n $PYTHON ]] || select_json_reader || return 2
+    panes=$(herdr pane list --workspace "$CALLER_WORKSPACE" 2>/dev/null) || return 2
+    count=$(json_op pane "$panes" pane_id "$CALLER_PANE" count 2>/dev/null) || return 2
+    [[ $count =~ ^[0-9]+$ ]] || return 2
+    (( count > 0 )) || return 1
   else
-    panes=$(tmux_call list-panes -a -F '#{pane_id} #{pane_pid}' 2>/dev/null) || return 1
+    panes=$(tmux_call list-panes -a -F '#{pane_id} #{pane_pid}' 2>/dev/null) || return 2
     while read -r pane pid; do
       [[ $pane != "$CALLER_PANE" || $pid != "$CALLER_PANE_PID" ]] || return 0
     done <<< "$panes"
@@ -1264,21 +1281,43 @@ wake_note() { # <line>: appended by rewriting the record from this process's own
   WATCH_RESULT_TEXT+="$1"$'\n'
   store_result "$WATCH_RESULT_TEXT" || printf 'child-session: result record could not be written\n' >&2
 }
-# Every 2 s: the caller pane must still be listed, else the record gets "wake:
-# caller pane gone"; an empty input is typed once; a draft or an unknown input
-# keeps looking. A failed typing call is tried again in the next round.
+# Every 2 s: a listing without the caller pane, or three failed listing calls in
+# a row, gives the record "wake: caller pane gone"; a failed listing call alone
+# types nothing and looks again. Only in a round whose listing shows the pane is
+# an empty input typed, once; a draft or an unknown input keeps looking. A failed
+# typing call is tried again in the next round.
 wake_typing() { # <line>
-  local screen
+  local screen listed failures=0
   while true; do
-    if ! caller_listed; then wake_note 'wake: caller pane gone'; return 0; fi
-    screen=$(caller_screen 2>/dev/null) || screen=''
-    if [[ $(input_state <<< "$screen") == empty ]] && wake_type "$1"; then wake_note 'wake: typed'; return 0; fi
+    listed=0
+    caller_listed || listed=$?
+    if (( listed == 1 )); then wake_note 'wake: caller pane gone'; return 0; fi
+    if (( listed == 2 )); then
+      failures=$((failures + 1))
+      if (( failures >= 3 )); then wake_note 'wake: caller pane gone'; return 0; fi
+    else
+      failures=0
+      screen=$(caller_screen 2>/dev/null) || screen=''
+      if [[ $(input_state <<< "$screen") == empty ]] && wake_type "$1"; then wake_note 'wake: typed'; return 0; fi
+    fi
     watch_sleep 2
   done
+}
+# The line comes from this process's own event and arguments, never from the
+# record: the event's launch, or for a deadline or an error the watched names
+# joined by ",". The claims go only after the typing loop, so no second watcher
+# or wake starts over a launch whose wake is pending.
+wake_finish() {
+  local launch=$WATCH_LAUNCH name
+  WAKE_PENDING=0
+  if [[ -z $launch ]]; then for name in "${WATCH_NAMES[@]}"; do launch+=${launch:+,}$name; done; fi
+  wake_typing "child-session wake: $launch; result record $RUNTIME_DIR/${WATCH_NAMES[0]}.result"
+  release_claims
 }
 cmd_wake() {
   local name claim text screen state directory=. self log attempt reply pid
   local -a handoff
+  WATCH_COMMAND=wake
   parse_watch_args "$@"
   caller_pane
   screen=$(caller_screen 2>/dev/null) || screen=''
@@ -1326,13 +1365,14 @@ cmd_wake() {
 # wake-run <nonce> tmux <pane_id> <pane_pid> -- <watch options and set>
 # wake-run <nonce> herdr <pane_id> <workspace_id> -- <watch options and set>
 cmd_wake_run() {
-  local code=0 valid=0 launch='' name
+  local code=0 valid=0
   local nonce_re='^[A-Za-z0-9]{16,}$' tmux_re='^%[0-9]+$' id_re='^[A-Za-z0-9_][A-Za-z0-9_:.-]*$'
   [[ $# -ge 5 && $5 == -- && $1 =~ $nonce_re ]] || die 'wake-run: malformed handoff'
   WAKE_NONCE=$1 CALLER_BACKEND=$2 CALLER_PANE=$3
   if [[ $2 == tmux && $3 =~ $tmux_re && $4 =~ ^[0-9]+$ ]]; then CALLER_PANE_PID=$4 valid=1
   elif [[ $2 == herdr && $3 =~ $id_re && $4 =~ $id_re ]]; then CALLER_WORKSPACE=$4 valid=1; fi
   shift 5
+  WATCH_COMMAND=wake-run
   parse_watch_args "$@"
   WAKE_ACK=$RUNTIME_DIR/${WATCH_NAMES[0]}.wake-ack-$WAKE_NONCE
   if (( ! valid )); then wake_ack 'refused wake: malformed caller pane in the handoff' || true; exit 2; fi
@@ -1344,14 +1384,11 @@ cmd_wake_run() {
   start_result
   # Before the watch loop, so a status already present cannot outrun it.
   wake_ack "started $$" || die 'wake: the acknowledgement could not be written'
+  # From here an error end (die) still records, types and only then releases.
+  WAKE_PENDING=1
   watch_loop || code=$?
   write_result "$WATCH_LAUNCH" "$WATCH_STATUS_FILE" "$code" "$WATCH_LINE" || die 'result record could not be written'
-  # The line comes from this process's own event and arguments, never from the record.
-  launch=$WATCH_LAUNCH
-  if [[ -z $launch ]]; then for name in "${WATCH_NAMES[@]}"; do launch+=${launch:+,}$name; done; fi
-  wake_typing "child-session wake: $launch; result record $RUNTIME_DIR/${WATCH_NAMES[0]}.result"
-  # Only now: no second watcher or wake starts over a launch whose wake is pending.
-  release_claims
+  wake_finish
   return "$code"
 }
 cmd_close() {
