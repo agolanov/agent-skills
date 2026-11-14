@@ -12,12 +12,12 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
 | splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
 | implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | xhigh |
-| inline implementer | `delivering-task` child in `inline` mode (one document or each unit of its queue), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `delivering-task` Execution mode |
+| solo implementer | `delivering-task` child in `solo` mode (one document or each unit of its queue), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `delivering-task` Implementation mode |
 | reviewer | `independent-review` reviewer in every place; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 | follow-ups fixer | `delivering-task-follow-ups` worker outside `inline`, which fixes the batch and runs the chain | latest available Opus | latest available Sol | high |
 | orchestrator | `delivering-spec-stages` outside `inline` | latest available Opus | latest available Sol | high |
 
-The root chooses between the two implementer roles by the execution mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
+The root chooses between the two implementer roles by the implementation mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
 
 Excluded from automatic choice, allowed explicitly: Fable (Claude), Astra (Codex).
 
@@ -123,7 +123,7 @@ Use the selected runtime's actual home/configuration directory when finding runt
 
 Every role keeps its policy in every place of the [run contract](../../child-sessions/references/run-contract.md#places):
 
-- **`inline`** (the place `--run inline`, not the `inline` execution mode of the **inline implementer** row): the worker is the current session. No settings are resolved, and explicit `--model`/`--effort` for it are refused before anything starts; in the orchestrators these keys set the implementer instead.
+- **`inline`** (the place `--run inline`): the worker is the current session. No settings are resolved, and explicit `--model`/`--effort` for it are refused before anything starts; in the orchestrators these keys set the implementer instead.
 - **`window`:** unchanged: `open` passes the pair.
 - **`subagent`:** resolve by the **Native** bullet of **Resolution** and set the pair with the host's native controls, as the [native subagent reviewer](subagent-reviewers.md) steps 1 and 3 describe, for any role. A pair the place cannot select and verify is refused before launch, naming the place and the pair.
 - **`background`:** resolve by the **CLI** bullet and pass the pair as CLI flags (run contract [Launch and wait](../../child-sessions/references/run-contract.md#launch-and-wait)).
