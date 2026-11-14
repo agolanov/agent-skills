@@ -47,7 +47,13 @@ Read [independent-review](../independent-review/SKILL.md), using the installed c
 
 The `dual` assignment has Codex and Claude review every round through [the dual review](../independent-review/references/dual.md): read it too, and resolve both reviewers' settings by its [step 1](../independent-review/references/dual.md#1-settings-and-target).
 
-Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise five completed rounds.
+Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise ten completed rounds.
+
+### Reviewer settings by round
+
+Rounds 1–2 use the resolved initial reviewer settings. Starting with round 3 (two completed valid rounds), use **Claude Fable 5.2 / high** for a Claude reviewer and **GPT-6 Astra / high** for a Codex reviewer. Starting with round 5 (four completed valid rounds), keep these flagship models and raise both reviewers' effort to **xhigh**. A single-system loop keeps its system; a dual loop switches both reviewers, including their cross-check calls. This schedule replaces initial model/effort settings unless the user explicitly requests a different schedule or pins settings for later rounds. Loop-owner settings are unaffected.
+
+Before launching round 3, resolve the exact supported model identifiers through independent-review's launch-settings contract and validate `high`; do not guess identifiers or substitute Opus, Sol or another model. If the requested model/effort is unavailable or cannot be verified, report blocked before launching that round. Before launching round 5, validate `xhigh` for each selected model through the same contract; unsupported or unverifiable `xhigh` blocks that round without substituting `high` or another effort. Announce and record each switch and its selection/runtime evidence. Pass the effective settings explicitly to independent-review on every later round, including final and disposition passes. Retries retain the pending round's settings and budget; resuming retains the completed-round count and schedule, so it cannot return to earlier models or effort levels. Do not replace an already-running attempt on resume.
 
 ## 2. Commit the reviewed state
 

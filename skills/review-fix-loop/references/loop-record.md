@@ -23,13 +23,15 @@ Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <background|subagent|window>/<codex|claude>, model <exact>, effort <exact>
 <or> Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
-Round limit: 5 <or explicit user limit>
+Round limit: 10 <or explicit user limit>
+Reviewer schedule: rounds 1–2 initial settings; rounds 3–4 Claude Fable 5.2/high and/or GPT-6 Astra/high; round 5 onward same models/xhigh; <explicit user exception, if any>
 Completed rounds: 0
 Final pass: not run <or round/commit>
 Pending round: 1; invalid attempts: 0 of 2 <dual: spent attempts per reviewer per call in the round's state.md>
 Next D: <dual: next free D<n>, starting at 1>
 
 ## Round 1
+Effective reviewer settings: <per system: exact model/effort; selection/runtime evidence; retained on retry>
 Target: <range|fix commit|dispositions only>
 Reviewed commit: <HEAD>
 Previous verdict: <none or verdict>
