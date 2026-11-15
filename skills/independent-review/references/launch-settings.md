@@ -12,14 +12,14 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
 | splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
 | implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | xhigh |
-| solo implementer | `delivering-task` child in `solo` mode (one document or each unit of its queue), including its later fixes | latest available Sonnet | latest available Sol | `medium` or `high`, chosen by the root per `delivering-task` Implementation mode |
+| solo implementer | `delivering-task` child in `solo` mode (one document or each unit of its queue), including its later fixes | family chosen per task by `delivering-task` Solo settings | family chosen per task by `delivering-task` Solo settings | `medium` or `high`, chosen with the model per [Implementation mode](../../delivering-task/SKILL.md#implementation-mode) |
 | reviewer | `independent-review` reviewer in every place; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 | follow-ups fixer | `delivering-task-follow-ups` worker outside `inline`, which fixes the batch and runs the chain | latest available Opus | latest available Sol | high |
 | orchestrator | `delivering-spec-stages` outside `inline` | latest available Opus | latest available Sol | high |
 
 The root chooses between the two implementer roles by the implementation mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
 
-Excluded from automatic choice, allowed explicitly: Fable (Claude), Astra (Codex).
+Outside an explicit caller schedule (such as review-fix-loop), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
 
 ## Precedence
 
