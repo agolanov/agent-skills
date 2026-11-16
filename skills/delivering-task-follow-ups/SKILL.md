@@ -1,13 +1,13 @@
 ---
 name: delivering-task-follow-ups
-description: Settles the findings of follow-ups files left after delivered tasks from one invocation, fixing the localized ones directly on the main branch in one checked, committed and reviewed batch, dropping resolved ones, and taking only those that need design or a large refactor through planning, review and delivery. Use when a task's follow-ups should be fixed, sorted out or merged without running each skill by hand.
+description: Use when findings left in a delivered task's follow-ups files need investigation, correction and verification, including difficult defects, or when follow-ups requiring new behavior or architectural decisions need planning and delivery.
 ---
 
 # Delivering Task Follow-ups
 
 `delivering-task-follow-ups <follow-ups file|directory>... [--run inline|background|window] [--model M|cli-default] [--effort E|cli-default] [--agent claude|codex] [--parallel N] [--impl solo|subagents|direct] [--reviewer-run background|subagent|window] [--reviewer-model M|cli-default] [--reviewer-effort E|cli-default] [--auto]`
 
-The **fixer**, the session performing this skill, gives every finding one outcome: **fix** (fixed in the batch), **drop** (removed with no change), **brief** (moved into a task brief for the [chain](#chain)) or **keep** (left in its file). The fixes form one **batch**, made by the fixer itself on the main branch of the project checkout with no worktree, spec, plan or subagent per finding: the checks run once after all fixes, one commit holds the batch and one `review-fix-loop` reviews it. Only the brief findings go through `planning-task-docs`, `refining-task-docs` and `delivering-task`.
+The **fixer**, the session performing this skill, gives every finding one outcome: **fix** (fixed in the batch), **drop** (removed with no change), **brief** (moved into a task brief for the [chain](#chain)) or **keep** (left in its file). The fixes form one **batch**, made by the fixer itself on the main branch of the project checkout with no worktree, spec, plan or implementing subagent per finding: the checks run once after all fixes, one commit holds the batch and one `review-fix-loop` reviews it. A [researcher](#difficult-findings) may investigate a difficult cause; the fixer still implements. Only the brief findings go through `planning-task-docs`, `refining-task-docs` and `delivering-task`.
 
 Keys:
 
@@ -45,28 +45,41 @@ Follow child-sessions' [Thin launchers](../child-sessions/references/run-contrac
 
 ## Recheck
 
-Read every finding against the code as it is now. A finding was recorded at its section's commit, so its paths and line numbers may have moved: find the described code by its content. Read the plan beside the file (the same path without the `-follow-ups` or `-tails` suffix) and that plan's spec only when the finding cannot be understood without them. Put each finding in one class:
+Investigate every finding against the code as it is now before choosing its route. Trace the relevant implementation, callers and checks; when the first investigation cannot establish the cause or a safe correction, use [Difficult findings](#difficult-findings), then finish classification from the evidence. A finding was recorded at its section's commit, so its paths and line numbers may have moved: find the described code by its content. Read the plan beside the file (the same path without the `-follow-ups` or `-tails` suffix) and that plan's spec only when the finding cannot be understood without them. Put each finding in one class:
 
 - **Resolved**: the defect no longer exists (fixed later, the code removed, the point made moot). Evidence: the `path:line` or commit that shows it.
-- **Fix**: you can state the exact change now, and it stays local to one or a few files. A change of behaviour still belongs here, whatever checks the project rules require for it: the checks never decide the class, since [Verify](#verify) runs them once for the whole batch.
-- **Large**: the finding leaves a design decision open (a behaviour, a contract or an interface to choose), or its change is a refactor across many modules or skills. It belongs in a task.
+- **Fix**: investigation establishes a correction to the intended behavior or existing contract. This is the default for confirmed defects, including changes across several files or modules. The fixer chooses ordinary implementation details. Required checks never decide the class, since [Verify](#verify) runs them once for the whole batch.
+- **Design**: resolving the finding requires choosing new behavior, changing a public contract or substantially restructuring the architecture. Name the concrete decision and why restoring the existing intended behavior cannot settle it. Difficulty, file count and internal refactoring alone do not qualify. It belongs in a task.
 - **Disputed**: the finding's `<why>` carries two positions, or your recheck disagrees with the finding. The user decides (under `--auto`, routed by [auto.md](../child-sessions/references/auto.md#deciding)).
 
-Put the Large findings into groups, one group per future task. Findings that share a mechanism, a module boundary or a design decision go together, and findings whose fixes depend on each other always go together, so that every group is a task independent of the others. A group may hold a single finding. Give each group a short title naming the change (`OAuth state hardening`).
+Put the Design findings into groups, one group per future task. Findings that share a mechanism, a module boundary or a design decision go together, and findings whose fixes depend on each other always go together, so that every group is a task independent of the others. A group may hold a single finding. Give each group a short title naming the change (`OAuth state hardening`).
 
-The recheck is done when every finding has a class and its evidence, exact change or current `path:line`, and every Large finding has a group.
+The recheck is done when every finding has a supported class: evidence for Resolved or Disputed, an exact correction for Fix, or the concrete decision for Design, with current code locations and a group for every Design finding. If unavailable evidence or access prevents classification, name the blocker and request what is missing while continuing independent findings. **keep** requires a user-selected deferral or a concrete blocker allowed by this workflow; investigation effort, complexity and an initially unknown fix are not blockers.
+
+### Difficult findings
+
+Launch a fresh native research subagent in the fixer's own system when Recheck or Fix cannot establish the cause or safe correction after initial investigation. Group findings that share the same suspected cause into one investigation. Use these researcher settings unless the user explicitly overrides them for this role; fixer and reviewer settings stay unchanged:
+
+| Fixer's system | Researcher model | Effort |
+| --- | --- | --- |
+| Claude | Fable 5.2 | xhigh |
+| Codex | GPT-6 Astra | xhigh |
+
+Resolve the exact native model identifier and supported effort through [launch settings](../independent-review/references/launch-settings.md#resolution), using this table as the caller's explicit policy. Pass both settings through the host's controls with a fresh context, and verify effective settings through its [Child settings check](../independent-review/references/launch-settings.md#child-settings-check). If native launch or the requested pair cannot be selected or verified, report that investigation blocked, continue independent findings, and obtain an explicit alternative assignment; do not silently downgrade or switch to a CLI.
+
+Give the researcher the absolute checkout, finding text, intended behavior, relevant evidence and attempted investigation, and any current owned edits. Its scope is read-only investigation: return the cause with code/trace evidence, the smallest sufficient correction, a reproducer or regression check, and remaining uncertainty or a concrete Design decision. It does not edit, commit or start the planning chain. Wait for its completed result, check its evidence against the checkout, then have the fixer implement and verify the correction. A hypothesis alone leaves investigation open; identify and obtain the missing evidence. A research report alone does not settle the finding.
 
 ## Select
 
-Show one table: `# | file | finding (short) | class | group | evidence or change`, followed by one line per group: its title and its findings' numbers. Propose an outcome for each finding: Fix → **fix**, Resolved → **drop**, Large → **brief** in its group; a Disputed finding gets no proposal, the user chooses among fix, drop, brief and keep. Ask the user one question: confirm or change the outcomes and the groups (move a finding, merge or split groups, retitle one, keep a finding instead of briefing it). Say in it that, on confirmation, the fixes are made, checked, committed on the main branch and reviewed by `review-fix-loop`, whose fix commits land on the main branch too, and the briefs go through planning and delivery: the answer is the consent to those commits, and no other question about them follows. No edit starts before the answer.
+Show one table: `# | file | finding (short) | class | group | evidence or change`, followed by one line per group: its title and its findings' numbers. Propose an outcome for each finding: Fix → **fix**, Resolved → **drop**, Design → **brief** in its group; a Disputed finding gets no proposal, the user chooses among fix, drop, brief and keep. Ask the user one question: confirm or change the outcomes and the groups (move a finding, merge or split groups, retitle one, keep a finding instead of briefing it). Say in it that, on confirmation, the fixes are made, checked, committed on the main branch and reviewed by `review-fix-loop`, whose fix commits land on the main branch too, and the briefs go through planning and delivery: the answer is the consent to those commits, and no other question about them follows. No edit starts before the answer.
 
-A finding the user moves changes the groups as the user says; a Disputed or Fix finding the user chooses to brief joins the group the user names, or a group of its own. A grouping that splits a dependency is not accepted: name the dependency and ask again. **fix** is chosen only for a finding whose exact change you can state; when the user disputes a Large finding's class, recheck it. Under `--auto` the proposed outcomes and groups are the skill's recommended options and settle this question by [auto.md](../child-sessions/references/auto.md#deciding); a Disputed finding, which has no proposal, is routed by it.
+A finding the user moves changes the groups as the user says; a Disputed or Fix finding the user chooses to brief joins the group the user names, or a group of its own. A grouping that splits a dependency is not accepted: name the dependency and ask again. The exact-change requirement selects the direct batch route after investigation; findings meeting the Design criterion take **brief** and the [chain](#chain). When the user disputes a Design finding's class, recheck it. Under `--auto` the proposed outcomes and groups are the skill's recommended options and settle this question by [auto.md](../child-sessions/references/auto.md#deciding); a Disputed finding, which has no proposal, is routed by it.
 
 ## Fix
 
 1. Record the checkout's status (`git status --porcelain=v1 -z`, with `GIT_OPTIONAL_LOCKS=0`) before the first edit. A file with uncommitted changes holds another writer's work: never edit, revert, stage or commit it. A chosen finding whose fix needs such a file is not fixed: its outcome becomes keep, with the reason `uncommitted changes in <path>`.
 2. Take the chosen findings file by file: read each file once and make every chosen change in it, each the smallest change that removes the defect, following the project rules. Run no check between fixes.
-3. A fix that turns out larger than chosen (it needs a design decision) is abandoned: undo your own edits for it, change its outcome to keep with the reason, and go on.
+3. When an approved fix proves difficult, use [Difficult findings](#difficult-findings) if its cause or safe correction remains unclear, then continue the correction in this batch. Only evidence meeting the Design criterion returns that finding to Recheck and Select: undo only your own edits for it, identify the concrete decision, and propose **brief** with its group. Reuse existing authorization when it covers this route; otherwise obtain the changed selection through Select (including its `--auto` routing). Continue independent findings, then carry the selected brief through the chain in this run.
 4. Anything you notice outside the chosen findings goes into the Report, unfixed.
 
 ## Verify
@@ -130,8 +143,11 @@ The tasks whose refine Report shows the plan with a `Review:` mark (a new one, o
 
 ## Report
 
+Account for every input finding. A written brief is an intermediate result: report its chain's delivery result or the concrete stop and remaining work. Completing the direct batch alone does not complete the selected brief tasks.
+
 - A table of every finding: `# | file | class | outcome` (fixed, dropped, brief `<brief file name>`, kept with reason, abandoned with reason).
 - The files changed, each check with its command and exit (or its unavailable reason), run once, and the batch commit SHA or `not committed: <reason>`; each follow-ups file updated, deleted or left local.
+- Each research assignment: finding numbers, agent identity, requested and effective model/effort with evidence or unavailable reason, result location, and how its findings were checked and used.
 - The review: `review-fix-loop`'s final verdict, rounds and commits, its deferred and disputed findings, and the follow-ups file they were written to with its count and commit (or where it was written locally); or `review skipped: no fixed finding`.
 - The briefs, in the order Select listed the groups, and a table of their tasks: `task | brief | spec | plan | refine | delivery | merge SHA | follow-ups count`, each phase's outcome as its nested call's Report gave it, `-` for a phase the chain did not reach, and the reason where a chain ended.
 - The settings lines of the delivery's Report, and for each call: phase agents: `subagent`, the host's default settings, not verified; `<p>` Prepare and `<a>` Accept agents. Add this session's own `Wait:` line and dialog counts (answered, declined, escalated), each worker whose inline place ran as `subagent`, and each call that ran `inline` with the shared contract's reason.
