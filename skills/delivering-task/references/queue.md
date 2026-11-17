@@ -51,6 +51,8 @@ The root writes no code, except under `--run inline`, where it is every unit's i
 
 In `window`, use each launch's `capabilities <name>` before terminal controls, with the matching checkout/launch record. A `peek` below is optional when unsupported: read the status/report instead. For an unavailable `send`, a live child receives answers directly from the user in its window (under `--auto`, answers the root decided, which the user only types in) and the queue keeps waiting through files; announce that limitation once when opening. Timeouts are not approval requests and dialog counts are not observable there. Keep the single reopen and alive checks of `delivering-task` Events, sharing the budget in each unit's `Reopen:` line. Count live agents, including ones whose owned stop failed; a retained terminal shell after proven agent exit takes no slot. Report a retained window separately when window closure is unsupported.
 
+Child-sessions' [quiet wait](../../child-sessions/SKILL.md#wait) holds for the whole queue: a unit's state change goes to the state file, and the user hears each unit's result in the final report.
+
 ## Scheduling
 
 Runs at the start, at the end of each drain that merged (Finish half 2), and whenever a slot frees while no drain end is pending.

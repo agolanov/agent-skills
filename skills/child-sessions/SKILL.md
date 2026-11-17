@@ -36,6 +36,8 @@ Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidenc
 
 ## Wait
 
+**Quiet wait.** The user watches a child in its own window, status file or run directory, and asks this session when they want a status. From launch until the final report, a parent's text to the user is only: the launch lines its skill words, the waiting notice, a question or dialog that needs the user's decision, the stall line, a declined or escalated dialog, and a stop or failure. Everything else a wake shows (a peeked screen, the child's progress, its commits and checks so far, the result of one unit, stage, phase or review round) goes into the run's records and reaches the user once, in the final report. This binds every parent in every place: a thin launcher, a wait holder, and an orchestrator over units, stages or rounds. A direct question from the user is answered as asked.
+
 ### Rungs
 
 Choose the highest proven rung once per run at its first long wait, after the first Startup. Keep it for later waits unless a watcher failure requires the present loop. An **interactive session** is the agent CLI's own TUI in its own pane or terminal (the user's session or a `window` child); a **native subagent** starts through a host agent tool; a **print session** is `claude --print` or `codex exec` (including a `background` child that itself waits).
@@ -133,7 +135,7 @@ After each answer (Enter, cancel or No), peek until the screen no longer shows t
 
 A decline can end the agent's turn: in Claude Code, Escape or "No, and tell Claude what to do differently" leaves it idle at an empty input prompt, with no choice and no spinner. When the re-peek after a decline shows the child waiting at its empty input prompt, send one line with `send "$name" "<text>"` that names the declined command and the reason, and tells it to continue without that command or to write `STATUS: blocked` with its question. This line is the only text the root types for a declined dialog.
 
-Tell the user about each answered dialog as it happens, in one line: window, command summary, answer. Declined or escalated dialogs are shown in full: window, whole command, reason. The calling task's final report counts the dialogs answered, declined and escalated.
+An approved dialog is only counted. Declined or escalated dialogs are shown to the user as they happen, in full: window, whole command, reason. The calling task's final report counts the dialogs answered, declined and escalated.
 
 ## Recover a silent exit
 

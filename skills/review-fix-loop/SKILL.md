@@ -47,7 +47,7 @@ Read [independent-review](../independent-review/SKILL.md), using the installed c
 
 The `dual` assignment has Codex and Claude review every round through [the dual review](../independent-review/references/dual.md): read it too, and resolve both reviewers' settings by its [step 1](../independent-review/references/dual.md#1-settings-and-target).
 
-Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise ten completed rounds.
+Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise ten completed rounds. Each round's verdict, findings and fixes go to the loop record and reach the user once, in the final report, by child-sessions' [quiet wait](../child-sessions/SKILL.md#wait).
 
 ### Reviewer settings by round
 
