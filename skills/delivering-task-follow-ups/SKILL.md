@@ -63,7 +63,7 @@ Launch a fresh native research subagent in the fixer's own system when Recheck o
 | Fixer's system | Researcher model | Effort |
 | --- | --- | --- |
 | Claude | Fable 5.2 | xhigh |
-| Codex | GPT-6 Astra | xhigh |
+| Codex | GPT-6.2 Astra | xhigh |
 
 Resolve the exact native model identifier and supported effort through [launch settings](../independent-review/references/launch-settings.md#resolution), using this table as the caller's explicit policy. Pass both settings through the host's controls with a fresh context, and verify effective settings through its [Child settings check](../independent-review/references/launch-settings.md#child-settings-check). If native launch or the requested pair cannot be selected or verified, report that investigation blocked, continue independent findings, and obtain an explicit alternative assignment; do not silently downgrade or switch to a CLI.
 
