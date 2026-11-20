@@ -19,7 +19,7 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 
 The root chooses between the two implementer roles by the implementation mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
 
-Outside an explicit caller schedule (such as review-fix-loop), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
+Outside an explicit caller rule (such as review-fix-loop's final pass), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
 
 ## Precedence
 

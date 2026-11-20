@@ -49,11 +49,18 @@ The `dual` assignment has Codex and Claude review every round through [the dual 
 
 Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise ten completed rounds. Each round's verdict, findings and fixes go to the loop record and reach the user once, in the final report, by child-sessions' [quiet wait](../child-sessions/SKILL.md#wait).
 
-### Reviewer settings by round
+### Reviewer settings by target
 
-Rounds 1–2 use the resolved initial reviewer settings. Starting with round 3 (two completed valid rounds), use **Claude Fable 5.2 / high** for a Claude reviewer and **GPT-6.2 Astra / high** for a Codex reviewer. Starting with round 5 (four completed valid rounds), keep these flagship models and raise both reviewers' effort to **xhigh**. A single-system loop keeps its system; a dual loop switches both reviewers, including their cross-check calls. This schedule replaces initial model/effort settings unless the user explicitly requests a different schedule or pins settings for later rounds. Loop-owner settings are unaffected.
+Reviewer settings follow the review's target in step 3's table, whatever the round number:
 
-Before launching round 3, resolve the exact supported model identifiers through independent-review's launch-settings contract and validate `high`; do not guess identifiers or substitute Opus, Sol or another model. If the requested model/effort is unavailable or cannot be verified, report blocked before launching that round. Before launching round 5, validate `xhigh` for each selected model through the same contract; unsupported or unverifiable `xhigh` blocks that round without substituting `high` or another effort. Announce and record each switch and its selection/runtime evidence. Pass the effective settings explicitly to independent-review on every later round, including final and disposition passes. Retries retain the pending round's settings and budget; resuming retains the completed-round count and schedule, so it cannot return to earlier models or effort levels. Do not replace an already-running attempt on resume.
+- **Round 1, scoped rounds and disposition rounds** use the resolved initial reviewer settings.
+- **The final pass** uses the flagship pair: **Claude Fable 5.2 / xhigh** for a Claude reviewer and **GPT-6.2 Astra / xhigh** for a Codex reviewer. It is the loop's one further complete review, so it gets the strongest reviewer; the narrow targets around it stay on the initial settings.
+
+A single-system loop keeps its system; a dual loop switches both reviewers for the final pass, including their cross-check calls. The flagship pair replaces the initial model/effort settings for the final pass unless the user explicitly sets the final pass's settings or asks for one setting on every round. Loop-owner settings are unaffected.
+
+Resolve the flagship pair early: as soon as a valid round-1 result leaves the loop unfinished, and before its fixes, resolve the exact supported model identifiers through independent-review's launch-settings contract and validate `xhigh` for each. Use exactly the resolved Fable or Astra identifier at `xhigh`: a pair that is unavailable or cannot be verified is reported blocked at that point, naming the pair, with no substitute model or effort, so the user can pin other final-pass settings before fix rounds are spent. Record the resolved pair and its selection evidence in the loop record and reuse it at the final pass.
+
+Pass the effective settings explicitly to independent-review on every round: the flagship pair for the final pass and its retries, the initial settings for every other round, including the scoped and disposition rounds after the final pass. Announce and record each switch and its selection/runtime evidence. Retries retain the pending round's settings and budget; a resumed loop keeps the recorded flagship pair and the pending round's settings. Do not replace an already-running attempt on resume.
 
 ## 2. Commit the reviewed state
 
@@ -114,6 +121,14 @@ Fix accepted defects in one round commit, including cheap minor fixes, run affec
 A valid round-1 CLEAN can finish immediately if complete required verification is applicable to that committed target under the canonical contract, including every phase/producer obligation other than the pending merge-candidate checks. Any other required failed/unrun check prevents either clean mode even when findings are CLEAN. Otherwise, after a scoped CLEAN or a round with no fix commit (all findings rejected/deferred/outside-scope), run the **one final complete pass** if it has not run. Final-pass findings return through ordinary fix-commit/scoped rounds; refresh affected evidence and satisfy complete applicable verification after those fixes before completion. There is never a second complete code-review pass or budget reset for suite renewal. If no fix commit exists after the final pass, use at most one disposition round per disposition set on the same HEAD: CLEAN confirms, an evidence-free repeat becomes disputed.
 
 **No progress:** if successive rounds return the same finding set with no accepted fix, stop repeating that unchanged review. Fix confirmed defects now and verify within remaining rounds, or mark eligible evidence-free repeats disputed; an unresolved non-disputed defect blocks rather than silently disappearing.
+
+**Checkpoint:** with a round limit above five, a loop still unfinished after five completed valid rounds pauses once, before its next fix or review, and asks the user how to go on. Give each round's target and verdict in one line, the open findings, and the cause the record shows for the extra rounds: fixes that failed their scoped review or introduced defects, findings rejected or deferred round after round, or new real defects closed in each round. Offer:
+
+- continue unchanged to the round limit;
+- continue with reviewer settings the user names;
+- stop with `blocked: stopped at the round-five checkpoint`, unresolved findings and the next action. The loop record stays, so the user can resume the loop with a stronger loop owner (`--run` with `--model`/`--effort`).
+
+Recommend continuing when each round closed real defects and the open set is shrinking; recommend stopping when fixes keep failing or the same kind of finding keeps being rejected, since more review rounds repair neither. Record the cause, the recommendation and the answer; a resumed loop keeps the answer. Under `--auto` the question is routed by [auto.md](../child-sessions/references/auto.md#deciding).
 
 **Limit:** every valid result counts, including final/disposition passes; invalid attempts never do. At the cap, adjudicate every open finding with a recorded reason. A last small unambiguous fix commit is allowed only when its scoped verification still fits within the limit. Otherwise report `blocked: round limit` with unresolved findings and next action.
 
