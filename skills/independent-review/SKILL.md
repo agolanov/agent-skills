@@ -60,10 +60,10 @@ A parallel caller owns one shared before set and one after both launches finish;
 
 ## Validate
 
-A native attempt is valid when all of these hold; window attempts add the [window guide's](references/window-reviewers.md#stop-confirm-capture-validate) conditions:
+A native attempt is valid when all of these hold; window attempts add the [window guide's](references/window-reviewers.md#stop-confirm-capture-validate) conditions, and where that guide names its own evidence for a condition below, a window attempt is judged by that evidence instead:
 
 - **Completion:** CLI exit 0 and a non-error final result, or a window's `STATUS: done` with a non-empty answer file **and** the window guide's stopped-process barrier. Window status alone is insufficient.
-- **The native tool ran:** for Claude, the stream's result event names the command (`local_command: code_review` in Claude Code 2.1.330) or the stream holds the expanded command; for Codex, the review-mode session record of the launch ([CLI guide](references/cli-reviewers.md#result-handling)).
+- **The native tool ran:** for a background Claude attempt, the stream's result event names the command (`local_command: code_review` in Claude Code 2.1.330) or the stream holds the expanded command; for Codex, the review-mode session record of the launch ([CLI guide](references/cli-reviewers.md#result-handling)). A window attempt has no event stream: its own check is the window guide's **The native tool ran**.
 - **The context file was read:** the runtime records (Claude's event stream or transcript, Codex's stderr log or session record) hold a tool call or command that reads the attempt's `context.md` path.
 - **The target was read:** the same records hold a command or tool call that reads the range's diff or commits, or each target file. A report of no findings is valid only with this evidence.
 - **The answer is a review report for this target:** findings that each name a path, or an explicit statement of no findings (`(none)`, or a Codex summary with no review comments). An answer that asks a question, refuses, says it could not read the diff or the context file, or reviewed another commit or range is invalid. A report whose form a style skill damaged so far that its findings carry no path is invalid like any other. No `VERDICT:` line and no report section is required.

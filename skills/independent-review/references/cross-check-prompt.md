@@ -1,6 +1,6 @@
 # Cross-Check Prompt
 
-Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. The coordination slot is the wrapper's dual line, present only when both cross-checks run at once. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
+Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. The related-code slot copies the `Related code:` checkout of the context files' `Under review` when it has one (a document review), and widens no authority. The coordination slot is the wrapper's dual line, present only when both cross-checks run at once. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
 
 ```text
 Role and assignment
@@ -14,6 +14,7 @@ Scope
 Checkout: <absolute checkout the review phase ran in>.
 Branch: <branch>. Fixed base: <base>. Reviewed HEAD: <reviewed commit>.
 Target: the findings listed below, raised on <the review phase's target: range <base>..<head> or files <paths> at <head>> by the other independent reviewer of this target.
+<when the context files' Under review names related code: the line "Related code: <absolute project checkout>, read-only context for checking the findings."; omitted otherwise>
 
 Requirements, rules and checks
 <the context files' Requirements content, pasted>
