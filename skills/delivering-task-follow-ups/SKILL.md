@@ -5,7 +5,7 @@ description: Use when findings left in a delivered task's follow-ups files need 
 
 # Delivering Task Follow-ups
 
-`delivering-task-follow-ups <follow-ups file|directory>... [--run inline|background|window] [--model M|cli-default] [--effort E|cli-default] [--agent claude|codex] [--parallel N] [--impl solo|subagents|direct] [--reviewer-run background|subagent|window] [--reviewer-model M|cli-default] [--reviewer-effort E|cli-default] [--auto]`
+`delivering-task-follow-ups <follow-ups file|directory>... [--run inline|background|window] [--model M|cli-default] [--effort E|cli-default] [--agent claude|codex] [--parallel N] [--impl solo|subagents|direct] [--reviewer-run background|window] [--reviewer-model M|cli-default] [--reviewer-effort E|cli-default] [--auto]`
 
 The **fixer**, the session performing this skill, gives every finding one outcome: **fix** (fixed in the batch), **drop** (removed with no change), **brief** (moved into a task brief for the [chain](#chain)) or **keep** (left in its file). The fixes form one **batch**, made by the fixer itself on the main branch of the project checkout with no worktree, spec, plan or implementing subagent per finding: the checks run once after all fixes, one commit holds the batch and one `review-fix-loop` reviews it. A [researcher](#difficult-findings) may investigate a difficult cause; the fixer still implements. Only the brief findings go through `planning-task-docs`, `refining-task-docs` and `delivering-task`.
 
@@ -14,7 +14,7 @@ Keys:
 - `--run` places the fixer: `inline`, the default, is this session; `background` or `window` moves the whole skill to one child ([Run elsewhere](#run-elsewhere)). Any other value, `subagent` included, stops before anything starts, naming it: the fixer starts subagents and a reviewer, which a subagent cannot hold on every host.
 - `--model` and `--effort` set the fixer. Under `inline` they are refused before anything starts: "the fixer is this session". Elsewhere the launcher consumes them.
 - `--review` (an older key) is refused before anything starts: the batch is always reviewed by `review-fix-loop`.
-- `--reviewer-run`, `--reviewer-model` and `--reviewer-effort`: to the batch's `review-fix-loop` and to every `refining-task-docs` and `delivering-task` call of the chain.
+- `--reviewer-run`, `--reviewer-model` and `--reviewer-effort`: to the batch's `review-fix-loop` and to every `refining-task-docs` and `delivering-task` call of the chain. `--reviewer-run subagent` is refused before anything starts, naming `background` and `window`: a native subagent has no native review command.
 - `--agent`: to every chain call. `--impl` and `--parallel`: to the chain's `delivering-task` call. A key not given is not passed: each nested skill resolves its own defaults, validates what it receives and decides its implementation mode. The implementer runs in `delivering-task`'s default place unless the user's words set it ("implement without a window"): announce the mapping and pass that place as `--run` to the `delivering-task` call.
 
 Under `--auto` read child-sessions' [auto.md](../child-sessions/references/auto.md): every question below that would go to the user is routed by its Deciding, every brief this skill writes says `Auto: yes`, and the Report lists `## Decisions`.

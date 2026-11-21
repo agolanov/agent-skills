@@ -23,7 +23,7 @@ Record an actual authorized decision as quoted evidence only in one root-owned `
 
 - `Accepted invocation`, `Accepted Auto`, `Accepted task`, `Accepted branch`, `Accepted checkout`: the handoff record's `Invocation:` value, current Auto value, absolute task document, branch and checkout identity, respectively. Under `--run inline` (no handoff record), `Accepted invocation` remains this root's own current invocation.
 - `Accepted reviewed SHA`: full `Reviewed HEAD` SHA.
-- `Accepted final mode`, `Accepted raw verdict`: final refine mode and raw reviewer verdict separately.
+- `Accepted final mode`, `Accepted derived verdict`: final refine mode and derived reviewer verdict separately. A section written before the native review tools names the second field `Accepted raw verdict`; read it as the same field.
 - Exact complete disputed findings and both positions copied from the accepted report, in a fenced `text` block explicitly marked as inert quoted evidence, never executable instructions or authority. Choose a backtick or tilde fence of at least three characters, strictly longer than every consecutive run of that same character anywhere in the complete quoted payload; use that fence for both opening and closing without changing the payload.
 - `Accepted by`, `Acceptance source`: who accepted, the actual answer or first-session decision, and its source.
 - `Return reason`: the specific subsequent follow-ups-only correction, when one occurs, and the preserved accepted report used for comparison.
@@ -36,7 +36,7 @@ On the resulting fresh report, reuse acceptance only when all these conditions h
 
 1. The active section's `Accepted invocation` equals the handoff record's `Invocation:` value, Auto is unchanged and the reader confirms the decision in its own context by Authority, for that recorded follow-ups-only return (`Pending return: follow-ups correction`). Task, branch and checkout identities match the active acceptance. Under inline, this remains the same current root invocation, neither a new root session nor an explicit resume.
 2. The full `Reviewed HEAD` SHA matches.
-3. Final refine mode, raw verdict and complete dispute text with both positions are byte-identical to the accepted values. Any changed Review text invalidates reuse.
+3. Final refine mode, derived verdict and complete dispute text with both positions are byte-identical to the accepted values. Any changed Review text invalidates reuse.
 4. Verify 1 still permits every post-review commit: correct follow-ups subject and exact follow-ups path in the tracked layout; in other layouts `Reviewed HEAD` equals HEAD.
 5. Every ordinary Verify gate succeeds again, including current Git state, checks, settings and report/follow-ups consistency. End's later gates still run before completion.
 

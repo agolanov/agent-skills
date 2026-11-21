@@ -29,7 +29,7 @@ HEAD: <full SHA>
 <command → actual result; required evidence paths>
 
 ## Review
-<role-dependent result: implementer's final refine verdict, reviewer's raw verdict, or caller-defined cross-check outcome; actual progress/reason when blocked or failed>
+<role-dependent result: implementer's final refine verdict beside the derived reviewer verdict, reviewer's saved report with `Verdict: derived by the caller`, or caller-defined cross-check outcome; actual progress/reason when blocked or failed>
 
 ## Out of scope
 <one line per finding: what — where (path:line) — why it is out of scope>
@@ -54,7 +54,7 @@ When the task requests reusable suite evidence, `Checks` links each absolute sui
 
 An **implementer** keeps the existing final refine result in `## Review`: `CLEAN`, or `CLEAN EXCEPT DISPUTED` with the disputed findings listed.
 
-A **reviewer** uses `STATUS: done` when its review assignment finished, including when it found changes. In `## Review`, begin with the exact raw `VERDICT: CLEAN` or `VERDICT: CHANGES` line from the answer. A cross-check using a caller-defined report records that report's raw outcome and references its answer instead of inventing a loop verdict. Done describes completion of reviewing, independently of findings, result validity or verification coverage.
+A **reviewer** uses `STATUS: done` when its review assignment finished, including when it found changes. For a native review, `## Review` names the saved report (the absolute answer file) and says `Verdict: derived by the caller`; the reviewer writes no verdict of its own, since the session that ran the review derives it from the native report. A cross-check using a caller-defined report records that report's raw outcome and references its answer instead of inventing a loop verdict. Done describes completion of reviewing, independently of findings, result validity or verification coverage.
 
 For reviewers, BRANCH/CHECKOUT/HEAD identify the reviewed tree; `## Commits` is `None`; `## Checks` lists actual commands/results separately from inherited evidence; `## Artifacts` is required by the reviewer brief and names the absolute answer file. A blocked/failed reviewer records actual progress and its reason in the existing sections, with `## Questions` explaining a block, and invents no final verdict. Controller dialog counts belong to the controller's result/output, not a child-written claim.
 
@@ -62,4 +62,4 @@ For reviewers, BRANCH/CHECKOUT/HEAD identify the reviewed tree; `## Commits` is 
 
 Write the report completely before exposing a terminal first line (for example, write a temporary file beside it, then rename it to the status path). The root may read as soon as that first line appears.
 
-The root reads only the first line to choose a branch, then the named sections needed for that branch. `Questions` explains a block; `Checks` and `Review` carry diagnostic results; `Commits`, `Checks`, `Review`, and `Out of scope` support the calling task's completion checks. The raw final review verdict remains unchanged when findings are deferred.
+The root reads only the first line to choose a branch, then the named sections needed for that branch. `Questions` explains a block; `Checks` and `Review` carry diagnostic results; `Commits`, `Checks`, `Review`, and `Out of scope` support the calling task's completion checks. The final derived review verdict remains unchanged when findings are deferred.
