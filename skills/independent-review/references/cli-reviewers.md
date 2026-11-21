@@ -47,12 +47,12 @@ For a native attempt `round_prompt` holds one line, the `/code-review` command o
 /code-review <level> --max-findings all <target> <wrapper lines 2 to the end, joined by single spaces>
 ```
 
-The level is the review's effort: `medium`, `high` or `xhigh`, equal to the resolved reviewer effort; `max` only when the user set the reviewer effort to `max` explicitly; none under the effort opt-out (`cli-default`), where the command keeps the level it remembers. Effort `low` is refused before launch. `--max-findings all` is always explicit. The target is `<base>..<head>` or the repository-relative paths; a path containing whitespace is untested: quote it inside the line (`"docs/my plan.md"`), and if the reviewer's records show it did not read that file, report the files target as unavailable coverage for that path. `--model` and `--effort` are passed as for any Claude launch. A caller-supplied prompt goes on stdin as it is, without `/code-review`.
+The level is the review's effort: `medium`, `high` or `xhigh`, equal to the resolved reviewer effort; `max` only when the user set the reviewer effort to `max` explicitly; none under the effort opt-out (`cli-default`), where the command keeps the level it remembers. Effort `low` is refused before launch. `--max-findings all` is always explicit. The target is `<base>..<head>` or the repository-relative paths; a path containing whitespace is untested: quote it inside the line (`"docs/my plan.md"`), and if the reviewer's records show it did not read that file, report the files target as unavailable coverage for that path. `--model` and `--effort` are passed as for any Claude launch. Every Claude reviewer launch also passes `--settings '{"language":"English"}'`, so that a `language` setting of the user does not put the report into another language; it holds for this process only and changes no other setting. A caller-supplied prompt goes on stdin as it is, without `/code-review`.
 
 Use a subshell so the implementing session keeps its working directory:
 
 ```bash
-settings=()
+settings=(--settings '{"language":"English"}')
 [ "$review_model" = cli-default ] || settings+=(--model "$review_model")
 [ "$review_effort" = cli-default ] || settings+=(--effort "$review_effort")
 review_exit=0
@@ -114,7 +114,7 @@ if ($native_attempt -ceq 'yes') {
 `$codex`/`$claude` are the resolved installed command paths. Put Codex global permission options before `review`, per installed help and existing authority. Claude uses the same helper:
 
 ```powershell
-$vector = @('--print', '--output-format', 'stream-json', '--verbose')
+$vector = @('--print', '--output-format', 'stream-json', '--verbose', '--settings', '{"language":"English"}')
 if ($review_model -cne 'cli-default') { $vector += @('--model', $review_model) }
 if ($review_effort -cne 'cli-default') { $vector += @('--effort', $review_effort) }
 $result = Invoke-ReviewerProcess -Executable $claude -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir -OutputName events.jsonl
