@@ -9,7 +9,7 @@ The reviewer keeps the user's normal configuration: permissions, tools, skills/p
 
 The Codex launch uses `codex review -` as an independent session carrying the attempt's prompt through stdin: the wrapper for a native attempt, the caller-supplied prompt otherwise. The target is in the wrapper's first line: installed review mode accepts a custom prompt or a scope flag, never both. Do not combine stdin instructions with `--base`, `--commit` or `--uncommitted`.
 
-**Native attempt:** the native report is the process's stdout. After the process ends the launcher copies `stdout.log` to `<round_dir>/answer.md`; the reviewer writes no file.
+**Native attempt:** the native report is the process's stdout. After the process ends the launcher copies `stdout.log` to a temporary sibling and renames it to `<round_dir>/answer.md`, so an interrupted copy never leaves a partial answer (`answer.md.tmp` is never an answer); the reviewer writes no file.
 
 **Caller-supplied prompt:** before launch, fill the prompt's report-delivery slot with an absent absolute `<round_dir>/answer.md` outside every monitored checkout. Require the reviewer to write the complete required report there atomically (temporary sibling, then rename), before returning its native review result. This authorized report write is separate from the unchanged-checkout rule. Preserve stdout separately as `stdout.log`: review mode's native final schema can reduce it to findings and a short explanation, even when a complete report was produced in commentary.
 
@@ -28,7 +28,9 @@ review_exit=0
 ) || review_exit=$?
 printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
 # A native attempt's report is its stdout.
-[ "$native_attempt" != yes ] || cp "$round_dir/stdout.log" "$round_dir/answer.md"
+# Publish it whole: copy to a temporary sibling, then rename.
+[ "$native_attempt" != yes ] || { cp "$round_dir/stdout.log" "$round_dir/answer.md.tmp" &&
+  mv "$round_dir/answer.md.tmp" "$round_dir/answer.md"; }
 ```
 
 Review mode has no `--json` or `--output-last-message` in the tested CLI. Read the answer, stdout, stderr and producer exit together; for a caller-supplied prompt stdout alone is not report completeness evidence. Stderr contains runtime/command evidence and the producer session ID. Pass already authorized sandbox/approval options as global options **before** `review` (check installed top-level help); only explicit unrestricted-execution authority permits `codex --dangerously-bypass-approvals-and-sandbox review ...`. If review mode cannot apply an authorized option, report a blocker.
