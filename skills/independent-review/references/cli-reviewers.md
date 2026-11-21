@@ -85,7 +85,7 @@ Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 ## Native PowerShell I/O
 
-Use installed PowerShell 7 (verified here: pwsh 7.6.9), literal arrays and the small owner-local [reviewer-process.ps1](../scripts/reviewer-process.ps1). The vectors below are unchanged for native attempts; only the prompt file's content differs (the wrapper for Codex, the one `/code-review` line for Claude). After a native Codex attempt copy `stdout.log` to `answer.md` with literal-path file APIs. Dot-source it by its resolved absolute installed path. It uses ordinary Process/File APIs, preserves prompt/stdout/stderr bytes, and records `producer.exit`. It accepts an executable or installed PowerShell script. For an npm shim it resolves the single existing JavaScript target and installed node executable, avoiding the shim's text stdin pipeline; an ambiguous/missing target is unavailable launch coverage. Verify the actual installed shim/help, rather than assuming every script has npm's shape. Keep normal caller configuration/permissions and pass already authorized flags explicitly. No jq or Python is needed.
+Use installed PowerShell 7 (verified here: pwsh 7.6.9), literal arrays and the small owner-local [reviewer-process.ps1](../scripts/reviewer-process.ps1). The vectors below are unchanged for native attempts; only the prompt file's content differs (the wrapper for Codex, the one `/code-review` line for Claude). After a native Codex attempt publish `stdout.log` as `answer.md` with literal-path file APIs, through a temporary sibling renamed on success (below); a failed publication is recorded in `copy.exit`, apart from the producer exit. Dot-source it by its resolved absolute installed path. It uses ordinary Process/File APIs, preserves prompt/stdout/stderr bytes, and records `producer.exit`. It accepts an executable or installed PowerShell script. For an npm shim it resolves the single existing JavaScript target and installed node executable, avoiding the shim's text stdin pipeline; an ambiguous/missing target is unavailable launch coverage. Verify the actual installed shim/help, rather than assuming every script has npm's shape. Keep normal caller configuration/permissions and pass already authorized flags explicitly. No jq or Python is needed.
 
 Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, and the recorded model/effort. Codex:
 
@@ -99,6 +99,16 @@ if (Test-Path -LiteralPath (Join-Path $round_dir 'answer.md')) { throw 'The answ
 $result = Invoke-ReviewerProcess -Executable $codex -Vector $vector -Checkout $task_checkout -PromptPath $round_prompt -OutputDirectory $round_dir -OutputName stdout.log
 $review_exit = $result.ProducerExit
 # Retain IOFailure too: an I/O error invalidates the answer even with producer exit 0.
+# A native attempt's report is its stdout: publish it whole through a temporary sibling.
+if ($native_attempt -ceq 'yes') {
+  $answer = Join-Path $round_dir 'answer.md'; $staged = Join-Path $round_dir 'answer.md.tmp'
+  try {
+    [System.IO.File]::Copy((Join-Path $round_dir 'stdout.log'), $staged, $true)
+    [System.IO.File]::Move($staged, $answer)
+  } catch {
+    [System.IO.File]::WriteAllText((Join-Path $round_dir 'copy.exit'), "1`n")
+  }
+}
 ```
 
 `$codex`/`$claude` are the resolved installed command paths. Put Codex global permission options before `review`, per installed help and existing authority. Claude uses the same helper:
