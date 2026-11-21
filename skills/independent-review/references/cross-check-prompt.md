@@ -1,19 +1,24 @@
 # Cross-Check Prompt
 
-Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The first slot is the "Role and assignment" block of independent-review's [review prompt](review-prompt.md), verbatim, with this verifier's `Assignment:` line and the run's `Auto:` line (`Auto: yes` under `--auto`); the evidence slot is that prompt's common verification-evidence slot, filled from the same run/acceptance records and pending coverage, followed by its dual coordination slot without its last sentence, the severity request, which the cross-check states itself. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the ID its raiser gave it, and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
+Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. The coordination slot is the wrapper's dual line. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
 
 ```text
-<the "Role and assignment" block of independent-review/references/review-prompt.md, verbatim, with this verifier's Assignment line and the line Auto: <yes|no>>
+Role and assignment
+You verify findings that another independent reviewer raised; only the implementing session decides findings and fixes code.
+Assignment: <place/system/concrete model/effort; existing permissions>.
+Auto: <yes|no>. With yes, ask the user nothing and put a question you cannot settle under coverage and limitations in your report.
+Do not change the checkout. Keep scratch files outside it.
+Report delivery: <background Codex: write the complete Required report atomically to the absent absolute answer-file path given here, before returning; other launches: the caller's answer-file or response contract>.
 
 Scope
-Checkout: <absolute checkout, as in the review prompts>.
+Checkout: <absolute checkout the review phase ran in>.
 Branch: <branch>. Fixed base: <base>. Reviewed HEAD: <reviewed commit>.
-Target: the findings listed below, raised on <the review prompts' target row, bound> by the other independent reviewer of this target.
+Target: the findings listed below, raised on <the review phase's target: range <base>..<head> or files <paths> at <head>> by the other independent reviewer of this target.
 
 Requirements, rules and checks
-<the requirements, rules and checks of the review prompts, without the security-focus instruction, regardless of originating round; retain exact resolved commands/cwd/source and coverage>
-<the common verification-evidence slot of independent-review/references/review-prompt.md, filled with immutable original run identities/tested states, current target/boundaries, inspected acceptance links, retained/fresh/pending/failed coverage, environment/dependency/profile facts, limits and remaining phase/producer obligations>
-<the dual coordination slot of independent-review/references/review-prompt.md, filled as in the review prompts, without its last sentence "Rate each finding critical, important or minor.">
+<the context files' Requirements content, pasted>
+<the context files' Check commands content, pasted: resolved commands with cwd, their last results and commits, pending and merge-candidate checks>
+Another reviewer works in this checkout at the same time: run no complete test suite, and report a check that fails in a way a concurrent run could explain as such, not as a defect.
 
 Findings to verify
 <source ID>: <the finding verbatim from the raiser's answer>

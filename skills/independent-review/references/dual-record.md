@@ -10,7 +10,7 @@ Checkout: /absolute/checkout <or clone <dual dir>/tree of /absolute/checkout>
 Branch: feature/task
 Fixed base: <full sha>
 Reviewed commit: <full sha>
-Target row and order: <final pass, direct use | caller's row and order>
+Review kind and target: <final pass, direct use | caller's kind>; <range <base>..<reviewed commit> | files <paths> at <reviewed commit>>
 Requirements/rules/checks: <links or concise text>
 Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
 Targeted checks: <commands; cwd/source and coverage>
@@ -31,12 +31,12 @@ Completion recovery: <None | affected phase/attempts; every participant's owner/
 
 ## Attempts
 - codex review: spent 0 of 2
-  - attempt-1: valid; <dual dir>/review/codex/attempt-1/result.md; commit <sha>
+  - attempt-1: valid; <dual dir>/review/codex/attempt-1/result.md; findings <dual dir>/review/codex/attempt-1/findings.md; derived CHANGES; commit <sha>
     Dialogs: answered 3; declined 1; escalated 1
 - claude review: spent 1 of 2
   - attempt-1: invalid: unsuccessful completion; <dual dir>/review/claude/attempt-1/result.md
     Dialogs: answered 0; declined 0; escalated 0
-  - attempt-2: valid; <dual dir>/review/claude/attempt-2/result.md; commit <sha>
+  - attempt-2: valid; <dual dir>/review/claude/attempt-2/result.md; findings <dual dir>/review/claude/attempt-2/findings.md; derived CHANGES; commit <sha>
     Dialogs: answered 0; declined 0; escalated 0
 - codex cross-check: spent 0 of 2
   - attempt-1: valid; <dual dir>/cross-check/codex/attempt-1/result.md; commit <sha>
@@ -58,7 +58,7 @@ Checkout: /absolute/checkout; target <base>..<reviewed commit>; state <dual dir>
 
 ## Verdict
 Derived: CHANGES
-Raw (each reviewer's own, as given): codex CHANGES; claude CHANGES
+Derived per reviewer (by this session from each native report): codex CHANGES; claude CHANGES
 Verification: complete | incomplete: <specific required commands/cwd/exits/reasons and coverage gaps; no complete suite defined when applicable>
 
 ## Confirmed findings
@@ -69,10 +69,10 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 - Evidence: <raiser's evidence; verifier's evidence when cross-checked>
 - Proposed fix: <...>
 - Raised by: codex, claude; confirmed by: both <or, for a unique finding: raised by codex; confirmed by: cross-check by claude>
-- Sources: codex F1, claude R1
+- Sources: codex F1, claude F1
 
 ## Rejected by cross-check
-### D2 (claude R2)
+### D2 (claude F2)
 - Finding: <as raised>
 - Raiser's position: <claude's scenario, requirement and evidence>
 - Verifier's evidence: <codex's quoted requirement, code read or run>
@@ -82,14 +82,14 @@ Verification: complete | incomplete: <specific required commands/cwd/exits/reaso
 - outside-task: <finding and evidence>; raised by codex F2
 
 ## Matching decisions
-- codex F1 + claude R1: one finding; same scenario (value equal to the limit rejected) and requirement, different lines.
-- claude R2: no match; no codex finding shares its location or requirement.
+- codex F1 + claude F1: one finding; same scenario (value equal to the limit rejected) and requirement, different lines.
+- claude F2: no match; no codex finding shares its location or requirement.
 
 ## Complete suite
 Original runs: <immutable absolute records, original tested checkout/HEAD/dirty states, exact ordered commands/cwd/source/exits, producer and phase; no complete suite defined when applicable>
 Current target/acceptance: <committed checkout/branch/full SHA; successful current boundary; inspected intervening differences and acceptance links; dependency/profile/environment applicability and limits>
 Final coverage: <per required item retained/fresh/pending/failed; fresh check paths/actual executions; phase/producer obligations satisfied or pending; actual full execution distinguished from composed coverage>
-Per-attempt Suite evidence: inherited: <records | None: caller supplied no suite evidence>; independently executed: <records | None: not required in this phase | missing: commands/reasons | no complete suite defined>
+Per-attempt Suite evidence: <this session's run and acceptance records | missing: commands/reasons | no complete suite defined>
 Targeted checks: <separate actual reproductions/checks with commands/results/evidence | None>
 
 ## Dialogs
@@ -100,17 +100,15 @@ Targeted checks: <separate actual reproductions/checks with commands/results/evi
 - Observable counters (partial): answered 3; declined 1; escalated 1; not observable: cross-check/codex/attempt-1
 
 ## Codex
-- Settings and evidence: <model/effort and runtime records; result.md paths>
-- Coverage: <as reported, with omissions>
-- Checks run: <as reported; inherited evidence separate>
+- Settings and evidence: <model/effort, engine and runtime records; result.md and findings.md paths>
+- Reviewer checks: <commands the report or the runtime records show | none seen>
 
 ## Claude
 - Settings and evidence: <...>
-- Coverage: <...>
-- Checks run: <...>
+- Reviewer checks: <...>
 ```
 
-The dialog examples show window records; a background run instead uses `not applicable (background)` for every attempt. Retain one record per saved attempt across review, retries and cross-checks, including invalid attempts; resume deduplicates those identities. Aggregates name nonobservable attempts alongside observable totals; `declined` is a subset of `answered`, and escalations can later be answered. Keep raw verdicts as given beside the derived verdict. Direct output carries these records; a shutdown block points to `state.md` and its retained attempt records.
+The dialog examples show window records; a background run instead uses `not applicable (background)` for every attempt. Retain one record per saved attempt across review, retries and cross-checks, including invalid attempts; resume deduplicates those identities. Aggregates name nonobservable attempts alongside observable totals; `declined` is a subset of `answered`, and escalations can later be answered. Keep each reviewer's derived verdict, named as derived, beside the dual verdict. Direct output carries these records; a shutdown block points to `state.md` and its retained attempt records.
 
 ## Ledger input
 
@@ -118,7 +116,7 @@ A caller such as `review-fix-loop` passes its full finding ledger and `Next D` (
 
 ```markdown
 Next D: 3
-- D1 critical (codex minor, claude critical); module.py:5; raised by codex F1, claude R1; scenario <as stated>; requirement <as stated>; evidence <as stated>; accepted; fixed in <fix commit>
-- D2; module.py:2; raised by claude R2; scenario <as stated>; requirement <as stated>; evidence <as stated>; rejected by cross-check: codex, <verifier evidence>; re-raised with <re-raised evidence>; rejected by cross-check again: codex, <verifier evidence>
-- C1 (outside-round): <finding and evidence>; raised by claude R3; carried from round 2
+- D1 critical (codex minor, claude critical); module.py:5; raised by codex F1, claude F1; scenario <as stated>; requirement <as stated>; evidence <as stated>; accepted; fixed in <fix commit>
+- D2; module.py:2; raised by claude F2; scenario <as stated>; requirement <as stated>; evidence <as stated>; rejected by cross-check: codex, <verifier evidence>; re-raised with <re-raised evidence>; rejected by cross-check again: codex, <verifier evidence>
+- C1 (outside-round): <finding and evidence>; raised by claude F3; carried from round 2
 ```
