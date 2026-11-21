@@ -1,6 +1,6 @@
 # Cross-Check Prompt
 
-Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. The coordination slot is the wrapper's dual line. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
+Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to it. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. The coordination slot is the wrapper's dual line, present only when both cross-checks run at once. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
 
 ```text
 Role and assignment
@@ -18,7 +18,7 @@ Target: the findings listed below, raised on <the review phase's target: range <
 Requirements, rules and checks
 <the context files' Requirements content, pasted>
 <the context files' Check commands content, pasted: resolved commands with cwd, their last results and commits, pending and merge-candidate checks>
-Another reviewer works in this checkout at the same time: run no complete test suite, and report a check that fails in a way a concurrent run could explain as such, not as a defect.
+<when both cross-checks run at once: the line "Another reviewer works in this checkout at the same time: run no complete test suite, and report a check that fails in a way a concurrent run could explain as such, not as a defect."; omitted when this cross-check carries an explicitly assigned complete-check obligation, which runs it alone>
 
 Findings to verify
 <source ID>: <the finding verbatim from the raiser's answer>
