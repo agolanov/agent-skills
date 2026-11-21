@@ -87,7 +87,7 @@ Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 Use installed PowerShell 7 (verified here: pwsh 7.6.9), literal arrays and the small owner-local [reviewer-process.ps1](../scripts/reviewer-process.ps1). The vectors below are unchanged for native attempts; only the prompt file's content differs (the wrapper for Codex, the one `/code-review` line for Claude). After a native Codex attempt publish `stdout.log` as `answer.md` with literal-path file APIs, through a temporary sibling renamed on success (below); a failed publication is recorded in `copy.exit`, apart from the producer exit. Dot-source it by its resolved absolute installed path. It uses ordinary Process/File APIs, preserves prompt/stdout/stderr bytes, and records `producer.exit`. It accepts an executable or installed PowerShell script. For an npm shim it resolves the single existing JavaScript target and installed node executable, avoiding the shim's text stdin pipeline; an ambiguous/missing target is unavailable launch coverage. Verify the actual installed shim/help, rather than assuming every script has npm's shape. Keep normal caller configuration/permissions and pass already authorized flags explicitly. No jq or Python is needed.
 
-Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, and the recorded model/effort. Codex:
+Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, the recorded model/effort, and `$native_attempt`: `'yes'` for the wrapper (a native window driver included), `'no'` for a caller-supplied prompt. Codex:
 
 ```powershell
 . $reviewer_io  # absolute installed independent-review/scripts/reviewer-process.ps1
