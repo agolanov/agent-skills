@@ -108,7 +108,7 @@ Answer: <absolute answer path>; engine: native: codex review | native: /code-rev
   Text: <the finding verbatim>
 ```
 
-- **Source ID:** `F<n>` by report order. The dual review qualifies them by reviewer (`codex F1`, `claude F1`).
+- **Source ID:** `F<n>` by report order, per attempt. It is provenance, not a ledger identity: the dual review qualifies source IDs by reviewer (`codex F1`, `claude F1`) and gives ledger IDs `D<n>`; a single-system loop gives a new finding the ledger ID `R<round>-F<n>` (for example `R1-F2`) and a repeat keeps the ledger ID it repeats. Prior findings in the context file carry ledger IDs.
 - **Severity**, native as given and normalized:
 
   | Native | Normalized |
