@@ -541,9 +541,9 @@ Every role keeps its launch-settings policy in every place: resolve, pass and ch
 
 Refused before anything starts, naming the combination:
 
-- a `subagent` of a system other than the current session's, for example `--codex --reviewer-run subagent` from Claude Code;
+- a `subagent` reviewer, in every skill (`--run subagent` of `independent-review`, `--reviewer-run subagent` of every skill that passes it), naming `background` and `window`: a native subagent has no native review command;
+- a worker `subagent` of a system other than the current session's, for example `--agent codex --run subagent` from Claude Code;
 - a `subagent` started by a session that is itself a subagent, where the host's subagents cannot start subagents ([Host mechanisms](#host-mechanisms)): the session checks its own agent tool and, on Codex, `[agents] max_depth` in the user's `config.toml` against its own depth (the segments of its canonical task name after `/root`). A spawn the host refuses at launch is reported as this combination, with no fallback to another place. Prepare alone starts no non-window worker and does not apply the refusal for this session being itself a subagent: judge that combination for its caller, which is never a subagent (both orchestrators refuse `--run subagent`); a refused worker start is Nested calls' `launch failure`. Every other refusal stays Prepare's, including an implementer subagent that would itself start subagents;
-- `--dual` with `subagent`;
 - a place that cannot select the role's model and effort ([Settings](#settings));
 - `--model` or `--effort` with an `inline` worker, except in the orchestrators, where they set the implementer;
 - an `inline` worker with `--agent` naming a system other than the current session's ([Session system](../../independent-review/SKILL.md#session-system)), refused before any edit.

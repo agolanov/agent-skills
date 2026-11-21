@@ -8,7 +8,7 @@ Last line of a reviewed spec or plan, exact shape:
 Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex>, commit <full SHA>
 ```
 
-`commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the system that performed the review, taken from the review loop's `Assignment:` (the opposite system by default, the child's own system under `--reviewer-run subagent`). `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `review-fix-loop` ends `clean` or `clean except disputed`, never by the root.
+`commit` names the docs-repository commit holding the reviewed content, before the mark was appended; the mark is committed afterwards as `mark: <basename>`. `reviewer` is the system that performed the review, taken from the review loop's `Assignment:` (the system opposite to the refiner's by default). `clean except disputed` is ready; the disputed findings stay in the document. Marks are written only by the child, after its `review-fix-loop` ends `clean` or `clean except disputed`, never by the root.
 
 ## Freshness
 

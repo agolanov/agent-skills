@@ -11,6 +11,8 @@ Checkout: /absolute/task
 Branch: feature/task
 Base: <fixed base>
 Pre-loop HEAD (squash anchor): <last task commit before the loop>
+Target form: range | files: <repository-relative paths>
+Related code: <absolute project checkout for a document review | None>
 Requirements/rules/checks: <links or concise text>
 Resolved complete suite: <ordered exact commands; cwd/source | no complete suite defined>
 Targeted checks: <commands; cwd/source and intended coverage>
@@ -20,7 +22,7 @@ Current acceptance: <absolute record; current committed target and inspected dif
 Coverage: <per required item: retained | fresh | pending | failed/unavailable>
 Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
-Assignment: <background|subagent|window>/<codex|claude>, model <exact>, effort <exact>
+Assignment: <background|window>/<codex|claude>, model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)>
 <or> Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
 Round limit: 10 <or explicit user limit>
@@ -34,15 +36,17 @@ Next D: <dual: next free D<n>, starting at 1>
 
 ## Round 1
 Effective reviewer settings: <per system: exact model/effort; selection/runtime evidence; retained on retry>
-Target: <range|fix commit|dispositions only>
+Target: <review kind; range <base>..<head> | files <paths> at <head>; added wrapper line: security | none | decisions only>
 Reviewed commit: <HEAD>
-Previous verdict: <none or verdict>
+Context file: <absolute path of the attempt's context.md>
+Findings file: <absolute path of the attempt's findings.md>
+Last derived verdict: <none or the previous round's derived verdict>
 Result validity/completion: <exit or native completion; metadata; monitored-state evidence; omissions; dual: the dual review's return>
-Dual record: <dual dir>; raw verdicts codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
-Verdict: <CLEAN|CHANGES; dual: the report's derived verdict>
+Dual record: <dual dir>; derived codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
+Derived verdict: <CLEAN|CHANGES, derived by the session from the native report; dual: the report's derived verdict>
 Findings/decisions:
-- F1 <severity>; <path:line>; <scenario/requirement/evidence>; <accepted | rejected: quoted requirement or test | deferred | disputed | outside-scope>; <fix/verification or both disputed positions and human question>
-- D2 <severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
+- R1-F1 (source F1) native <P1 | important | ...>, <critical | important | minor | unrated>; <path:line>; <scenario/requirement/evidence>; <accepted | rejected: quoted requirement or test | deferred | disputed | outside-scope | not re-raised>; <fix/verification or both disputed positions and human question>
+- D2 <normalized severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
 Checks: <fresh commands/cwd/exits/tested states/checkout and affected coverage; immutable run paths; Git outputs/comparison; dependency/profile/environment facts and gaps>
@@ -54,7 +58,7 @@ Pending-round retry count: <retained across reconciliation; dual: spent attempts
 ## Finish
 Status: <running | clean | clean except disputed | blocked: reason>
 Final reviewed commit: <HEAD>
-Raw last verdict: <CLEAN|CHANGES; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, raw codex <..>, claude <..>>
+Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
 Final composed verification: <current committed target; original runs/tested states and acceptance links; retained/fresh passing coverage per required item; satisfied phase/producer obligations; actual full executions distinguished from composed coverage; pending/failed/unavailable checks>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; deferred minors; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>

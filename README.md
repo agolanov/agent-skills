@@ -37,7 +37,7 @@ Review committed work with a separate reviewer, with or without a fix cycle.
 
 | Skill | Description |
 |-------|-------------|
-| `review-fix-loop` | Review committed work and fix the findings until clean, in the session that did the work. The reviewer is the other system by default, or Codex, Claude or both (`--codex`, `--claude`, `--dual`), in the background, a native subagent or a window (`--reviewer-run`). |
+| `review-fix-loop` | Review committed work and fix the findings until clean, in the session that did the work. The reviewer is the other system by default, or Codex, Claude or both (`--codex`, `--claude`, `--dual`), in the background or a window (`--reviewer-run`). |
 | `independent-review` | One validated review by a separate reviewer, without fixes. With `--dual`, Codex and Claude review in parallel, cross-check the findings only one raised, and return one severity-ranked list of confirmed findings. |
 
 ### Utilities
@@ -68,12 +68,12 @@ Each skill picks its default: a window where the worker talks to the user or wor
 | `refining-task-docs` | the refiner, which owns the review loop and fixes | `window` | `inline`, `subagent`, `background` |
 | `delivering-task` | the implementer of each task | `window` | `inline`, `subagent`, `background`; with several documents these run the tasks one at a time in queue order, and `--parallel` applies to `window` only |
 | `review-fix-loop` | the loop owner, which fixes | `inline`: the session that did the work fixes it | `subagent`, `background`, `window` |
-| `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `subagent`, `window`; `inline` is refused, since reviewing one's own work is not independent |
+| `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `window`; `inline` is refused, since reviewing one's own work is not independent, and `subagent`, since a native subagent has no native review command |
 | `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
 | `delivering-spec-stages` | the orchestrator itself | `inline`; nested skills run as phase agents while the orchestrator waits | `background`, `window` |
 | `delivering-task-follow-ups` | the fixer, which fixes the batch and runs the chain for the findings that need design | `inline`; chain skills run as phase agents while the orchestrator waits | `background`, `window` |
 
-A skill that launches a reviewer takes `--reviewer-run background|subagent|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
+A skill that launches a reviewer takes `--reviewer-run background|window` for it (default `background`), with `--reviewer-model` and `--reviewer-effort`. The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window").
 
 `--auto`, given to the first session, runs the whole chain without the user: every child sends its questions to its parent, a parent answers what its own task, its documents or the skill's recommended option settle, and the rest goes up to the first session, which decides. The user is asked only when the first session is unsure what to build, or when an action is hard to undo (deleting unmerged work, discarding uncommitted changes or untracked or ignored files, pushing). The final report lists every decision taken without the user. The rules are in [auto.md](skills/child-sessions/references/auto.md).
 
@@ -121,11 +121,11 @@ $independent-review
 $independent-review --dual
 ```
 
-The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, skill composition, scope and completion rules, and the [review prompt](skills/independent-review/references/review-prompt.md) of `independent-review` for the reviewer's capabilities.
+The independent reviewer reviews; the implementing session decides findings and fixes them. The cycle commits task state and fixes per round on the task branch; the user squashes afterwards. See [review-fix-loop](skills/review-fix-loop/SKILL.md) for the cycle, skill composition, scope and completion rules, and the [review wrapper](skills/independent-review/references/review-wrapper.md) of `independent-review` for what the reviewer receives: the reviewer runs its system's native review tool (Codex `codex review`, Claude `/code-review`), and the session derives the verdict from its report.
 
 [Launch settings](skills/independent-review/references/launch-settings.md) defines the automatic model/effort defaults for every launched agent role (planner, refiner and reviewer: latest available Opus for Claude, latest available Sol for Codex, effort `high`; implementer: the same models with effort `xhigh`; solo implementer, the implementer in `solo` implementation mode: latest available Sonnet for Claude, latest available Sol for Codex, effort `medium` or `high`) and independent per-field overrides; the value `cli-default` opts a field out to the CLI's configured default. `refining-task-docs` and `delivering-task` also accept `--reviewer-run`, `--reviewer-model` and `--reviewer-effort` for the reviewer of their cross review. Native mode requires controls and runtime evidence for both settings; it never silently switches to CLI.
 
-Without `--codex`, `--claude` or `--dual`, `review-fix-loop` and `independent-review` choose the system opposite to the current session's as the reviewer, Codex for Claude Code and Claude for Codex, and run it in the background; with `--reviewer-run subagent` (`--run subagent` for `independent-review`) the reviewer is a native subagent of the session's own system. `--reviewer-model` and `--reviewer-effort` set the reviewer of `review-fix-loop`; its `--model` and `--effort` belong to the loop owner. The cycle requires `independent-review`, and a window reviewer also `child-sessions`. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
+Without `--codex`, `--claude` or `--dual`, `review-fix-loop` and `independent-review` choose the system opposite to the current session's as the reviewer, Codex for Claude Code and Claude for Codex, and run it in the background. `--reviewer-model` and `--reviewer-effort` set the reviewer of `review-fix-loop`; its `--model` and `--effort` belong to the loop owner. The cycle requires `independent-review`, and a window reviewer also `child-sessions`. A missing dependency is reported and stops the cycle before review or fixes; the cycle does not install skills automatically.
 
 ## License
 
