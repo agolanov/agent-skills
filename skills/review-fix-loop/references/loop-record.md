@@ -56,8 +56,8 @@ Pending-round retry count: <retained across reconciliation; dual: spent attempts
 
 ## Finish
 Status: <running | clean | clean except disputed | blocked: reason>
-Final reviewed commit: <commit of the last valid review>; final HEAD: <HEAD, with "unreviewed minor-only fix commit" when it differs>
-Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; or `CHANGES`; minor fixes <IDs> in <commit> closed without review; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
+Final reviewed commit: <commit of the last valid review>; final HEAD: <HEAD, with "unreviewed minor-only fix commit" only when that commit took the `no review: minor-only` row>
+Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; after a minor-only fix commit left without review: the last review's derived verdict as recorded, plus "minor fixes <IDs> in <commit> closed without review"; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
 Final composed verification: <current committed target; original runs/tested states and acceptance links; retained/fresh passing coverage per required item; satisfied phase/producer obligations; actual full executions distinguished from composed coverage; pending/failed/unavailable checks>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; minors deferred at the round limit; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>

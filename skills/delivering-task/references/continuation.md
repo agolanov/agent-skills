@@ -37,7 +37,7 @@ On the resulting fresh report, reuse acceptance only when all these conditions h
 1. The active section's `Accepted invocation` equals the handoff record's `Invocation:` value, Auto is unchanged and the reader confirms the decision in its own context by Authority, for that recorded follow-ups-only return (`Pending return: follow-ups correction`). Task, branch and checkout identities match the active acceptance. Under inline, this remains the same current root invocation, neither a new root session nor an explicit resume.
 2. The full `Reviewed HEAD` SHA matches.
 3. Final refine mode, derived verdict and complete dispute text with both positions are byte-identical to the accepted values. Any changed Review text invalidates reuse.
-4. Verify 1 still permits every post-review commit: correct follow-ups subject and exact follow-ups path in the tracked layout; in other layouts `Reviewed HEAD` equals HEAD.
+4. Verify 1 still permits every post-review commit: correct follow-ups subject and exact follow-ups path in the tracked layout; in other layouts `Reviewed HEAD`, or the `Unreviewed minor-only commit` directly on it, equals HEAD.
 5. Every ordinary Verify gate succeeds again, including current Git state, checks, settings and report/follow-ups consistency. End's later gates still run before completion.
 
 A further follow-ups-only correction may reuse the same record under these conditions. Report reused acceptance with its reviewed SHA and authority. Under `--auto`, keep the original decision in Decisions; reuse adds no approval.
