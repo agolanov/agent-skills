@@ -18,7 +18,7 @@ Place: <window|subagent|background|inline>
 Auto: <yes|no>
 Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: <name>
-Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
+Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>)[; effort step: <most demanding step, one phrase>]; resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 Reviewer run: <background|window> (<default | explicit>)
 Reviewer agent: <claude|codex|dual> (<default | explicit>)

@@ -26,8 +26,7 @@ Assignment: <background|window>/<codex|claude>, model <exact>, effort <exact>; e
 <or> Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
 Round limit: 10 <or explicit user limit>
-Reviewer settings by target: round 1, scoped and disposition rounds initial settings; final pass Claude Fable 5.2/xhigh and/or GPT-6.2 Astra/xhigh; <explicit user exception, if any>
-Flagship pair: <not needed: round 1 finished | exact identifiers/effort and selection evidence, resolved after round 1 | blocked: unavailable or unverified pair>
+Reviewer settings by target: initial settings on every round; <explicit user final-pass settings, if any>
 Completed rounds: 0
 Checkpoint (five completed rounds): <not reached | cause; recommendation; answer and who gave it>
 Final pass: not run <or round/commit>

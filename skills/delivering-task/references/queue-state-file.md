@@ -53,7 +53,7 @@ Parallel: <N>
 Merge: <merge|no-merge>
 Hold: <None|unit>
 Drain end: <none|pending>
-Unit: <unit> | depends on: <units, comma-separated|none> | mode: <mode> (<rule|explicit|recorded>); <reason> | settings: <model M (source), effort E (source)|recorded> | result: <-|merged <sha7>; follow-ups <path|-> <count|->|branch ready; follow-ups <path|-> <count|->>
+Unit: <unit> | depends on: <units, comma-separated|none> | mode: <mode> (<rule|explicit|recorded>); <reason> | settings: <model M (source), effort E (source)[; effort step: <step>]|recorded> | result: <-|merged <sha7>; follow-ups <path|-> <count|->|branch ready; follow-ups <path|-> <count|->>
 ```
 
 Report carries retains Preflight 4's count lines and what Input 3 listed. Decisions and Told the user work as in every handoff record. Hold and Drain end retain the hold and the pending drain end of queue Finish half across agents; each result cell retains the unit's final report data for End.
