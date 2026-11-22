@@ -44,7 +44,7 @@ Result validity/completion: <exit or native completion; metadata; monitored-stat
 Dual record: <dual dir>; derived codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
 Derived verdict: <CLEAN|CHANGES, derived by the session from the native report; dual: the report's derived verdict>
 Findings/decisions:
-- R1-F1 (source F1) native <P1 | important | ...>, <critical | important | minor | unrated>; <path:line>; <scenario/requirement/evidence>; <accepted | rejected: quoted requirement or test | deferred | disputed | outside-scope | not re-raised>; <fix/verification or both disputed positions and human question>
+- R1-F1 (source F1) native <P1 | important | ...>, <critical | important | minor | unrated>; <path:line>; <scenario/requirement/evidence>; <accepted | minor | rejected: quoted requirement or test | deferred: round limit | disputed | outside-scope | not re-raised>; <fix/verification or both disputed positions and human question>
 - D2 <normalized severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
 - C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
 Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
@@ -59,6 +59,6 @@ Status: <running | clean | clean except disputed | blocked: reason>
 Final reviewed commit: <HEAD>
 Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
 Final composed verification: <current committed target; original runs/tested states and acceptance links; retained/fresh passing coverage per required item; satisfied phase/producer obligations; actual full executions distinguished from composed coverage; pending/failed/unavailable checks>
-Decisions/candidates: <disputed both positions and fix-or-dismiss question; deferred minors; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
+Decisions/candidates: <disputed both positions and fix-or-dismiss question; minors deferred at the round limit; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>
 ```
