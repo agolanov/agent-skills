@@ -12,7 +12,7 @@ Take one task, or several, from a task text to the main branch.
 |-------|-------------|
 | `planning-task-docs` | Turn one task (a task text, a brief, a spec without a plan or a staged spec with an unplanned stage, or a follow-ups file) into a superpowers spec and plan in a child session. |
 | `refining-task-docs` | Cross-review one task's spec and plan in a child session, fix the findings, and mark the documents that pass with a `Review:` line. |
-| `delivering-task` | Take one or more task documents, or a directory of them, through implementation in a child session and cross review to a merge into the main branch and cleanup, recording follow-ups; several documents run as a dependency-ordered queue, in parallel up to a limit. With `--no-merge`, leave reviewed branches ready to merge. |
+| `delivering-task` | Take one or more task documents, or a directory of them, through implementation in a child session and cross review to a merge into the main branch and cleanup, recording follow-ups; several documents run as a dependency-ordered queue, in parallel up to a limit. With `--no-merge`, leave reviewed branches ready to merge; with `--checkout branch` or `main`, work for one document in the main checkout, on a new branch or on the main branch, instead of a worktree. |
 
 ### Staged specs
 
