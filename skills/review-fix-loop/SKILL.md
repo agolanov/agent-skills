@@ -133,15 +133,15 @@ A valid round-1 derived `CLEAN` with no minor finding to fix can finish immediat
 
 **No progress:** if successive rounds return the same finding set with no accepted fix, stop repeating that unchanged review. Fix confirmed defects now and verify within remaining rounds, or mark eligible evidence-free repeats disputed; an unresolved non-disputed defect blocks rather than silently disappearing.
 
-**Checkpoint:** with a round limit above five, a loop still unfinished after five completed valid rounds pauses once, before its next fix or review, and asks the user how to go on. Give each round's target and verdict in one line, the open findings, and the cause the record shows for the extra rounds: fixes that failed their scoped review or introduced defects, findings rejected round after round, new real defects closed in each round, or rounds that closed minor findings alone. Offer:
+**Limit:** every valid result counts, including final/disposition passes; invalid attempts never do. Rounds run without pausing up to the limit. A loop is at its limit when its completed rounds equal the limit and it is unfinished. There, a last fix commit is allowed only when the review **After the fix commit** requires for it still fits within the limit; a commit that requires none is allowed. When finishing needs one more review, the loop pauses at the **checkpoint** below before that fix or review. When the user stops it there, adjudicate every open finding with a recorded reason; with an unresolved accepted defect, report `blocked: round limit` with unresolved findings and next action.
 
-- continue unchanged to the round limit;
-- continue with reviewer settings the user names;
-- stop with `blocked: stopped at the round-five checkpoint`, unresolved findings and the next action. The loop record stays, so the user can resume the loop with a stronger loop owner (`--run` with `--model`/`--effort`).
+**Checkpoint:** at the limit, before its next fix or review, the loop asks the user how to go on. Give each round's target and verdict in one line, the open findings, and the cause the record shows for the rounds: fixes that failed their scoped review or introduced defects, findings rejected round after round, new real defects closed in each round, or rounds that closed minor findings alone. Offer:
 
-Recommend continuing when each round closed real defects and the open set is shrinking; recommend stopping when fixes keep failing or the same kind of finding keeps being rejected, since more review rounds repair neither. Record the cause, the recommendation and the answer; a resumed loop keeps the answer. Under `--auto` the question is routed by [auto.md](../child-sessions/references/auto.md#deciding).
+- continue with more rounds, as many as the user names: the limit rises by that number;
+- continue with more rounds and reviewer settings the user names;
+- stop with `blocked: round limit`, unresolved findings and the next action. The loop record stays, so the user can resume the loop with a raised limit or a stronger loop owner (`--run` with `--model`/`--effort`).
 
-**Limit:** every valid result counts, including final/disposition passes; invalid attempts never do. At the cap, adjudicate every open finding with a recorded reason. A last fix commit is allowed only when the review **After the fix commit** requires for it still fits within the limit; a commit that requires none is allowed. Otherwise, with an unresolved accepted defect, report `blocked: round limit` with unresolved findings and next action.
+Recommend continuing, with a number of rounds, when each round closed real defects and the open set is shrinking; recommend stopping when fixes keep failing or the same kind of finding keeps being rejected, since more review rounds repair neither. Record the cause, the recommendation, the answer and the new limit; a resumed loop keeps them. A raised limit that is reached again brings the checkpoint again. Under `--auto` the question is routed by [auto.md](../child-sessions/references/auto.md#deciding).
 
 Report:
 

@@ -25,10 +25,10 @@ Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <background|window>/<codex|claude>[ via <command>], model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)>
 <or> Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
-Round limit: 20 <or explicit user limit>
+Round limit: 20 <or explicit user limit; raised to <n> at a checkpoint>
 Reviewer settings by target: initial settings on every round; <explicit user final-pass settings, if any>
 Completed rounds: 0
-Checkpoint (five completed rounds): <not reached | cause; recommendation; answer and who gave it>
+Checkpoints (round limit): <not reached | per checkpoint: limit reached; cause; recommendation; answer (stop | <n> more rounds[, reviewer settings]) and who gave it>
 Final pass: not run <or round/commit>
 Pending round: 1; invalid attempts: 0 of 2 <dual: spent attempts per reviewer per call in the round's state.md>
 Next D: <dual: next free D<n>, starting at 1>
