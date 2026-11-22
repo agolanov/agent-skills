@@ -64,8 +64,10 @@ Resolve once per run, record the concrete values with their source and discovery
 Child sessions (planner, splitter, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root, and so does the child of every other worker role outside `inline` (the loop owner, the `consolidating-plans` worker, follow-ups fixer, orchestrator) in its [run-contract](../../child-sessions/references/run-contract.md#brief) brief, after the identity lines:
 
 ```text
-Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
+Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>)[; effort step: <most demanding step, one phrase>]; resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 ```
+
+The optional `effort step:` clause appears only when [Effort by task](#effort-by-task) chose the effort (source `policy`); it names the justifying step and leaves the source value as it is. An explicit, `cli-default`, recorded or caller-resolved effort carries no clause, and a resumed run keeps the line as recorded.
 
 Refiner and implementer briefs also record the settings of the reviewer their cross review starts:
 
