@@ -12,7 +12,7 @@ The caller binds two absolute paths:
 ## Rule
 
 - **Last line.** The last line of `recorded` is its bytes after the last `\n` that is not its final byte, or the whole content when there is none, without its final `\n` when it has one. A `recorded` that ends in an empty line has an empty last line, so no mark is dropped.
-- **Original content.** `R` is the bytes of `recorded` before its last line when that line, one trailing CR removed, matches `^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit [0-9a-f]{40}$`; otherwise `R` is all of `recorded`.
+- **Original content.** `R` is the bytes of `recorded` before its last line when that line, one trailing CR removed, matches `^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit [0-9a-f]{40}$`; otherwise `R` is all of `recorded`.
 - **Pass.** `file` starts with the bytes of `R`, and the bytes after them are zero or more line endings (`\n` or `\r\n`; at least one when `R` is not empty and does not end with `\n`), then `## Stages`, then at most one CR, then `\n` or the end of `file`. The bytes after that line are not checked.
 
 The comparison is of bytes only: no normalisation of encoding, line endings or whitespace. `## Stagesx`, `## Stages ` with a trailing space, a NUL byte in that line, and a `## Stages` joined to the last line of `R` all fail.
@@ -43,7 +43,7 @@ prefix_check() {
       if (p != 2) exit 4
       for (i = 32; i < 127; i++) chr[i] = sprintf("%c", i)
       d = "[0-9]"; h = "[0-9a-f]"; h = h h h h h h h h; h = h h h h h
-      mark = "^Review: (clean|clean except disputed), " d d d d "-" d d "-" d d ", reviewer (claude|codex), commit " h "$"
+      mark = "^Review: (clean|clean except disputed), " d d d d "-" d d "-" d d ", reviewer (claude|codex|dual), commit " h "$"
       e = rn; if (e && r[e] == 10) e--
       s = e; while (s && r[s] != 10) s--
       if (e > s && r[e] == 13) e--
@@ -91,7 +91,7 @@ $prefix_exit = & {
         $s = if ($e -gt 0) { [Array]::LastIndexOf($r, [byte]10, $e - 1) + 1 } else { 0 }
         if ($e -gt $s -and $r[$e - 1] -eq 13) { $e-- }
         $last = [Text.Encoding]::GetEncoding(28591).GetString($r, $s, $e - $s)
-        $mark = '^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit [0-9a-f]{40}\z'
+        $mark = '^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit [0-9a-f]{40}\z'
         $n = if ([regex]::IsMatch($last, $mark)) { $s } else { $r.Length }
         for ($i = 0; $i -lt $n; $i++) {
             if ($i -ge $f.Length -or $f[$i] -ne $r[$i]) { return (& $fail "differs from the original content at byte offset $i") }
