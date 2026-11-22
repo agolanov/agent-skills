@@ -20,7 +20,7 @@ export LANG=${LANG:-C.UTF-8}
 
 usage() {
   cat <<'USAGE'
-child-session open [--agent claude|codex] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
+child-session open [--agent claude|codex[:COMMAND]] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
   --split asks for a herdr pane beside HERDR_PANE_ID; it opens a tab or tmux window instead, with a note on
   stderr, when the opener's tab has another pane, HERDR_PANE_ID is unset or the backend is tmux.
 child-session send <name> <text>       Empty text sends only Enter.
@@ -55,7 +55,8 @@ child-session list
 CHILD_SESSION_BACKEND: herdr, tmux or terminal (default: connected herdr, installed tmux, then terminal).
 child-session runtime-dir
 child-session capabilities <name>
-CHILD_SESSION_AGENT: claude (default) or codex.
+CHILD_SESSION_AGENT: claude (default) or codex, optionally as SYSTEM:COMMAND.
+--agent SYSTEM:COMMAND starts COMMAND (one word on PATH or a path, such as codex-avc) with SYSTEM's flags.
 CHILD_SESSION_TMUX_SESSION: child-sessions (default).
 CHILD_SESSION_TAB=0 disables the best-effort Windows Terminal tab.
 CHILD_SESSION_CLAUDE_ARGS / CHILD_SESSION_CODEX_ARGS replace default CLI flags.
@@ -521,18 +522,20 @@ split_target() {
 cmd_open() {
   local split=$1 name=$2 cwd=$3 brief=$4 model=$5 effort=$6
   valid_name "$name"
-  [[ $AGENT == claude || $AGENT == codex ]] || die '--agent must be claude or codex'
+  local system=${AGENT%%:*} launch=${AGENT#*:}
+  [[ $system == claude || $system == codex ]] || die '--agent must be claude or codex, optionally as SYSTEM:COMMAND'
+  [[ $launch =~ ^[A-Za-z0-9._/+-]+$ ]] || die '--agent COMMAND must be one word of [A-Za-z0-9._/+-]'
   backend_probe
   cwd=$(cd -P "$cwd" && pwd) || die 'checkout directory unavailable'
   brief=$(cd -P "${brief%/*}" && printf '%s/%s\n' "$PWD" "${brief##*/}")
   [[ -f $brief ]] || die 'brief is not a regular file'
-  command -v "$AGENT" >/dev/null || die "$AGENT is not on PATH"
+  command -v "$launch" >/dev/null || die "$launch is not on PATH"
   if [[ -n $split ]]; then split=$(split_target "$name" "$split"); fi
   if runtime_op find "$name" >/dev/null || has_window "$name" || h_find "$name"; then die "window $name already exists"; fi
   W=$BACKEND
 
   local -a args environment
-  if [[ $AGENT == claude ]]; then
+  if [[ $system == claude ]]; then
     args=(--permission-mode bypassPermissions)
     if [[ ${CHILD_SESSION_CLAUDE_ARGS+x} ]]; then read -r -a args <<< "$CHILD_SESSION_CLAUDE_ARGS" || true; fi
     [[ -z "$model" ]] || args+=(--model "$model")
@@ -591,7 +594,7 @@ cmd_open() {
     # shellcheck disable=SC2016 # Capture the actual launcher PID at runtime.
     printf 'printf "running %%s %%s\\n" "$$" "$(process_identity "$$")" > %q\n' "$state"
     printf 'rm -f -- %q %q\n' "$launcher" "$launcher.command"
-    printf '%q ' "$AGENT" "${args[@]}"; printf '<&0 &\nagent_pid=$!\n'
+    printf '%q ' "$launch" "${args[@]}"; printf '<&0 &\nagent_pid=$!\n'
     printf 'agent_start=$(process_identity "$agent_pid") || agent_start=\n'
     printf 'runtime_op started %q "$$" "$agent_pid"\n' "$record_name"
     printf 'wait "$agent_pid"; agent_exit=$?\n'

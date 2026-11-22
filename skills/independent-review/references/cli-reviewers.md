@@ -13,7 +13,7 @@ The Codex launch uses `codex review -` as an independent session carrying the at
 
 **Caller-supplied prompt:** before launch, fill the prompt's report-delivery slot with an absent absolute `<round_dir>/answer.md` outside every monitored checkout. Require the reviewer to write the complete required report there atomically (temporary sibling, then rename), before returning its native review result. This authorized report write is separate from the unchanged-checkout rule. Preserve stdout separately as `stdout.log`: review mode's native final schema can reduce it to findings and a short explanation, even when a complete report was produced in commentary.
 
-Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request; a field may be `cli-default`), `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**, and `native_attempt` to `yes` for the wrapper or `no` for a caller-supplied prompt:
+Set `review_command` to the assignment's [command](../SKILL.md#assignment), `codex` when it has none. Set `task_checkout`, `review_model` and `review_effort` from the caller (the loop record, or the direct-use request; a field may be `cli-default`), `round_prompt` and `round_dir` to the attempt's prompt file and directory per independent-review **Launch**, and `native_attempt` to `yes` for the wrapper or `no` for a caller-supplied prompt:
 
 ```bash
 settings=()
@@ -23,7 +23,7 @@ review_exit=0
 [ ! -e "$round_dir/answer.md" ] && [ ! -L "$round_dir/answer.md" ] || exit 2
 (
   cd "$task_checkout" || exit
-  codex review "${settings[@]}" - \
+  "$review_command" review "${settings[@]}" - \
     < "$round_prompt" > "$round_dir/stdout.log" 2> "$round_dir/stderr.log"
 ) || review_exit=$?
 printf '%s\n' "$review_exit" > "$round_dir/producer.exit"
@@ -49,7 +49,7 @@ For a native attempt `round_prompt` holds one line, the `/code-review` command o
 
 The level is the review's effort: `medium`, `high` or `xhigh`, equal to the resolved reviewer effort; `max` only when the user set the reviewer effort to `max` explicitly; none under the effort opt-out (`cli-default`), where the command keeps the level it remembers. Effort `low` is refused before launch. `--max-findings all` is always explicit. The target is `<base>..<head>` or the repository-relative paths; a path containing whitespace is untested: quote it inside the line (`"docs/my plan.md"`), and if the reviewer's records show it did not read that file, report the files target as unavailable coverage for that path. `--model` and `--effort` are passed as for any Claude launch. Every Claude reviewer launch also passes `--settings '{"language":"English"}'`, so that a `language` setting of the user does not put the report into another language; it holds for this process only and changes no other setting. A caller-supplied prompt goes on stdin as it is, without `/code-review`.
 
-Use a subshell so the implementing session keeps its working directory:
+Set `review_command` to the assignment's [command](../SKILL.md#assignment), `claude` when it has none. Use a subshell so the implementing session keeps its working directory:
 
 ```bash
 settings=(--settings '{"language":"English"}')
@@ -58,7 +58,7 @@ settings=(--settings '{"language":"English"}')
 review_exit=0
 (
   cd "$task_checkout" || exit
-  claude --print "${settings[@]}" \
+  "$review_command" --print "${settings[@]}" \
     --output-format stream-json --verbose \
     < "$round_prompt" > "$round_dir/events.jsonl" 2> "$round_dir/stderr.log"
 ) || review_exit=$?
@@ -87,7 +87,7 @@ Explicit unrestricted execution maps to `--permission-mode bypassPermissions`.
 
 Use installed PowerShell 7 (verified here: pwsh 7.6.9), literal arrays and the small owner-local [reviewer-process.ps1](../scripts/reviewer-process.ps1). The vectors below are unchanged for native attempts; only the prompt file's content differs (the wrapper for Codex, the one `/code-review` line for Claude). After a native Codex attempt publish `stdout.log` as `answer.md` with literal-path file APIs, through a temporary sibling renamed on success (below); a failed publication is recorded in `copy.exit`, apart from the producer exit. Dot-source it by its resolved absolute installed path. It uses ordinary Process/File APIs, preserves prompt/stdout/stderr bytes, and records `producer.exit`. It accepts an executable or installed PowerShell script. For an npm shim it resolves the single existing JavaScript target and installed node executable, avoiding the shim's text stdin pipeline; an ambiguous/missing target is unavailable launch coverage. Verify the actual installed shim/help, rather than assuming every script has npm's shape. Keep normal caller configuration/permissions and pass already authorized flags explicitly. No jq or Python is needed.
 
-Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, the recorded model/effort, and `$native_attempt`: `'yes'` for the wrapper (a native window driver included), `'no'` for a caller-supplied prompt. Codex:
+Bind absolute `$task_checkout`, `$round_prompt`, `$round_dir`, the recorded model/effort, `$codex` or `$claude` as the resolved installed assignment [command](../SKILL.md#assignment) (the system's own executable when it has none), and `$native_attempt`: `'yes'` for the wrapper (a native window driver included), `'no'` for a caller-supplied prompt. Codex:
 
 ```powershell
 . $reviewer_io  # absolute installed independent-review/scripts/reviewer-process.ps1

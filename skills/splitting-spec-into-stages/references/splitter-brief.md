@@ -8,7 +8,7 @@ Split one design spec into stages, working in this checkout.
 Checkout: <absolute project checkout>
 Docs repository: <absolute top level of the docs repository; the project checkout itself when the spec is tracked by it>
 Base SHA: <full docs repository HEAD>
-Agent: <claude|codex>
+Agent: <claude|codex>[:<command>]
 Place: <window|subagent|background>
 Auto: <yes|no>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>

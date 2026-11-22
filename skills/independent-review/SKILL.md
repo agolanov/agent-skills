@@ -15,6 +15,8 @@ An assignment is a reviewer system and a place. Resolve both before anything sta
 
 **System:** `--codex`, `--claude`, `--dual` (Codex and Claude together), or equivalent prose. With none, the reviewer is the system opposite to this session's ([Session system](#session-system)). Two system keys conflict: ask which one applies (under `--auto`, routed by [auto.md](../child-sessions/references/auto.md#deciding)).
 
+**Command:** `--codex=<command>` or `--claude=<command>` chooses that system and starts the reviewer through `<command>`, a child-sessions [launch command](../child-sessions/references/run-contract.md#launch-command) such as `codex-avc`; beside `--dual` the same keys only set that reviewer's command and are no second system key. Without one the system's own executable runs. The command replaces `codex` or `claude` in every launch of that reviewer ([CLI reviewers](references/cli-reviewers.md), [window reviewers](references/window-reviewers.md) step 5) and is recorded in `Assignment:`; a resumed review keeps its recorded command.
+
 **Place:** `--run background|window`, or equivalent words ("let Codex review it in a window"), which the session maps to the key and announces. Default `background`; a resumed dual review keeps its recorded place ([State and resume](references/dual.md#state-and-resume)). Under `--dual` the place holds for both reviewers.
 
 Refused before anything starts, naming the combination:
@@ -91,7 +93,7 @@ Write `<attempt dir>/result.md` for every attempt and return its path with the r
 
 ```text
 Result: valid | invalid: <reason> | checkout changed; otherwise valid | checkout changed; otherwise invalid: <reason>
-Assignment: <background|window>/<codex|claude>, model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)> | caller-supplied prompt
+Assignment: <background|window>/<codex|claude>[ via <command>], model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)> | caller-supplied prompt
 Settings evidence: <runtime records>
 Target: <review kind; range <base>..<head> | files <paths> at <head>>; reviewed commit <full sha>
 Derived verdict: <CLEAN | CHANGES> (derived by this session from the native report) | none: <invalid attempt | caller-supplied prompt>
@@ -109,7 +111,7 @@ Answer: <absolute path>
 Coverage gaps: <None | list>
 ```
 
-A dual review records both reviewers in its `state.md` as `Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>`; each of its attempts' `result.md` keeps the single form above.
+A dual review records both reviewers in its `state.md` as `Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>`; each of its attempts' `result.md` keeps the single form above.
 
 ### Dialogs
 

@@ -16,7 +16,7 @@ Resolved complete suite: <ordered exact commands; cwd/source | no complete suite
 Targeted checks: <commands; cwd/source and coverage>
 Required phase/producer: <per check, source and obligation; None when absent>
 Unavailable coverage: <None | checks/reasons>
-Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
+Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>
 Settings evidence: <per reviewer: discovery and runtime records>
 Window identity: <not applicable (background) | persisted token path/allocation; owner entrypoint; per-attempt names/launch IDs/capabilities; clone/source mappings>
 Original suite runs: <immutable absolute records; ordered commands/cwd/source, actual exits, original tested checkout/HEAD/dirty inputs, dependency/profile/environment facts; caller or controller producer | no complete suite defined>

@@ -10,9 +10,9 @@ Read [checkout state and suite evidence](checkout-state.md), and [independent-re
 
 ## 1. Settings and target
 
-`independent-review --dual [--run background|window] [--codex-model M] [--codex-effort E] [--claude-model M] [--claude-effort E] [--effort E] [--auto] [<range|commit>]`
+`independent-review --dual [--run background|window] [--codex=<command>] [--claude=<command>] [--codex-model M] [--codex-effort E] [--claude-model M] [--claude-effort E] [--effort E] [--auto] [<range|commit>]`
 
-The assignments are `<place>/codex` and `<place>/claude`, one place for both reviewers: `--run background` (the default) or `--run window`. `--effort` sets both efforts unless a per-reviewer flag sets that reviewer's; a `--model` without a reviewer prefix asks which reviewer it is for (under `--auto`, routed by [auto.md](../../child-sessions/references/auto.md#deciding)); equivalent prose counts as the flag. Everything else follows independent-review's [launch settings](launch-settings.md) for the reviewer role per reviewer; the cross-check phase uses each reviewer's same recorded settings; announce and record both resolved assignments.
+The assignments are `<place>/codex` and `<place>/claude`, each with its [command](../SKILL.md#assignment) when given, one place for both reviewers: `--run background` (the default) or `--run window`. `--effort` sets both efforts unless a per-reviewer flag sets that reviewer's; a `--model` without a reviewer prefix asks which reviewer it is for (under `--auto`, routed by [auto.md](../../child-sessions/references/auto.md#deciding)); equivalent prose counts as the flag. Everything else follows independent-review's [launch settings](launch-settings.md) for the reviewer role per reviewer; the cross-check phase uses each reviewer's same recorded settings; announce and record both resolved assignments.
 
 Direct use takes the target, the preflight with its committed-state rule, and the requirement sources from independent-review **Direct use**; run that preflight before the suite and any launch, including on its no-changes branch. It reviews with the final-pass kind (complete target in the range form, the wrapper's security line), prior findings `None`, and numbers from `D1`.
 

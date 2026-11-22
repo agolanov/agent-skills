@@ -274,15 +274,17 @@ function Start-ChildSession {
     if ($Vector.Count-$i -ne 3) { throw 'open requires NAME CWD BRIEF' }
     $name=$Vector[$i];$cwd=[IO.Path]::GetFullPath($Vector[$i+1]);$brief=[IO.Path]::GetFullPath($Vector[$i+2])
     if ($name -notmatch '^[A-Za-z0-9_-]+$') { throw 'Window names must match [A-Za-z0-9_-]+' }
-    if ($agent -cnotin @('claude','codex')) { throw '--agent must be claude or codex' }
+    $system,$launch=$agent.Split(':',2); if ($null -eq $launch) { $launch=$system }
+    if ($system -cnotin @('claude','codex')) { throw '--agent must be claude or codex, optionally as SYSTEM:COMMAND' }
+    if ($launch -cnotmatch '\A[A-Za-z0-9._/\\:+-]+\z') { throw '--agent COMMAND must be one word' }
     if ($script:Runtime -ieq $cwd -or $script:Runtime.StartsWith($cwd.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime must be outside checkout.' }
     if (-not [IO.Directory]::Exists($cwd) -or -not [IO.File]::Exists($brief)) { throw 'Checkout/brief unavailable.' }
     $backend=Get-ChildSessionBackend
     $existing=Read-ChildSessionRecord $name
     if ($existing -and -not $existing.closed) { throw 'Window already exists.' }
-    $resolved=Resolve-ChildSessionAgent $agent
+    $resolved=Resolve-ChildSessionAgent $launch
     $cli=New-Object Collections.Generic.List[string]
-    if ($agent -eq 'claude') {
+    if ($system -ceq 'claude') {
         if (Test-Path Env:CHILD_SESSION_CLAUDE_ARGS) { foreach ($word in ($env:CHILD_SESSION_CLAUDE_ARGS -split '\s+' | Where-Object { $_ -ne '' })) { $cli.Add($word) } }
         else { $cli.Add('--permission-mode');$cli.Add('bypassPermissions') }
         if ($model) { $cli.Add('--model');$cli.Add($model) }; if ($effort) { $cli.Add('--effort');$cli.Add($effort) }

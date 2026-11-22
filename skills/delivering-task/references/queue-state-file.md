@@ -48,7 +48,7 @@ Facts holds exactly these labelled lines, one Unit per unit in queue order:
 
 ```text
 State file: <absolute path>
-Agent: <claude|codex>
+Agent: <claude|codex>[:<command>]
 Parallel: <N>
 Merge: <merge|no-merge>
 Hold: <None|unit>

@@ -13,7 +13,7 @@ Task document paths: <absolute installed planning-task-docs/references/document-
 Base SHA: <full docs repository HEAD>
 Authority: Write and commit only this task's spec and plan in the document repository on its current branch; decide their contents within the approved task; do not implement, branch, merge, push, rebase or change persistent configuration.
 Git evidence directory: <absolute fresh child evidence directory under runtime-dir>
-Agent: <claude|codex>
+Agent: <claude|codex>[:<command>]
 Place: <window|subagent|background>
 Auto: <yes|no>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>

@@ -18,7 +18,11 @@ One contract for every child outside `inline`: the parent writes a brief, starts
 - Any skill can be run as a whole outside `inline` by its caller, a parent skill or the user's words, through this contract; `--run` only names each skill's default target of that move.
 - The user's words set places as keys do ("run the plan without a window", "let Codex review it in a window"): the session maps them to keys and announces the mapping.
 
-**System.** `--agent claude|codex` chooses the worker's system. Without it the worker is the caller's own system, identified from session identity as independent-review's [Session system](../../independent-review/SKILL.md#session-system) says, and a window's `open` receives it as `--agent`; the helper's own default is not this rule. A reviewer is the opposite system unless `--codex`, `--claude` or `--dual` chooses it; with `subagent` and no system key it is the caller's own system. A `subagent` is always the caller's own system.
+**System.** `--agent claude|codex`, optionally with a [launch command](#launch-command), chooses the worker's system. Without it the worker is the caller's own system, identified from session identity as independent-review's [Session system](../../independent-review/SKILL.md#session-system) says, and a window's `open` receives it as `--agent`; the helper's own default is not this rule. A reviewer is the opposite system unless `--codex`, `--claude` or `--dual` chooses it; with `subagent` and no system key it is the caller's own system. A `subagent` is always the caller's own system.
+
+### Launch command
+
+An agent value is `<system>` or `<system>:<command>`, for example `codex:codex-avc`. The system (`claude` or `codex`) decides everything a system decides: CLI flags, native review tool, runtime records, the opposite system, review marks and window names. A reviewer's command comes from its own key ([independent-review Assignment](../../independent-review/SKILL.md#assignment)). The command is the executable a `window` or `background` launch starts in place of the system's own `claude` or `codex`: one word of `[A-Za-z0-9._/+-]` (also `\` and `:` on native Windows), found on `PATH` or given as a path, taking the system's CLI arguments unchanged. Without a command the system's own executable runs; an `inline` or `subagent` worker starts no CLI and refuses a command ([Refused combinations](#refused-combinations)). Carry the value whole wherever the agent travels: `--agent` to `open` (the helper splits it), the brief's `Agent:` line, nested calls and state records; compare and choose systems by its system part only.
 
 ## Brief
 
@@ -95,7 +99,7 @@ Write the complete producer recipe, with its bindings, to an owned runtime scrip
 
 **Record format.** All five coordination records use UTF-8 without BOM and LF only. `launch.time` is nonnegative decimal Unix epoch seconds plus one LF; `wrapper.identity` is positive decimal PID plus LF, then the start identity plus LF; `producer.exit` is signed decimal exit plus one LF; `session.id` is the extracted single-line CLI ID plus LF (an empty line records missing ID/launch failure, not a successful session); `wrapper.done` is exactly the bytes `complete\n`. Linux/WSL start identity is positive decimal kernel start ticks from field 22 of `/proc/PID/stat`; parse after the final `) ` so spaces/parentheses in comm do not shift fields. State is the first field of that suffix and start ticks its twentieth. Do not use calendar lstart as the Linux identity: procps derives it from a boot wall-clock timestamp. On other POSIX hosts trim only outer ASCII spaces from LC_ALL=C ps lstart; those platforms remain unverified unless exercised. Native start identity is invariant decimal `StartTime.ToUniversalTime().Ticks`. Writer and reader use that same canonical form. Change the recipe's default PowerShell Set-Content writes for these records to explicit no-BOM LF writes; stdout/stderr log bytes remain untouched. Marker readers compare exact bytes/text including the single LF, not arbitrary trimming. Missing/malformed launch.time or identity is unavailable (2); malformed completed producer records are incomplete (3).
 
-POSIX recipe (Bash). Bind absolute `checkout` and `run_dir` holding `prompt.md` (the start prompt, or a resume's continuation message), `agent` (`claude` or `codex`), `model` and `effort` (each may be `cli-default`), and `session_id` (empty to start, the recorded ID to resume). The Linux parser adapts the owner's `process_identity` algorithm; lifecycle scripts remain unchanged. Every required command checks its real exit; no shell-wide errexit is assumed.
+POSIX recipe (Bash). Bind absolute `checkout` and `run_dir` holding `prompt.md` (the start prompt, or a resume's continuation message), `agent` (`claude` or `codex`, the system part of the agent value), `command` (the [launch command](#launch-command), else the system's name), `model` and `effort` (each may be `cli-default`), and `session_id` (empty to start, the recorded ID to resume). The Linux parser adapts the owner's `process_identity` algorithm; lifecycle scripts remain unchanged. Every required command checks its real exit; no shell-wide errexit is assumed.
 
 ```bash
 wrapper_pid=$$
@@ -122,7 +126,7 @@ mv -- "$run_dir/wrapper.identity.tmp" "$run_dir/wrapper.identity" || exit $?
 if [ "$agent" = claude ]; then
   if [ -n "${CHILD_SESSION_CLAUDE_ARGS+x}" ]; then read -r -a perm <<< "$CHILD_SESSION_CLAUDE_ARGS"
   else perm=(--permission-mode bypassPermissions); fi
-  vector=(claude --print --output-format stream-json --verbose "${perm[@]}")
+  vector=("$command" --print --output-format stream-json --verbose "${perm[@]}")
   [ -z "$session_id" ] || vector+=(--resume "$session_id")
   [ "$model" = cli-default ] || vector+=(--model "$model")
   [ "$effort" = cli-default ] || vector+=(--effort "$effort")
@@ -130,7 +134,7 @@ if [ "$agent" = claude ]; then
 else
   if [ -n "${CHILD_SESSION_CODEX_ARGS+x}" ]; then read -r -a perm <<< "$CHILD_SESSION_CODEX_ARGS"
   else perm=(--dangerously-bypass-approvals-and-sandbox); fi
-  vector=(codex exec)
+  vector=("$command" exec)
   [ -z "$session_id" ] || vector+=(resume)
   vector+=("${perm[@]}")
   [ "$model" = cli-default ] || vector+=(-c "model=\"$model\"")
@@ -165,7 +169,7 @@ printf 'complete\n' > "$run_dir/wrapper.done.tmp" || exit $?
 mv -- "$run_dir/wrapper.done.tmp" "$run_dir/wrapper.done" || exit $?
 ```
 
-Native PowerShell recipe (PowerShell 7). Bind the same values as `$checkout`, `$runDir`, `$agent`, `$model`, `$effort` and `$sessionId`, plus `$exe` with `$lead`: the resolved installed `claude` or `codex` executable with `$lead = @()`, or for an npm shim its installed node with `$lead = @('<the shim's JavaScript target>')`; any other shim is unavailable, never evaluated. It uses `System.Diagnostics.Process` directly and depends on no other skill's script. Start/property, copy, extraction and literal .NET write errors stop the recipe without a marker; `$LASTEXITCODE` is not used for managed operations.
+Native PowerShell recipe (PowerShell 7). Bind the same values as `$checkout`, `$runDir`, `$agent`, `$model`, `$effort` and `$sessionId`, plus `$exe` with `$lead`: the resolved installed [launch command](#launch-command) (`claude` or `codex` by default) with `$lead = @()`, or for an npm shim its installed node with `$lead = @('<the shim's JavaScript target>')`; any other shim is unavailable, never evaluated. It uses `System.Diagnostics.Process` directly and depends on no other skill's script. Start/property, copy, extraction and literal .NET write errors stop the recipe without a marker; `$LASTEXITCODE` is not used for managed operations.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -546,7 +550,8 @@ Refused before anything starts, naming the combination:
 - a `subagent` started by a session that is itself a subagent, where the host's subagents cannot start subagents ([Host mechanisms](#host-mechanisms)): the session checks its own agent tool and, on Codex, `[agents] max_depth` in the user's `config.toml` against its own depth (the segments of its canonical task name after `/root`). A spawn the host refuses at launch is reported as this combination, with no fallback to another place. Prepare alone starts no non-window worker and does not apply the refusal for this session being itself a subagent: judge that combination for its caller, which is never a subagent (both orchestrators refuse `--run subagent`); a refused worker start is Nested calls' `launch failure`. Every other refusal stays Prepare's, including an implementer subagent that would itself start subagents;
 - a place that cannot select the role's model and effort ([Settings](#settings));
 - `--model` or `--effort` with an `inline` worker, except in the orchestrators, where they set the implementer;
-- an `inline` worker with `--agent` naming a system other than the current session's ([Session system](../../independent-review/SKILL.md#session-system)), refused before any edit.
+- an `inline` worker with `--agent` naming a system other than the current session's ([Session system](../../independent-review/SKILL.md#session-system)), refused before any edit;
+- an `inline` or `subagent` worker whose `--agent` carries a [launch command](#launch-command), naming the value.
 
 ## Nested calls
 

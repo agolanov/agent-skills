@@ -22,8 +22,8 @@ Current acceptance: <absolute record; current committed target and inspected dif
 Coverage: <per required item: retained | fresh | pending | failed/unavailable>
 Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
-Assignment: <background|window>/<codex|claude>, model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)>
-<or> Assignment: dual (<background|window>): codex <model>/<effort>; claude <model>/<effort>
+Assignment: <background|window>/<codex|claude>[ via <command>], model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)>
+<or> Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>
 Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
 Round limit: 10 <or explicit user limit>
 Reviewer settings by target: initial settings on every round; <explicit user final-pass settings, if any>

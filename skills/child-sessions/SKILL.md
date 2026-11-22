@@ -154,7 +154,7 @@ Stop proven owned processes with `close "$name"` when supported (report a retain
 | Variable | Meaning |
 |---|---|
 | `CHILD_SESSION_BACKEND` | Force compatible `herdr`, `tmux` or `terminal`. |
-| `CHILD_SESSION_AGENT` | Default agent, `claude` or `codex`. |
+| `CHILD_SESSION_AGENT` | Default agent, `claude` or `codex`, or `<system>:<command>` ([launch command](references/run-contract.md#launch-command)). |
 | `CHILD_SESSION_TMUX_SESSION` | Tmux session name; default `child-sessions`. |
 | `CHILD_SESSION_TAB=0` | Disable best-effort Windows Terminal tab creation. |
 | `CHILD_SESSION_CLAUDE_ARGS` | Replace Claude's default `--permission-mode bypassPermissions`. |
