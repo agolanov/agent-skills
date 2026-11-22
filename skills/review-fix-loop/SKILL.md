@@ -48,7 +48,7 @@ Read [independent-review](../independent-review/SKILL.md), using the installed c
 
 The `dual` assignment has Codex and Claude review round 1, the final pass and every disposition round through [the dual review](../independent-review/references/dual.md). A scoped round of a dual loop is a single-system round by the system opposite to the loop owner's (identified as the default reviewer above is), with that reviewer's recorded command, model and effort and the recorded place, obtained from independent-review without `--dual`. Read the dual review too, and resolve both reviewers' settings by its [step 1](../independent-review/references/dual.md#1-settings-and-target).
 
-Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise ten completed rounds. Each round's verdict, findings and fixes go to the loop record and reach the user once, in the final report, by child-sessions' [quiet wait](../child-sessions/SKILL.md#wait).
+Keep one [loop record](references/loop-record.md) outside the checkout; reuse an existing task log. Record the resolved assignment there. Use the explicit round limit, otherwise twenty completed rounds. Each round's verdict, findings and fixes go to the loop record and reach the user once, in the final report, by child-sessions' [quiet wait](../child-sessions/SKILL.md#wait).
 
 ### Reviewer settings by target
 
