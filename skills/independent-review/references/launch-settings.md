@@ -67,7 +67,7 @@ Child sessions (planner, splitter, refiner, implementer) record the settings in 
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>)[; effort step: <most demanding step, one phrase>]; resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 ```
 
-The optional `effort step:` clause appears only when [Effort by task](#effort-by-task) chose the effort (source `policy`); it names the justifying step and leaves the source value as it is. An explicit, `cli-default`, recorded or caller-resolved effort carries no clause, and a resumed run keeps the line as recorded.
+The optional `effort step:` clause appears only when [Effort by task](#effort-by-task) chose the effort (source `policy`); it names the justifying step and leaves the source value as it is. An explicit, `cli-default` or recorded effort carries no clause, and a resumed run keeps the line as recorded. An effort that a caller chose by Effort by task and passes as a policy value keeps its step: the caller forwards the step with the value, and the receiving skill writes it into the line without choosing the effort again.
 
 Refiner and implementer briefs also record the settings of the reviewer their cross review starts:
 
