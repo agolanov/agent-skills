@@ -11,7 +11,7 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 | planner | `planning-task-docs` child, and the `consolidating-plans` worker outside `inline` | latest available Opus | latest available Sol | high |
 | refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
 | splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
-| implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | xhigh |
+| implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | `high` or `xhigh`, chosen per task by [Effort by task](#effort-by-task) |
 | solo implementer | `delivering-task` child in `solo` mode (one document or each unit of its queue), including its later fixes | family chosen per task by `delivering-task` Solo settings | family chosen per task by `delivering-task` Solo settings | `medium` or `high`, chosen with the model per [Implementation mode](../../delivering-task/SKILL.md#implementation-mode) |
 | reviewer | `independent-review` reviewer in its two places, `background` and `window`; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
 | follow-ups fixer | `delivering-task-follow-ups` worker outside `inline`, which fixes the batch and runs the chain | latest available Opus | latest available Sol | high |
@@ -19,7 +19,20 @@ Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version l
 
 The root chooses between the two implementer roles by the implementation mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
 
-Outside an explicit caller rule (such as review-fix-loop's final pass), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
+Outside an explicit caller rule (the researcher of difficult findings in `delivering-task-follow-ups`), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
+
+## Effort by task
+
+The session that launches the agent, or that resolves the policy for it, reads the work the agent is given and picks the effort from the most demanding step of that work, not the average step or the file count:
+
+| Most demanding step of the work | Effort |
+| --- | --- |
+| Prose instructions requiring implementation choices, ordinary integration or debugging, or anything less demanding | `high` |
+| Architecture/design decisions, subtle concurrency or similarly demanding correctness reasoning | `xhigh` |
+
+- The choice is the role's policy value (source `policy`). It applies only to an effort field that has no explicit value (a `cli-default` opt-out included), no recorded value and no caller-resolved policy value, in the same way as the effort of [Solo settings](../../delivering-task/SKILL.md#implementation-mode); it never changes the model.
+- The record of the choice names the step that justified it, in one phrase, beside the effort.
+- Resolve and validate the model/effort pair through [Resolution](#resolution) as for any role; an unsupported pair stops before launch.
 
 ## Precedence
 
