@@ -2,7 +2,7 @@
 
 Reuse an existing task log outside the checkout when possible. This is a short Markdown example, not a parser format. Fill it with inspected facts; do not copy illustrative status/evidence as a result.
 
-With the `dual` assignment, findings carry the merged IDs `D<n>` of the [dual review](../../independent-review/references/dual.md) with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to the dual review as its [ledger input](../../independent-review/references/dual.md#4-matching); a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
+With the `dual` assignment, findings carry the merged IDs `D<n>` of the [dual review](../../independent-review/references/dual.md) with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round that is a dual review (round 1, the final pass, a disposition round) passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to the dual review as its [ledger input](../../independent-review/references/dual.md#4-matching). A scoped round is a single-system round by the system opposite to the loop owner's, whose new findings the loop owner numbers `D<n>` from `Next D`, recorded `raised by <system> <source ID>; no cross-check`; a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
 
 ```markdown
 # Review Fix Loop record
@@ -34,20 +34,20 @@ Pending round: 1; invalid attempts: 0 of 2 <dual: spent attempts per reviewer pe
 Next D: <dual: next free D<n>, starting at 1>
 
 ## Round 1
-Effective reviewer settings: <per system: exact model/effort; selection/runtime evidence; retained on retry>
+Effective reviewer settings: <per system: exact model/effort; dual loop's scoped round: the one reviewer, <system> <model>/<effort>; selection/runtime evidence; retained on retry>
 Target: <review kind; range <base>..<head> | files <paths> at <head>; added wrapper line: security | none | decisions only>
 Reviewed commit: <HEAD>
 Context file: <absolute path of the attempt's context.md>
 Findings file: <absolute path of the attempt's findings.md>
 Last derived verdict: <none or the previous round's derived verdict>
 Result validity/completion: <exit or native completion; metadata; monitored-state evidence; omissions; dual: the dual review's return>
-Dual record: <dual dir>; derived codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat>
+Dual record: <dual dir>; derived codex <CLEAN|CHANGES>, claude <CLEAN|CHANGES>; cross-check: <D-ids confirmed / rejected / repeat> <or: not applicable (scoped round)>
 Derived verdict: <CLEAN|CHANGES, derived by the session from the native report; dual: the report's derived verdict>
 Findings/decisions:
 - R1-F1 (source F1) native <P1 | important | ...>, <critical | important | minor | unrated>; <path:line>; <scenario/requirement/evidence>; <accepted | minor | rejected: quoted requirement or test | deferred: round limit | disputed | outside-scope | not re-raised>; <fix/verification or both disputed positions and human question>
 - D2 <normalized severity>; <path:line>; raised by codex F2; <scenario/requirement/evidence as raised>; rejected by cross-check: claude, <verifier evidence>; closed <or: repeat, unchanged | re-raised with <evidence>; rejected again: <verifier evidence>>
-- C1 outside-round candidate: <evidence; pending final pass disposition, or immediate adjudication if it already ran; dual: raised by <reviewer> <source ID>; carried in the next ledger input, or recorded for the user after the final pass>
-Fix commit: <single hash and finding IDs, or none; next is final/disposition review>
+- C1 outside-round candidate: <evidence; adjudicated at once by evidence; from a resumed record with the final pass pending: carried to it; dual, from a dual review's report: raised by <reviewer> <source ID>; round 1's carried in the final pass's ledger input, the final pass's carried to the first scoped round, or recorded for the user when none follows>
+Fix commit: <single hash and finding IDs, or none>; next: <final pass | scoped round | no review: minor-only | disposition round>
 Checks: <fresh commands/cwd/exits/tested states/checkout and affected coverage; immutable run paths; Git outputs/comparison; dependency/profile/environment facts and gaps>
 Acceptance: <current committed target; original-run/acceptance links; intervening differences and disposition; unchanged coverage and fresh checks; pending broader coverage and phase/producer obligations>
 State: <before/after Git output/exit/diagnostic paths; comparison result/exits/errors; retained recovery baseline>; ignored files and untracked-file contents not covered; Git flags/normalization may hide bytes; nested repositories/submodules not recursively covered; transient restored writes not detected
@@ -56,8 +56,8 @@ Pending-round retry count: <retained across reconciliation; dual: spent attempts
 
 ## Finish
 Status: <running | clean | clean except disputed | blocked: reason>
-Final reviewed commit: <HEAD>
-Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
+Final reviewed commit: <commit of the last valid review>; final HEAD: <HEAD, with "unreviewed minor-only fix commit" when it differs>
+Last derived verdict: <CLEAN|CHANGES, derived by the session from the native report; or `CHANGES`; minor fixes <IDs> in <commit> closed without review; if dispute-only CHANGES closes, preserve it and explain why all other completion conditions hold; dual: derived <..>, derived codex <..>, claude <..>>
 Final composed verification: <current committed target; original runs/tested states and acceptance links; retained/fresh passing coverage per required item; satisfied phase/producer obligations; actual full executions distinguished from composed coverage; pending/failed/unavailable checks>
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; minors deferred at the round limit; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>
