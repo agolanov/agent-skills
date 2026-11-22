@@ -1,4 +1,4 @@
-Display copy of `delivering-task/SKILL.md` Preflight 2 (the branch and window naming), Worktree 1 (the worktree path) and Worktree 3 (the removed-skill brief stop), and of `delivering-task/references/queue.md` Input 3 (the merged-subject search and the leftovers list) and Input 5–6; keep equal.
+Display copy of `delivering-task/SKILL.md` Preflight 2 (the branch and window naming), Worktree 1 (the worktree path) and Worktree 3 (the removed-skill brief stop), and of `delivering-task/references/queue.md` Input 3 (the merged-subject search and the leftovers list) and Input 5–6; keep equal, except that the queue records Input 6's discard answers and its archives and performs them later (in its Preflight 4's Documents bullet), while staged delivery performs a discard or an archive at once, when Stage loop step 1 has the answer.
 
 # Stage derivation
 

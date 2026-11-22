@@ -5,14 +5,14 @@ Display copy of `refining-task-docs/references/review-mark.md`, its format and i
 Last line of a reviewed spec or plan, exact shape:
 
 ```text
-Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex>, commit <full SHA>
+Review: clean | clean except disputed, <YYYY-MM-DD>, reviewer <claude|codex|dual>, commit <full SHA>
 ```
 
 ## Freshness
 
 A document is **fresh** when all three hold for its content (the working file in a checkout, or `git -C <docs-main> show <ref>:<rel>` when checking a branch):
 
-1. The last line matches `^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit [0-9a-f]{40}$`.
+1. The last line matches `^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit [0-9a-f]{40}$`.
 2. It is the only line matching `^Review: (clean|clean except disputed), `.
 3. The named commit holds the document (`git -C <docs-repo> rev-parse --verify --quiet <sha>:<rel>` succeeds) and the content without that line equals that blob as bytes, allowing only the uniform CRLF representation described below. Preserve the `show` producer exit before comparison: an unknown SHA or failed producer never supplies an empty successful body.
 
@@ -24,7 +24,7 @@ Everything else is **stale** and the document needs review: no mark, a mark that
 
 ```bash
 last=$(tail -n 1 -- "$file")
-re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit ([0-9a-f]{40})$'
+re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit ([0-9a-f]{40})$'
 [[ $last =~ $re ]] && sha=${BASH_REMATCH[3]} &&
 [[ $(grep -cE '^Review: (clean|clean except disputed), ' -- "$file") -eq 1 ]] &&
 python3 "$state_helper" git-read --checkout "$docs_repo" -- rev-parse --verify --quiet "$sha:$rel" >/dev/null &&
@@ -48,7 +48,7 @@ freshness_check() {
   last=$(tail -n 1 "$file") || return 2
   cr=$(printf '\r')
   last=${last%"$cr"}
-  re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit ([0-9a-f]{40})$'
+  re='^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit ([0-9a-f]{40})$'
   [[ $last =~ $re ]] || return 1
   sha=${BASH_REMATCH[3]}
   count=$(LC_ALL=C grep -cE '^Review: (clean|clean except disputed), ' "$file") || return 2
@@ -96,7 +96,7 @@ $freshness_exit = & {
         $bytes = [IO.File]::ReadAllBytes($file)
         $byteText = [Text.Encoding]::GetEncoding(28591)
         $text = $byteText.GetString($bytes)
-        $mark = [regex]::Match($text, '(?m)^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex), commit ([0-9a-f]{40})(?:\r?\n)?\z')
+        $mark = [regex]::Match($text, '(?m)^Review: (clean|clean except disputed), [0-9]{4}-[0-9]{2}-[0-9]{2}, reviewer (claude|codex|dual), commit ([0-9a-f]{40})(?:\r?\n)?\z')
         if (-not $mark.Success -or [regex]::Matches($text, '(?m)^Review: (clean|clean except disputed), ').Count -ne 1) { return 1 }
         $sha = $mark.Groups[3].Value
         & git -C $docs_repo rev-parse --verify --quiet ($sha + ':' + $rel) > "$freshness_dir/exists.stdout" 2> "$freshness_dir/exists.stderr"
