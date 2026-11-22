@@ -29,7 +29,7 @@ Settle the findings left after a delivered task.
 
 | Skill | Description |
 |-------|-------------|
-| `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation: investigate difficult causes with a stronger research subagent, fix confirmed defects directly on the main branch in one batch, checked once, committed and reviewed with `review-fix-loop`, drop resolved ones, and plan, review and deliver only the findings that need design. |
+| `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation: investigate difficult causes with a stronger research subagent, fix confirmed defects directly on the main branch in one batch, checked once, committed and reviewed with `review-fix-loop`, drop resolved ones, keep those the finding itself defers (an owner's decision, an accepted risk, a revisit condition not yet met), and plan, review and deliver only the findings that need design. |
 
 ### Review and refinement
 
