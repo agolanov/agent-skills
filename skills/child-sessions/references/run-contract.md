@@ -642,7 +642,7 @@ Follow child-sessions' [Wait](../SKILL.md#wait): the ladder for window workers (
 | The wait ends with | The orchestrator |
 |---|---|
 | a worker's `blocked` | answers by [Questions and continuation](#questions-and-continuation): show or route, rename to `<file>-blocked-<n>`; for a window, `alive <name>` first: alive, send the answer (without send, child-sessions' direct-entry rule), then wait again; dead, fresh Accept with `Event: dead before send` and Line to send. Outside window continue the conversation you started, or the contract's fresh child with a new Opened/Openings line, then wait again. No Accept for a live worker's question. |
-| stall, exit `4` | child-sessions' stall rule: peek; a dialog by Dialogs, bounded by the worker brief's Authority and Checkout and never beyond the call's own Authority; nothing to answer, one line to the user and a re-armed watcher. |
+| stall, exit `4` | child-sessions' stall rule: peek; a dialog by Dialogs, bounded by the worker brief's Authority and Checkout and never beyond the call's own Authority; nothing to answer, nothing to the user and a re-armed watcher. |
 | exit `124` | on the present loop, the next bounded call; on rung 1 or 2, the wait's deadline: the exit table's peek and Dialogs first, then with nothing to answer fresh Accept with `Event: deadline`. |
 | worker `done` or `failed` | fresh Accept with `Event: worker status`. |
 | exit `3`, or a non-window worker ends without a valid first line | fresh Accept with `Event: silent exit`. |

@@ -36,7 +36,7 @@ Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidenc
 
 ## Wait
 
-**Quiet wait.** The user watches a child in its own window, status file or run directory, and asks this session when they want a status. From launch until the final report, a parent's text to the user is only: the launch lines its skill words, the waiting notice, a question or dialog that needs the user's decision, the stall line, a declined or escalated dialog, and a stop or failure. Everything else a wake shows (a peeked screen, the child's progress, its commits and checks so far, the result of one unit, stage, phase or review round) goes into the run's records and reaches the user once, in the final report. This binds every parent in every place: a thin launcher, a wait holder, and an orchestrator over units, stages or rounds. A direct question from the user is answered as asked.
+**Quiet wait.** The user watches a child in its own window, status file or run directory, and asks this session when they want a status. From launch until the final report, a parent's text to the user is only: the launch lines its skill words, the waiting notice, a question or dialog that needs the user's decision, a declined or escalated dialog, and a stop or failure. Everything else a wake shows (a peeked screen, the child's progress, its commits and checks so far, the result of one unit, stage, phase or review round) goes into the run's records and reaches the user once, in the final report. This binds every parent in every place: a thin launcher, a wait holder, and an orchestrator over units, stages or rounds. A direct question from the user is answered as asked.
 
 ### Rungs
 
@@ -79,7 +79,7 @@ A valid status first line wins: use the status table below. Otherwise dispatch t
 
 If the record is absent and the watcher is alive (rung 1: the host task still runs; rung 2: `kill -0 <pid>` or the platform's process query), there is no event: answer what was asked, print the notice again, end the turn and start no watcher. **Record absent and watcher gone, or `exit: 2`, is a watcher failure.** After the evidence reads, `alive` exit `1` takes exit-table row `3`; `alive` exit `0` finishes this wait and all later waits of the run on the present loop, reported explicitly. Try no second watcher after failure.
 
-**Stall rule (`4`).** Run `peek <launch> 40`. A dialog goes to [Dialogs](#dialogs). If the screen has nothing you may answer (the user thinking in a planner window, an idle prompt), tell the user `Window <name>: screen unchanged for 180 s, nothing to answer: <what it shows>` and type nothing into the child. The next watcher names it with `--rearm <name>`. Remove that launch's re-arm once you send it anything or its next event is not a stall.
+**Stall rule (`4`).** Run `peek <launch> 40`. A dialog goes to [Dialogs](#dialogs). If the screen has nothing you may answer (the user thinking in a planner window, an idle prompt), tell the user nothing about the stall or the screen and type nothing into the child. The next watcher names it with `--rearm <name>`. Remove that launch's re-arm once you send it anything or its next event is not a stall.
 
 After an event leaves children working, start one watcher over those still working, on the same rung. If start is refused with `already has a live watcher` (the preceding wake line is still pending), pause with `wait <name> <status-file> 5` and retry at most three times, then treat it as a watcher failure.
 
