@@ -4,7 +4,7 @@ A brief is the task document `delivering-task <brief>` implements for a Brief gr
 
 ## Path
 
-`<project>/docs/superpowers/tasks/<today>-<slug>.md`, `<today>` as `YYYY-MM-DD` and `<slug>` made of `[a-z0-9-]` from the group's title (`OAuth state hardening` → `2026-11-04-oauth-state-hardening`); a slug ending in `-design` loses every such ending, and the final file name is checked after the collision suffix too, since `delivering-task` reads a name ending `-design.md` as a spec. Create the `tasks/` directory when it is missing; in the separate docs layout it lies in the docs repository. `planning-task-docs` takes the brief's stem as the task's would-be spec and plan names, so the stem must be free in all three places: no existing `tasks/<stem>.md`, `specs/<stem>-design.md` or `plans/<stem>.md` in that docs dir. When one exists, append `-2`, `-3`… to the slug, the smallest number free in all three.
+`<project>/docs/superpowers/tasks/<today>-<slug>.md`, `<today>` as `YYYY-MM-DD` and `<slug>` made of `[a-z0-9-]` from the group's title (`OAuth state hardening` → `2026-11-04-oauth-state-hardening`); when the stem (date, slug and any collision suffix) would end in `-design`, append `-task` to the slug, since `delivering-task` reads a name ending `-design.md` as a spec. Create the `tasks/` directory when it is missing; in the separate docs layout it lies in the docs repository. `planning-task-docs` takes the brief's stem as the task's would-be spec and plan names, so the stem must be free in all three places: no existing `tasks/<stem>.md`, `specs/<stem>-design.md` or `plans/<stem>.md` in that docs dir. When one exists, append `-2`, `-3`… to the slug, the smallest number free in all three.
 
 ## Content
 
