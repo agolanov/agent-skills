@@ -1,6 +1,6 @@
 ---
 name: delivering-task-follow-ups
-description: Use when findings left in a delivered task's follow-ups files need investigation, correction and verification, including difficult defects, or when follow-ups requiring new behavior or architectural decisions need planning and delivery.
+description: Use when findings left in a delivered task's follow-ups files need investigation, correction and verification, including difficult defects, or when follow-ups that require new behavior or architectural decisions need to become tasks and be delivered.
 ---
 
 # Delivering Task Follow-ups
