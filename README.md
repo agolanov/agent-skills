@@ -109,10 +109,10 @@ npx skills add agolanov/agent-skills --skill \
   review-fix-loop independent-review child-sessions
 ```
 
-`dual-consult` starts its two consultants through `child-sessions`; install them together:
+`dual-consult` starts its two consultants through `child-sessions`, whose launch settings check lives in `independent-review`; install them together:
 
 ```sh
-npx skills add agolanov/agent-skills --skill dual-consult child-sessions
+npx skills add agolanov/agent-skills --skill dual-consult child-sessions independent-review
 ```
 
 ## Runtime support
