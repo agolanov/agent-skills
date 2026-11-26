@@ -109,6 +109,12 @@ npx skills add agolanov/agent-skills --skill \
   review-fix-loop independent-review child-sessions
 ```
 
+`dual-consult` starts its two consultants through `child-sessions`; install them together:
+
+```sh
+npx skills add agolanov/agent-skills --skill dual-consult child-sessions
+```
+
 ## Runtime support
 
 Use existing Git, agent CLIs and shells; the skills do not install runtimes or change profiles. Resolve the installed child-sessions helper by absolute path: its Bash entrypoint is self-contained, while native Windows uses `child-session.ps1` through installed PowerShell (see [platform runtime](skills/child-sessions/references/platform-runtime.md)). `runtime-dir` supplies artifact paths and `capabilities NAME` supplies supported controls. Plain terminals keep brief/status waiting; questions need direct attention in the visible window, and dialog counts are not observable.
