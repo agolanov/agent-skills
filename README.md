@@ -31,6 +31,14 @@ Settle the findings left after a delivered task.
 |-------|-------------|
 | `delivering-task-follow-ups` | Settle a task's follow-ups from one invocation, closing every finding: investigate difficult causes with a stronger research subagent, fix confirmed defects directly on the main branch in one batch, checked once, committed and reviewed with `review-fix-loop`, drop the resolved ones and those shown not to need a change, with the reason recorded, and turn the harder findings into task briefs that carry the chosen solution and are delivered straight from the brief; a spec and plan are written only for the tasks that need them. |
 
+### Decisions
+
+Get a recommendation on an open question before deciding.
+
+| Skill | Description |
+|-------|-------------|
+| `dual-consult` | Claude and Codex each study an open question, a vague idea or a set of follow-ups on their own, argue until they agree, and leave one decision file: the recommendation, the points they still disagree on, the questions only the user can answer and next steps. Nothing in the project changes. |
+
 ### Review and refinement
 
 Review committed work with a separate reviewer, with or without a fix cycle.
@@ -69,6 +77,7 @@ Each skill picks its default: a window where the worker talks to the user or wor
 | `delivering-task` | the implementer of each task | `window` | `inline`, `subagent`, `background`; with several documents these run the tasks one at a time in queue order, and `--parallel` applies to `window` only |
 | `review-fix-loop` | the loop owner, which fixes | `inline`: the session that did the work fixes it | `subagent`, `background`, `window` |
 | `independent-review`; the reviewer of any skill (`--reviewer-run`) | the reviewer | `background` | `window`; `inline` is refused, since reviewing one's own work is not independent, and `subagent`, since a native subagent has no native review command |
+| `dual-consult` | the two consultants, one Claude and one Codex | `background` | `window` |
 | `consolidating-plans` | the skill itself | `inline` | `subagent`, `background`, `window` |
 | `delivering-spec-stages` | the orchestrator itself | `inline`; nested skills run as phase agents while the orchestrator waits | `background`, `window` |
 | `delivering-task-follow-ups` | the fixer, which fixes the batch and runs the chain for the findings that become tasks | `inline`; chain skills run as phase agents while the orchestrator waits | `background`, `window` |
@@ -98,6 +107,12 @@ The review skills share dependencies, and a window reviewer runs through `child-
 ```sh
 npx skills add agolanov/agent-skills --skill \
   review-fix-loop independent-review child-sessions
+```
+
+`dual-consult` starts its two consultants through `child-sessions`, whose launch settings check lives in `independent-review`; install them together:
+
+```sh
+npx skills add agolanov/agent-skills --skill dual-consult child-sessions independent-review
 ```
 
 ## Runtime support
