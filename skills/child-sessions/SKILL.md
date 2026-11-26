@@ -40,7 +40,7 @@ Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidenc
 
 ### Rungs
 
-Choose the highest proven rung once per run at its first long wait, after the first Startup. Keep it for later waits unless a watcher failure requires the present loop. An **interactive session** is the agent CLI's own TUI in its own pane or terminal (the user's session or a `window` child); a **native subagent** starts through a host agent tool; a **print session** is `claude --print` or `codex exec` (including a `background` child that itself waits).
+Choose the rung once per run at its first long wait, after the first Startup. Keep it for later waits unless a watcher failure requires the present loop. An **interactive session** is the agent CLI's own TUI in its own pane or terminal (the user's session or a `window` child); a **native subagent** starts through a host agent tool; a **print session** is `claude --print` or `codex exec` (including a `background` child that itself waits).
 
 | Rung | Mechanism | Turns while waiting | Proof |
 |---|---|---|---|
@@ -48,7 +48,9 @@ Choose the highest proven rung once per run at its first long wait, after the fi
 | 2 | Detached watcher types a wake line into the session's own pane | 0 | The run's first `wake` exits `0`, proving the caller pane and classifiable input. |
 | Present loop | Bounded calls in the foreground | As today | Used when neither free rung is proven. |
 
-Only an interactive session may use rung 1 or try rung 2. A native subagent and a print session use the present loop and **never call `wake`**: the helper would prove the parent's pane and type into the parent. No rung puts another agent between the session and its child. A wake after the cache lifetime rewrites the context once; no rung keeps a session awake for its cache.
+An interactive session waiting on a window child uses rung 1 when host notification is proven. Otherwise it **runs `wake` once** before choosing the present loop. The command itself checks the caller pane and input, so run it even when the caller pane has yet to be proven. Use rung 2 on success. On a refusal listed below, use the present loop and include the actual refusal in `Wait:`.
+
+A native subagent and a print session use the present loop and **never call `wake`**: the helper would prove the parent's pane and type into the parent. No rung puts another agent between the session and its child. A wake after the cache lifetime rewrites the context once; no rung keeps a session awake for its cache.
 
 The calling task's final report includes one of these lines (a watcher-failure switch adds the present-loop line after the original rung):
 
