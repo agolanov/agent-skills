@@ -37,7 +37,7 @@ Get a recommendation on an open question before deciding.
 
 | Skill | Description |
 |-------|-------------|
-| `dual-consult` | *(in development)* Claude and Codex each study an open question, a vague idea or a set of follow-ups on their own, argue until they agree, and leave one decision file: the recommendation, the points they still disagree on, the questions only the user can answer and next steps. Nothing in the project changes. |
+| `dual-consult` | Claude and Codex each study an open question, a vague idea or a set of follow-ups on their own, argue until they agree, and leave one decision file: the recommendation, the points they still disagree on, the questions only the user can answer and next steps. Nothing in the project changes. |
 
 ### Review and refinement
 

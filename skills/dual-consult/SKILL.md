@@ -1,8 +1,6 @@
 ---
 name: dual-consult
 description: "Has Claude and Codex each study an open question independently, argue it out and write one decision file: a joint recommendation, the points they still disagree on, the questions only the user can answer and next steps, without changing the project. Use when a question, a vague idea, open follow-ups or a doubtful aspect of a project needs two independent views and a recommendation before the user decides."
-metadata:
-  internal: true
 ---
 
 # Dual Consult
