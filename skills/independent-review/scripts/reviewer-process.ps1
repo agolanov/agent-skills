@@ -132,8 +132,9 @@ function Invoke-ReviewerLaunch {
         $off = [ordered]@{}
         $lines = New-Object Collections.Generic.List[string]
         try {
-            $listed = & $Command plugin list --json 2>$null
-            if ($LASTEXITCODE -ne 0) { throw ($Command + ' plugin list --json failed') }
+            Push-Location -LiteralPath $Checkout
+            try { $listed = & $Command plugin list --json 2>$null; $listExit = $LASTEXITCODE } finally { Pop-Location }
+            if ($listExit -ne 0) { throw ($Command + ' plugin list --json failed') }
             foreach ($plugin in @(ConvertFrom-Json -InputObject ($listed -join "`n"))) {
                 if ($plugin.enabled -ne $true) { continue }
                 $path = [string]$plugin.installPath

@@ -23,7 +23,7 @@ git -C "$checkout" diff --binary --no-ext-diff --no-textconv >"$evidence/worktre
 git -C "$checkout" diff --cached --binary --no-ext-diff --no-textconv >"$evidence/cached-diff.stdout" 2>"$evidence/cached-diff.stderr"; echo $? >"$evidence/cached-diff.exit"
 ```
 
-On native Windows run the same four in PowerShell 7 with the resolved `git` application, `$ErrorActionPreference = 'Stop'`, `$PSNativeCommandUseErrorActionPreference = $false`, the four variables removed from `Env:`, direct `>`/`2>` redirection (byte-preserving in PowerShell 7) and `$LASTEXITCODE` written to each `.exit` file; a launch or redirection exception is unavailable evidence. Another shell uses its own byte-preserving file and process APIs; an unsupported shell stays explicit, and no runtime is installed for this.
+On native Windows run the same four in PowerShell 7.4 or later (earlier versions decode native output as text, so their boundary is unavailable) with the resolved `git` application, `$ErrorActionPreference = 'Stop'`, `$PSNativeCommandUseErrorActionPreference = $false`, the four variables removed from `Env:`, direct `>`/`2>` redirection (byte-preserving from 7.4) and `$LASTEXITCODE` written to each `.exit` file; a launch or redirection exception is unavailable evidence. Another shell uses its own byte-preserving file and process APIs; an unsupported shell stays explicit, and no runtime is installed for this.
 
 At entry and continuation also record `git rev-parse --show-toplevel`, the branch (`symbolic-ref --quiet --short HEAD`, or the caller's expected detached state) and HEAD, and check them against the task identity; a mismatch blocks until reconciled.
 

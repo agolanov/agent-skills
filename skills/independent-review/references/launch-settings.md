@@ -76,6 +76,8 @@ The fields the targeted lookup reads. Records live under `${CLAUDE_CONFIG_DIR:-$
 | --- | --- | --- |
 | Claude `init` event of the launch | `model` | none |
 | Claude assistant record of the bound session | `message.model` | top-level `effort` |
+| Claude `api-request` record of the bound session | `params.model` (corroborates) | `params.output_config.effort` |
+| Claude `api-request-blob` record with an object `message` | `message.model` (corroborates) | `message.output_config.effort` |
 | Claude `/code-review` agent record (`<project dir>/<session id>/subagents/agent-*.jsonl`) | `message.model` | top-level `effort`, or `output_config.effort` |
 | Codex `turn_context` of the bound rollout | `payload.model` | `payload.effort` |
 | Codex review delegate (`session_meta.payload.source` `{"subagent":"review"}`, `parent_thread_id` the producer's ID): `turn_context` and `thread_settings_applied` | `payload.model`, `thread_settings.model` | `payload.effort`, `thread_settings.reasoning_effort` |

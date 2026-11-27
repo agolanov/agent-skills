@@ -62,9 +62,9 @@ Every review uses the resolved initial reviewer settings, passed explicitly each
 Invoking the loop requests a task-state commit and one fix commit per round on the task branch; that is all it authorizes. Push, merge, rebase, amend, squash, deploy, worktree creation, installation and persistent configuration changes each need their own authorization. A request forbidding commits withdraws it: stop and ask whether to allow these commits or end without review. Before the first commit, a detached HEAD or the default branch (`main`/`master` or configured) asks for confirmation unless already authorized.
 
 1. Record the pre-loop HEAD for the squash command.
-2. Commit task-owned changes, if any, as `review-fix-loop: task state before review`, staging exact task paths only; unrelated staged and unstaged work stays as it was, its exclusion recorded.
+2. Commit task-owned changes, if any, as `review-fix-loop: task state before review`. Stage and commit exact task paths only (`git --literal-pathspecs commit --only -- <paths>` when unrelated work is staged): a plain commit of the whole index would absorb unrelated staged work. Unrelated staged and unstaged work stays as it was, its exclusion recorded. Fix commits follow the same rule.
 3. Before each commit, require passing affected checks (applicable evidence or a run) and any explicit pre-commit gate; after each fix batch make exactly one commit naming the round and finding IDs. Apply the [suite contract](../independent-review/references/checkout-state.md#resolve-checks-and-bind-suite-evidence) and [handoff recipe](../independent-review/references/checkout-state.md#run-and-hand-off-a-suite); a new SHA alone needs no suite run.
-4. Round 1 and the final pass need accepted complete coverage, merge-candidate checks aside. A fix commit followed by a scoped round or by no review may have broader coverage pending until completion; one followed by the final pass meets the final-pass gate first.
+4. Round 1 and the final pass need accepted complete coverage, merge-candidate checks and checks a requirement gives to the reviewer aside (step 3). A fix commit followed by a scoped round or by no review may have broader coverage pending until completion; one followed by the final pass meets the final-pass gate first.
 
 A failed required check blocks dependent work and authorizes no amend, squash or unreviewed corrective commit. Every review targets a recorded stable commit. Under the dual assignment the dual review's [Complete suite](../independent-review/references/dual.md#2-complete-suite) runs the suites.
 
@@ -79,7 +79,7 @@ Obtain each attempt from independent-review (`--auto` under `--auto`), passing t
 | Final pass | complete task; accumulated outside-round candidates in `Candidates` | security |
 | Disposition round | complete task, on the same HEAD | decisions only |
 
-Scoped rounds run only after the final pass (step 5). A requirement that names the reviewer as the one who runs a check adds the reviewer-run line; that check stays `pending` until the attempt's runtime records show it ran, and the loop cannot close before. Each finding's class (in scope, outside-round or outside-task) comes from the attempt's `findings.md`.
+Scoped rounds run only after the final pass (step 5). A requirement that names the reviewer as the one who runs a check adds the reviewer-run line; that check does not hold back the launch, stays `pending` until the attempt's runtime records show it ran, and the loop cannot close before. Each finding's class (in scope, outside-round or outside-task) comes from the attempt's `findings.md`.
 
 **Outside-round candidates** of a scoped round are adjudicated at once by evidence, without widening the review: accepted task defects and minor task findings go through a fix commit within the remaining limit; others get a recorded disposition. A record resumed with the final pass pending carries every such candidate to the final pass's `Candidates` unfixed. Pre-existing outside-task problems never block.
 

@@ -15,7 +15,8 @@
 #   events.jsonl (Claude) or stdout.log (Codex), and stderr.log
 #   answer.md      Claude: the last result event; Codex: stdout of a native attempt. Published through
 #                  answer.md.tmp and a rename, so a partial answer never exists.
-#   extraction.exit, extraction-error.txt (Claude)
+#   extraction.exit, extraction-error.txt (Claude: extraction or publication failure)
+#   copy.exit, copy-error.txt (Codex native: a failed publication; absent on success)
 #   plugins.txt    Claude: "off <id>" or "on <id> <reason>" per enabled plugin, or "unavailable: <reason>"
 # Exit 0 once the reviewer ran, whatever its exit; 2 on a usage or setup error before launch.
 set -u
@@ -77,7 +78,7 @@ plugins_off() {
   if [[ -z $json_tool ]]; then
     printf 'unavailable: no installed JSON parser (jq or node)\n' > "$dir/plugins.txt"; return
   fi
-  if ! list=$("$command" plugin list --json 2> "$dir/plugins-error.txt"); then
+  if ! list=$(cd "$checkout" && "$command" plugin list --json 2> "$dir/plugins-error.txt"); then
     printf 'unavailable: %s plugin list --json failed\n' "$command" > "$dir/plugins.txt"; return
   fi
   if [[ $json_tool == jq ]]; then
@@ -137,6 +138,10 @@ else
   out=$dir/stdout.log
 fi
 printf '%s\n' "$command" "${args[@]}" > "$dir/argv.txt"
+# Setup: the outputs must be writable and the prompt readable before the producer starts,
+# so that a redirection failure is a setup error (exit 2), never a producer exit.
+[[ -r $prompt ]] || die 'prompt file unreadable'
+{ : > "$out" && : > "$dir/stderr.log"; } 2>/dev/null || die 'cannot write the attempt outputs'
 
 producer_exit=0
 ( cd "$checkout" || exit 2; "$command" "${args[@]}" < "$prompt" > "$out" 2> "$dir/stderr.log" ) || producer_exit=$?
@@ -146,7 +151,9 @@ if [[ $system == codex ]]; then
   sed -n 's/^session id: \([^[:space:]]*\).*/\1/p' "$dir/stderr.log" | head -n 1 > "$dir/session-id.tmp"
   if [[ -s $dir/session-id.tmp ]]; then mv "$dir/session-id.tmp" "$dir/session-id"; else rm -f "$dir/session-id.tmp"; fi
   if [[ $native == yes ]]; then
-    cp "$dir/stdout.log" "$dir/answer.md.tmp" && mv "$dir/answer.md.tmp" "$dir/answer.md"
+    copy_exit=0
+    { cat "$dir/stdout.log" > "$dir/answer.md.tmp" && mv "$dir/answer.md.tmp" "$dir/answer.md"; } 2> "$dir/copy-error.txt" || copy_exit=$?
+    [[ $copy_exit == 0 ]] || printf '%s\n' "$copy_exit" > "$dir/copy.exit"
   fi
   exit 0
 fi
@@ -164,6 +171,10 @@ case $json_tool in
     extraction_exit=127
     printf '%s\n' 'No installed JSON parser: extraction unavailable.' > "$dir/extraction-error.txt" ;;
 esac
-if [[ $extraction_exit == 0 ]]; then mv "$dir/answer.md.tmp" "$dir/answer.md"; else rm -f "$dir/answer.md.tmp"; fi
+if [[ $extraction_exit == 0 ]]; then
+  mv "$dir/answer.md.tmp" "$dir/answer.md" 2>> "$dir/extraction-error.txt" || extraction_exit=$?
+else
+  rm -f "$dir/answer.md.tmp" 2>/dev/null
+fi
 printf '%s\n' "$extraction_exit" > "$dir/extraction.exit"
 exit 0
