@@ -53,7 +53,7 @@ None
 
 `State:` is one of `prepare: brief written`, `prepare: launched`, `prepare: asked <what>`, `waiting`, `accept: returned to worker`, `accept: reopened`, `accept: asked <what>`, `accept: reported`. `Reopen:` is `unused` or `used: <silent exit | dead before send>`; non-window workers count the run contract's one restart here too. `Return to worker:` is `unused` or `used: <archived status path>`. `Wait:` is the child-sessions report line's value once a rung is chosen, otherwise `not chosen`.
 
-**Launch words.** Written by Prepare before it opens a window or writes `Action: start`, and never rewritten: the run contract's [lean launch](run-contract.md#launch-and-wait) words chosen for the worker (`none` for a subagent or a Codex worker). A resume that renames the record copies the archived record's value. Every reopen, restart and resumed start passes the same words, checked first by [Authority](#authority) 3; a `--session-id` word gets a fresh UUID.
+**Launch words.** Written by Prepare before it opens a window or writes `Action: start`, and never rewritten: the run contract's [lean launch](run-contract.md#launch-and-wait) words chosen for the worker (`none` for a subagent or a Codex worker), the same value as the worker brief's `Launch words:` line. A resume that renames the record takes the brief's value. Every reopen, restart and resumed start passes the same words, checked first by [Authority](#authority) 3; a `--session-id` word gets a fresh UUID.
 
 **Waiting.** The launches still working and the first action to perform, in the [Waiting](#waiting) format. An empty block is `None` when no worker remains.
 
@@ -83,7 +83,7 @@ Before using the record, check what can be checked against independent run evide
 
 1. The worker brief exists, and its `Status file:` and `Place:` lines equal the record's.
 2. For a window launch, run `alive` and read `capabilities`, checking the recorded checkout and launch identity. A dead worker is an event, not by itself a disagreement.
-3. `Launch words:` equals the words the run contract's [lean launch](run-contract.md#launch-and-wait) rule gives, derived again from the brief's agent and place and the needs its brief or task names: `none` for a subagent or a Codex worker; for a local-only Claude worker `--strict-mcp-config --no-chrome`, without `--strict-mcp-config` for a named MCP server and without `--no-chrome` for a browser need. Any difference is a disagreement. A record written before the line existed takes the derived words.
+3. `Launch words:` equals the worker brief's `Launch words:` line. A brief without that line was written before lean launches, and its worker launched with `none`; a record without the line takes the brief's value. Any difference is a disagreement.
 
 Compare other derivable facts against the brief, status archives and runtime records too: an `unused` flag cannot override evidence of an earlier reopen or return. A disagreement stops the phase, naming both values; preserve the files.
 

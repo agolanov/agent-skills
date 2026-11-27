@@ -20,6 +20,7 @@ Auto: <yes|no>
 Terminal controls: not part of this brief; the root reads them from each launch of this window after it opens and may be unable to see or answer this window, so a question or dialog shown here can wait for the user to answer it directly.
 Window name: <name>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>)[; effort step: <most demanding step, one phrase>]; resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
+Launch words: <the run contract's lean launch words for this worker, as passed | none>
 Nested agents: set model and effort on every agent you start (Claude Agent tool: model, effort; Codex: model, reasoning_effort, fork_turns "none"), by these rows: supplied text or code, isolated mechanical edit: Haiku/Luna medium; ordinary implementation, integration and routine fixes: Sonnet/Terra high; architecture, concurrency, subtle correctness: Opus/Sol high
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 Reviewer run: <background|window> (<default | explicit>)

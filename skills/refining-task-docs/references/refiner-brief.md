@@ -12,6 +12,7 @@ Agent: <claude|codex>[:<command>]
 Place: <window|subagent|background>
 Auto: <yes|no>
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>); resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
+Launch words: <the run contract's lean launch words for this worker, as passed | none>
 Nested agents: set model and effort on every agent you start (Claude Agent tool: model, effort; Codex: model, reasoning_effort, fork_turns "none"), by these rows: supplied text or code, isolated mechanical edit: Haiku/Luna medium; refinement and document review subagents: Opus/Sol high
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 Reviewer run: <background|window> (<default | explicit>)
