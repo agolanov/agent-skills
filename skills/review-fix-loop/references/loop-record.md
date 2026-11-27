@@ -2,8 +2,6 @@
 
 The one format of the loop record, kept outside the checkout (an existing task log is reused). A Markdown example, not a parser format: fill it with inspected facts.
 
-With the `dual` assignment, findings carry the merged IDs `D<n>` of the [dual review](../../independent-review/references/dual.md) with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round that is a dual review (round 1, the final pass, a disposition round) passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to the dual review as its [ledger input](../../independent-review/references/dual.md#4-matching). A scoped round is a single-system round by the system opposite to the loop owner's, whose new findings the loop owner numbers `D<n>` from `Next D`, recorded `raised by <system> <source ID>; no cross-check`; a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
-
 ```markdown
 # Review Fix Loop record
 Status: running
@@ -62,3 +60,13 @@ Final composed verification: <current committed target; original runs/tested sta
 Decisions/candidates: <disputed both positions and fix-or-dismiss question; minors deferred at the round limit; outside-scope; unresolved findings; dual: rejected by cross-check with both positions>
 Squash command for the user (not executed): <command per `review-fix-loop` step 5>
 ```
+
+## Dual rounds
+
+Resolve both assignments by [dual settings](../../independent-review/references/dual.md#1-settings-and-target). Pass `--reviewer-effort` to both; for `--reviewer-model` ask which reviewer it selects. Prose may set one reviewer's model or effort using `--codex-model`, `--codex-effort`, `--claude-model` or `--claude-effort`.
+
+- **Round 1, final pass and disposition.** Request [dual review](../../independent-review/references/dual.md) with the review kind, target, recorded place and settings, round directory, suite runs/acceptances and pending coverage. Pass the full [ledger input](../../independent-review/references/dual.md#4-matching), carried candidates and `Next D`. The dual review runs the suites and owns its attempt budgets.
+- **Result.** A `report.md` completes the round. Keep its derived verdict and both reviewers' verdicts. Adjudicate confirmed findings, including unrated ones. Carry round 1 report candidates to the final pass; carry final or disposition candidates as prior findings to the first scoped round, or report them to the user. Do not fix a dual report candidate on the loop owner’s evidence alone.
+- **Cross-check decisions.** Keep each rejected finding closed with its raiser, source ID, original claim and verifier evidence. Record a repeat without new evidence as `repeat, unchanged`; append new evidence to a renewed rejection. A confirmation returns to ordinary adjudication.
+- **Scoped round.** Use one reviewer opposite the loop owner, with that reviewer's recorded command, place and settings. Apply ordinary single-attempt, candidate and retry rules. Assign new in-scope findings from `Next D`, recording `raised by <system> <source ID>; no cross-check`. If an older record already has a started scoped dual review (`state.md` exists), finish it as dual.
+- **Interrupted round.** A system-qualified block keeps its reason. On `checkout changed: <state.md>`, apply step 4's ownership rule; an unattributable parallel write is invalidating unless demonstrably unrelated scratch. Continue by [State and resume](../../independent-review/references/dual.md#state-and-resume) with the recorded state and write decision.

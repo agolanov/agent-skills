@@ -11,11 +11,9 @@ independent-review [--codex[=<command>] | --claude[=<command>] | --dual] [--run 
                    [--auto] [<range|commit>]
 ```
 
-One assigned reviewer reviews one recorded target once with its system's native review tool (Codex `codex review -`, Claude `/code-review`). This skill launches that attempt, validates it, turns the native report into findings with a derived verdict and writes `result.md`. It changes nothing in the checkout and commits nothing. A caller such as `review-fix-loop` supplies the absolute checkout, target and its form, review kind, requirements, checks, assignment and ledger, and owns its retry budget; direct use resolves them by [Direct use](#direct-use). With `--dual`, Codex and Claude both review and cross-check each other ([dual review](references/dual.md)). The user's words count as the keys.
+Review one committed target with the assigned native tool, validate the attempt and return its result. Preserve the checkout. A caller supplies the absolute checkout, target and form, review kind, requirements, checks, assignment and ledger, and owns its retries. Without a caller, start with [Direct use](#direct-use). The user's words count as keys.
 
-The reviewer takes the review row of [launch settings](references/launch-settings.md#roles): Opus / Sol, the other system, `high`. `cli-default` opts a field out.
-
-Under `--auto` read child-sessions' [auto.md](../child-sessions/references/auto.md): a question below that would go to the user is routed by its Deciding, every window driver brief and cross-check prompt says `Auto: yes`, and direct use reports `## Decisions`.
+Under `--auto`, apply [auto.md](../child-sessions/references/auto.md) to questions, driver briefs, cross-check prompts and direct reporting.
 
 ## Assignment
 
@@ -24,7 +22,7 @@ An assignment is a reviewer system and a place, resolved before anything starts.
 - **System:** `--codex`, `--claude` or `--dual`. With none, the system opposite to this session's ([Session system](#session-system)). Two system keys conflict: ask which applies.
 - **Command:** `--codex=<command>` or `--claude=<command>` chooses that system and starts it through a child-sessions [launch command](../child-sessions/references/run-contract.md#launch-command) such as `codex-avc`; beside `--dual` it sets only that reviewer's command. The command replaces `codex` or `claude` in every launch of that reviewer, is recorded in `Assignment:`, and a resume keeps it.
 - **Place:** `--run background` (default) or `--run window`, for both reviewers under `--dual`; a resumed dual review keeps its recorded place ([State and resume](references/dual.md#state-and-resume)).
-- **Settings:** resolve by [launch settings](references/launch-settings.md) for the reviewer role, validate explicit values for the resolved system, announce and record the assignment. Changing place or settings needs explicit authorization; a place whose runtime capabilities are missing blocks.
+- **Settings:** resolve by [launch settings](references/launch-settings.md) for the reviewer role (`cli-default` opts a field out), validate explicit values for the resolved system, announce and record the assignment. Changing place or settings needs explicit authorization; a place whose runtime capabilities are missing blocks.
 
 Refused before anything starts, each naming its replacement: `--run subagent` and `--subagent` (`background` or `window`: a native subagent has no native review command); `--run inline` (reviewing one's own work is not independent); `--reviewer codex|claude` (`--codex` or `--claude`); effort `low` for a Claude reviewer (`medium`: at `low` `/code-review` reads the diff only). A caller passes its system and place through these same rules.
 
@@ -40,12 +38,7 @@ This rule selects what the context file's `Requirements` names ([The context fil
 
 Every native attempt carries the wrapper and a context file `<attempt dir>/context.md`, both filled by [review-wrapper.md](references/review-wrapper.md). The native tool finds the defects; nothing else is sent to it. A caller may supply a complete prompt instead, as the dual review does for its cross-check: it goes on stdin unchanged, without `/code-review`, and its required report governs **Validate**.
 
-**What the session owns.** The session that runs the review owns everything procedural:
-
-- **Suite.** Resolve, inspect and run the required checks before the launch by the [suite contract](references/checkout-state.md#resolve-checks-and-bind-suite-evidence), and keep the run and acceptance records. A caller's scoped round may launch with passing affected checks and broader coverage explicitly pending; a final review needs complete applicable coverage or the missing runs. The reviewer gets the commands and their results as data in `Check commands`, never record paths.
-- **A run the requirement gives to the reviewer.** A requirement that names the reviewer as the one who runs a check stays the reviewer's: the wrapper carries the reviewer-run line, and the obligation is met only by runtime records showing each command and how it ended; without them it stays `pending`.
-- **Unchanged checkout.** Only the before/after Git evidence of **Launch** proves it; the wrapper's "Do not change the checkout" is a request.
-- **Verdict and findings.** The session writes `findings.md` and derives the verdict ([Findings and derived verdict](references/review-wrapper.md#findings-and-derived-verdict)).
+Before launch apply the [suite contract](references/checkout-state.md#resolve-checks-and-bind-suite-evidence) in the reviewed tree. A scoped round can carry broader coverage pending with passing affected checks. The final review needs complete applicable coverage or the missing runs. Give the reviewer commands and results in the context file. For a reviewer-assigned check include the [reviewer-run line](references/review-wrapper.md#added-lines) and require runtime evidence.
 
 ## Launch
 
@@ -60,10 +53,9 @@ With `--dual`, follow [the dual review](references/dual.md) instead: it runs eve
 
 ## Validate
 
-A native attempt is valid when all of these hold; the [window guide](references/window-reviewers.md#stop-confirm-capture-validate) supplies its own evidence where it names one.
+Use the evidence from the selected launch guide. For a valid native attempt require all of the following:
 
-- **Completion:** producer exit 0 and a non-error final result, or a window's `STATUS: done`, a non-empty answer and the stopped-process barrier.
-- **The native tool ran:** the runtime records show `/code-review` or `codex review` ran for this attempt ([Result handling](references/cli-reviewers.md#result-handling)).
+- Completion per the selected guide (background: producer exit 0 and a non-error final result), with runtime proof that the assigned native tool ran.
 - **Context and target read:** the reviewing process's records hold a read of the attempt's `context.md` and of the range's diff or each target file. A report of no findings is valid only with this.
 - **A review report for this target:** findings that each name a path, or an explicit statement of no findings. A question, a refusal, a report on another commit or range, or one a style skill damaged until its findings carry no path is invalid. No verdict line or section is required.
 - **Claude level:** the command carried the resolved level (none under `cli-default`) and `--max-findings all`; an observed `low` is `invalid: /code-review ran at low`.
@@ -76,7 +68,7 @@ Failed, empty, stale or substituted results are invalid. With a caller-supplied 
 
 **Changed checkout.** A demonstrated difference takes precedence: `checkout changed` in `result.md`, its content and diff preserved outside the checkout, its source identified, returned for the caller's adjudication. This skill never resets or commits a write. A failed Git comparison without a proven difference is `invalid: state verification unavailable: <error>`. Either way record every other completion, settings and coverage condition, for both attempts after a shared failed after check.
 
-**Unconfirmed shutdown.** While any window participant lacks validated ownership or a fresh `alive` exit 1, return `blocked: reviewer shutdown unconfirmed`, even beside a proven difference; `result.md` keeps `invalid: reviewer shutdown unconfirmed` (or `checkout changed; otherwise invalid: …`). A capture taken while a reviewer may live is never the final boundary.
+For a window, unconfirmed shutdown takes precedence even over a proven difference. Return the shutdown block and record the outcome per the [window barrier](references/window-reviewers.md#stop-confirm-capture-validate).
 
 Every continuation applies [Phase recovery and resume](references/checkout-state.md#phase-recovery-and-resume) before a retry or new baseline, charging an invalid attempt once.
 
@@ -104,19 +96,10 @@ Answer: <absolute path>
 Coverage gaps: <None | list>
 ```
 
-A dual review records `Assignment: dual (<place>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>` in its `state.md`; each attempt's `result.md` keeps the form above.
-
 ### Dialogs
 
-The controller counts each actual window dialog response once: `answered` includes approvals and declines, `declined` is its subset, `escalated` counts dialogs forwarded for a decision. Navigation keys and stale peeks do not count; reopening keeps the attempt's counts; the child never supplies them. Carry each attempt's record, invalid attempts and cross-checks included, through direct output and dual reports, deduplicated by attempt identity on resume; a total of observable counters names the nonobservable attempts beside it.
+For a window, keep the [controller's dialog record](references/window-reviewers.md#dialogs). Background attempts report `not applicable (background)`.
 
 ## Direct use
 
-1. **Settings keys.** Without `--dual`, `--model` and `--effort` set the reviewer, and a per-reviewer key asks whether `--dual` was meant. With `--dual` they apply by [dual review](references/dual.md#1-settings-and-target) step 1.
-2. **Target.** The given range `X..Y` or commit `C` (`C^..C`), else `$(git merge-base <default branch> HEAD)..HEAD`, full SHAs, always the range form of the [wrapper](references/review-wrapper.md#target). An empty range, a checkout on the default branch without a target, or a target that does not resolve asks for the target.
-3. **Uncommitted changes.** Run the [direct-use preflight](references/checkout-state.md#direct-use-preflight) before any suite or launch. Uncommitted paths raise no question: the committed state is reviewed and those paths are listed as not reviewed.
-4. **Reviewed state.** When the reviewed commit is not HEAD or the checkout is dirty, the attempt runs in a disposable clone inside the attempt directory: `git clone --quiet --no-checkout <checkout> <attempt dir>/tree && git -C <attempt dir>/tree checkout --quiet --detach <reviewed commit>` (a plain path: a `file://` URL cannot reach an unreferenced commit). A failed clone launches nothing, spends nothing and is reported as blocked. Checks and reads count only in the clone; Git evidence covers the clone and the user's checkout, one State line each.
-5. **Clone limits.** The clone lacks untracked and ignored files, `.git/info/exclude`, local agent configuration and submodules: say so in the context file's `Limits`. A required check that failed only for such a lack is a `Coverage gaps` entry named beside the verdict, not an invalid attempt.
-6. **Requirements and kind.** The documents or text the user names, else the project rules and commit messages as the only sources. The final-pass kind: complete target, security line, `Prior findings` and `Candidates` `None`; the session runs the missing suite in the reviewed tree first.
-7. **Retry.** One retry after `invalid`, same system, place and settings; a second invalid attempt is blocked. A shutdown block is continued by the same session after shutdown is confirmed. `checkout changed` is shown to the user with the preserved diff and not retried, under `--auto` too, since discarding a write is [hard to undo](../child-sessions/references/auto.md#hard-to-undo).
-8. **Output.** The derived verdict, named as derived by this session from the native report, with `Verification:` and, when the preflight found them, `Not reviewed (uncommitted): <exact paths>` beside it; the findings as given, labelled "not adjudicated"; the `result.md` path; `Dialogs:`; under `--auto` `## Decisions`. On unconfirmed shutdown: `blocked: reviewer shutdown unconfirmed` with the attempt directory. No commit, no fix.
+Without a caller, follow [Direct use](references/direct-use.md) for preflight, target, retries and output.

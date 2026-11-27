@@ -19,7 +19,7 @@ Read [checkout state](checkout-state.md), and [independent-review](../SKILL.md) 
 
 The assignments are `<place>/codex` and `<place>/claude`, each with its [command](../SKILL.md#assignment) when given, one place for both (`background` by default, or `window`). `--effort` sets both efforts unless a per-reviewer key sets one; a `--model` without a reviewer prefix asks which reviewer it is for. Everything else follows [launch settings](launch-settings.md) for the reviewer role per reviewer; cross-checks keep each reviewer's recorded settings. Announce and record both assignments.
 
-Direct use takes target, preflight and requirements from independent-review **Direct use**, running its preflight before the suite and any launch; it reviews with the final-pass kind, prior findings `None`, numbering from `D1`.
+Direct use takes target, preflight and requirements from [Direct use](direct-use.md), running its preflight before the suite and any launch; it reviews with the final-pass kind, prior findings `None`, numbering from `D1`.
 
 `<dual dir>` lies outside the checkout: the caller's round directory, else a fresh temporary directory. It holds `state.md`, one attempt directory per attempt at `review/<codex|claude>/attempt-<n>/` and `cross-check/<codex|claude>/attempt-<n>/`, and `report.md`. When **Direct use** calls for a clone, make one at `<dual dir>/tree` for both reviewers and every phase on that commit; every state check covers it and the user's checkout. Write `state.md` per [dual record](dual-record.md) now and update it after every attempt and phase.
 
@@ -75,7 +75,7 @@ Fill the [cross-check prompt](cross-check-prompt.md) per verifier and launch it 
 
 ## 6. Report and verdict
 
-Write `<dual dir>/report.md` per [dual record](dual-record.md). Every finding from either reviewer appears in exactly one of confirmed, rejected or candidates. Rank confirmed findings `unrated`, critical, important, minor, ties by `D<n>`. The report states the reviewers' findings, positions and evidence as given, with no assessment of this session's own. `Dialogs` keeps the per-attempt [records](../SKILL.md#dialogs), background ones `not applicable (background)`.
+Write `<dual dir>/report.md` per [dual record](dual-record.md). Every finding from either reviewer appears in exactly one of confirmed, rejected or candidates. Rank confirmed findings `unrated`, critical, important, minor, ties by `D<n>`. The report states the reviewers' findings, positions and evidence as given, with no assessment of this session's own. `Dialogs` keeps the per-attempt [window records](window-reviewers.md#dialogs), background ones `not applicable (background)`.
 
 The derived verdict is `CHANGES` when a confirmed finding is critical, important or `unrated`, or is a spec-compliance gap (the finding as raised and its confirmation both name the violated requirement), otherwise `CLEAN`. Place the [Verification marker](checkout-state.md#verification-marker) beside it, and each reviewer's derived verdict, named as derived by this session from its native report. Set phase `done` and return the report path. Direct use shows the report as the reviewers' confirmed findings, not adjudicated, with `Not reviewed (uncommitted): <paths>` when the preflight found them; nothing is fixed or committed.
 
