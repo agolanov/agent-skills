@@ -42,7 +42,7 @@ Nothing is committed: the state file is the run's only record, and the final rep
 
 ## Queue record
 
-Only queue phase agents write `<runtime>/<queue-slug>-handoff.md`, atomically, in the [handoff format](../../child-sessions/references/handoff-record.md#format) with these readings: `Run: <queue-slug>`; `Worker brief: None`; `Status file: None`; Place is the run's place; Checkout is the project main checkout. Reopen and Return to worker stay `unused` (each unit's record counts its own). Openings holds `None`. Waiting holds one `Launch:` line per unit whose agent is working, then the action; a recipe appears only in a one-at-a-time place. A queue performed by one root writes no queue record.
+Only queue phase agents write `<runtime>/<queue-slug>-handoff.md`, atomically, in the [handoff format](../../child-sessions/references/handoff-record.md#format) with these readings: `Run: <queue-slug>`; `Worker brief: None`; `Status file: None`; Place is the run's place; Checkout is the project main checkout. Reopen and Return to worker stay `unused` (each unit's record counts its own). Waiting holds one `Launch:` line per unit whose agent is working, then the action; a recipe appears only in a one-at-a-time place. A queue performed by one root writes no queue record.
 
 Facts holds exactly these labelled lines, one Unit per unit in queue order:
 
