@@ -38,7 +38,7 @@ On the resulting fresh report, reuse acceptance only when all these conditions h
 2. The full `Reviewed HEAD` SHA matches.
 3. Final refine mode, derived verdict and complete dispute text with both positions are byte-identical to the accepted values. Any changed Review text invalidates reuse.
 4. Verify 1 still permits every post-review commit, reading a named `Unreviewed minor-only commit` whose only parent is `Reviewed HEAD` in its place in every layout: correct follow-ups subject and exact follow-ups path in the tracked layout; in other layouts that commit equals HEAD.
-5. Every ordinary Verify gate succeeds again, including current Git state, checks, settings and report/follow-ups consistency. End's later gates still run before completion.
+5. Every ordinary Verify gate succeeds again, including current Git state, checks, the settings line and report/follow-ups consistency. End's later gates still run before completion.
 
 A further follow-ups-only correction may reuse the same record under these conditions. Report reused acceptance with its reviewed SHA and authority. Under `--auto`, keep the original decision in Decisions; reuse adds no approval.
 
