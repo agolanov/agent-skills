@@ -72,7 +72,7 @@ A failed required check blocks dependent work and authorizes no amend, squash or
 
 Obtain each attempt from independent-review (`--auto` under `--auto`), passing the review kind, target form and target, and the [context file](../independent-review/references/review-wrapper.md#the-context-file) data: requirements, the full finding ledger with evidence and dispositions, carried candidates, check commands with results. Each round gets a fresh round directory beside the loop record, with a random part (`mktemp -d "<record dir>/round-<n>-XXXXXX"`).
 
-After preparing the context file, avoid printing it back into the session. Inspect the sections needed for the current checks or decisions.
+Read back only the portions needed to verify the written context file.
 
 | Review | Target | Added [wrapper line](../independent-review/references/review-wrapper.md#added-lines) |
 | --- | --- | --- |
