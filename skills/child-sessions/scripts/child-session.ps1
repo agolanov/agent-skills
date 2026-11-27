@@ -260,12 +260,14 @@ function Start-ChildSession {
     param([string[]]$Vector)
     $agent=$env:CHILD_SESSION_AGENT; if (-not $agent) { $agent='claude' }
     $model='';$effort='';$split='';$i=0
+    $cliArgs=New-Object Collections.Generic.List[string]
     while ($i -lt $Vector.Count -and $Vector[$i].StartsWith('--') -and $Vector[$i] -ne '--') {
-        if ($i+1 -ge $Vector.Count -or $Vector[$i+1] -eq '') { throw 'Open option requires a value.' }
+        if ($i+1 -ge $Vector.Count -or ($Vector[$i+1] -eq '' -and $Vector[$i] -cne '--cli-arg')) { throw 'Open option requires a value.' }
         switch -CaseSensitive ($Vector[$i]) {
             '--agent' { $agent=$Vector[$i+1] }
             '--model' { $model=$Vector[$i+1] }
             '--effort' { $effort=$Vector[$i+1] }
+            '--cli-arg' { $cliArgs.Add($Vector[$i+1]) }
             '--split' { $split=$Vector[$i+1]; if ($split -notin @('right','down')) { throw '--split must be right or down' } }
             default { throw ('Unknown option '+$Vector[$i]) }
         }; $i+=2
@@ -293,6 +295,8 @@ function Start-ChildSession {
         else { $cli.Add('--dangerously-bypass-approvals-and-sandbox') }
         if ($model) { $cli.Add('-m');$cli.Add($model) }; if ($effort) { $cli.Add('-c');$cli.Add('model_reasoning_effort='+$effort) }
     }
+    # Literal launch words: appended in order, never split or evaluated.
+    foreach ($word in $cliArgs) { $cli.Add($word) }
     $cli.Add('Read the brief at '+$brief+' completely and carry it out.')
     $launch=[Guid]::NewGuid().ToString('N')+[Guid]::NewGuid().ToString('N')
     $r=[pscustomobject]@{name=$name;backend=$backend;launch_id=$launch;runtime=$script:Runtime;checkout=$cwd;workspace=$script:HerdrWorkspace;window='';pane='';launcher=$null;agent=$null;phase='starting';exit_code=$null;closed=$false;dialog_counts='not observable'}

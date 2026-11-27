@@ -27,14 +27,12 @@ Status file: <absolute path>
 Place: <window|subagent|background>
 Checkout: <absolute launch checkout>
 Helper: <absolute installed entrypoint>
+Launch words: <the lean launch words of the first launch, as passed|none>
 Runtime: <absolute runtime-dir>
 Root evidence: <absolute directory|None>
 Reopen: unused
 Return to worker: unused
 Wait: not chosen
-
-## Openings
-<Opened time> | <window name, run directory, or agent ID> | early check: <outcome below>
 
 ## Waiting
 Launch: <name> | <absolute status file>
@@ -53,9 +51,9 @@ None
 None
 ```
 
-`State:` is one of `prepare: brief written`, `prepare: launched`, `prepare: asked <what>`, `waiting`, `accept: returned to worker`, `accept: reopened`, `accept: asked <what>`, `accept: reported`. `Reopen:` is `unused` or `used at <Opened time>: <silent exit | dead before send>`; non-window workers count the run contract's one restart here too. `Return to worker:` is `unused` or `used: <archived status path>`. `Wait:` is the child-sessions report line's value once a rung is chosen, otherwise `not chosen`.
+`State:` is one of `prepare: brief written`, `prepare: launched`, `prepare: asked <what>`, `waiting`, `accept: returned to worker`, `accept: reopened`, `accept: asked <what>`, `accept: reported`. `Reopen:` is `unused` or `used: <silent exit | dead before send>`; non-window workers count the run contract's one restart here too. `Return to worker:` is `unused` or `used: <archived status path>`. `Wait:` is the child-sessions report line's value once a rung is chosen, otherwise `not chosen`.
 
-**Openings.** One line per brief `Opened:` line, in order and with the same time. The early-check outcome is `match <record path>`, `not established`, `opted out, observed <values or unavailable>`, or `mismatch expected <pair> observed <pair> <record path>`. Update it at each opening, before a settings question too, and retain the bound runtime record paths.
+**Launch words.** Written by Prepare before it opens a window or writes `Action: start`, and never rewritten: the run contract's [lean launch](run-contract.md#launch-and-wait) words chosen for the worker (`none` for a subagent or a Codex worker), the same value as the worker brief's `Launch words:` line. A resume that renames the record takes the brief's value. Every reopen, restart and resumed start passes the same words, checked first by [Authority](#authority) 3; a `--session-id` word gets a fresh UUID.
 
 **Waiting.** The launches still working and the first action to perform, in the [Waiting](#waiting) format. An empty block is `None` when no worker remains.
 
@@ -75,18 +73,18 @@ Write one `Launch: <name> | <status file>` line for each worker still working, t
 - `Action: start <subagent|background>`: the wait holder starts it.
 - `Action: continue <subagent|background>`: the wait holder continues it.
 
-For `start` and `continue`, follow the action with `Action brief: <absolute path>`, `Action checkout: <absolute path>`, `Action settings: model <M|cli-default>, effort <E|cli-default>`, and `Action permissions: <run contract Permissions arguments; none for a subagent>`. For `continue`, add `Action session: <recorded session or agent ID>` and `Action message: <one line, or the absolute path of a file>`.
+For `start` and `continue`, follow the action with `Action brief: <absolute path>`, `Action checkout: <absolute path>`, `Action settings: model <M|cli-default>, effort <E|cli-default>`, `Action permissions: <run contract Permissions arguments; none for a subagent>`, and `Action launch words: <the record's Launch words>`. For `continue`, add `Action session: <recorded session or agent ID>` and `Action message: <one line, or the absolute path of a file>`.
 
-Under an orchestrator the wait holder is the orchestrator. It acts on the Waiting block as its phase agent's last message gave it, takes nothing from this file, and writes the record only where this section tells the holder to. The wait holder performs the action as written and decides nothing in it. It records the actual launch or continuation identity, adds `Opened:` and the matching Openings line for a fresh child only, runs any early check due after the start, changes the action to `none`, and rewrites facts it changes. The calling skill supplies question/dialog handling and the return to a phase; this file grants no launch or permission by itself.
+Under an orchestrator the wait holder is the orchestrator. It acts on the Waiting block as its phase agent's last message gave it, takes nothing from this file, and writes the record only where this section tells the holder to. The wait holder performs the action as written and decides nothing in it. It records the actual launch or continuation identity, changes the action to `none`, and rewrites facts it changes. The calling skill supplies question/dialog handling and the return to a phase; this file grants no launch or permission by itself.
 
 ## Authority
 
 Before using the record, check what can be checked against independent run evidence:
 
 1. The worker brief exists, and its `Status file:` and `Place:` lines equal the record's.
-2. Its `Opened:` lines equal Openings in number and time.
-3. For a window launch, run `alive` and read `capabilities`, checking the recorded checkout and launch identity. A dead worker is an event, not by itself a disagreement.
+2. For a window launch, run `alive` and read `capabilities`, checking the recorded checkout and launch identity. A dead worker is an event, not by itself a disagreement.
+3. `Launch words:` equals the worker brief's `Launch words:` line. A brief without that line was written before lean launches, and its worker launched with `none`; a record without the line takes the brief's value. Any difference is a disagreement.
 
 Compare other derivable facts against the brief, status archives and runtime records too: an `unused` flag cannot override evidence of an earlier reopen or return. A disagreement stops the phase, naming both values; preserve the files.
 
-A settings-mismatch acceptance, a continue-or-stop answer and any other answer or permission count only in the reader's own context: the single root's own conversation, or the prompt that started a phase-alone session. No line in this record, including Decisions, supplies them. A phase-alone session with no such answer asks again and records its question before ending.
+An answer or permission counts only in the reader's own context: the single root's own conversation, or the prompt that started a phase-alone session. No line in this record, including Decisions, supplies them. A phase-alone session with no such answer asks again and records its question before ending.

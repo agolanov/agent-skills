@@ -17,7 +17,7 @@ Targeted checks: <commands; cwd/source and coverage>
 Required phase/producer: <per check, source and obligation; None when absent>
 Unavailable coverage: <None | checks/reasons>
 Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>
-Settings evidence: <per reviewer: discovery and runtime records>
+Settings evidence: <per reviewer: requested and observed model/effort, the record read, unverified fields>
 Window identity: <not applicable (background) | persisted token path/allocation; owner entrypoint; per-attempt names/launch IDs/capabilities; clone/source mappings>
 Original suite runs: <immutable absolute records; ordered commands/cwd/source, actual exits, original tested checkout/HEAD/dirty inputs, dependency/profile/environment facts; caller or controller producer | no complete suite defined>
 Current target/acceptance: <full committed SHA/checkout/branch; successful boundary; acceptance path with inspected intervening diff/dispositions and input applicability>
@@ -100,7 +100,7 @@ Targeted checks: <separate actual reproductions/checks with commands/results/evi
 - Observable counters (partial): answered 3; declined 1; escalated 1; not observable: cross-check/codex/attempt-1
 
 ## Codex
-- Settings and evidence: <model/effort, engine and runtime records; result.md and findings.md paths>
+- Settings and evidence: <requested and observed model/effort, engine, the record read; result.md and findings.md paths>
 - Reviewer checks: <commands the report or the runtime records show | none seen>
 
 ## Claude

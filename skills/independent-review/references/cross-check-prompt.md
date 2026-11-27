@@ -1,6 +1,14 @@
 # Cross-Check Prompt
 
-Fill one prompt per verifier from `state.md` and the raiser's valid review answer; resolve identifiers and paths before launch. The sent prompt is self-contained: paste the text each slot names, never a pointer to `state.md` or a context file. A requirement document that the context files name by path and section stays named that way: the verifier reads it as the reviewers did. The cross-check is no review: it tests another reviewer's claims, so it keeps this prompt of its own and runs without `/code-review`. The first slot is the role block below, with this verifier's `Assignment:` line, the run's `Auto:` line (`Auto: yes` under `--auto`) and its report delivery. The evidence slot is the content of the context files' `Check commands`, pasted. For a review phase recorded before the native review tools, which has no context files, the requirements and evidence slots take the requirements, rules and checks of that phase's filled review prompts and `state.md` ([dual guide](dual.md#state-and-resume)). The related-code slot copies the `Related code:` checkout of the context files' `Under review` when it has one (a document review), and widens no authority. The coordination slot is the wrapper's dual line, present only when both cross-checks run at once. These slots carry provenance and coordination; the Instructions below determine this cross-check's required executions. "Findings to verify" holds each finding verbatim as its raiser stated it, under the source ID this session gave it (`F<n>` by the raiser's report order), and nothing else about it: no assessment or check result of this session, no matching notes, none of the verifier's own findings.
+Fill one prompt per verifier from `state.md` and the raiser's valid answer, with identifiers and paths resolved. The sent prompt is self-contained: each slot holds pasted text, never a pointer to `state.md` or a context file. The cross-check tests another reviewer's claims, so it runs without `/code-review`.
+
+- **Role block:** this verifier's `Assignment:` line, the run's `Auto:` line and its report delivery.
+- **Requirements and evidence:** the context files' `Requirements` and `Check commands`, pasted; a requirement document named there by path and section stays named that way.
+- **Related code:** the `Related code:` checkout of the context files' `Under review`, when it has one; it widens no authority.
+- **Coordination:** the dual line, only when both cross-checks run at once.
+- **Findings to verify:** each finding verbatim as its raiser stated it, under its source ID (`F<n>` by the raiser's report order), and nothing else: no assessment, check result or matching note of this session, none of the verifier's own findings.
+
+The Instructions below, not the slots, decide this cross-check's required executions.
 
 ```text
 Role and assignment

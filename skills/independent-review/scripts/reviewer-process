@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# Run one background reviewer attempt with the lean launch and record it.
+#
+# usage: reviewer-process <claude|codex> --command PATH --checkout DIR --prompt FILE --dir ROUND_DIR
+#          --model M|cli-default --effort E|cli-default --native yes|no [--keep-feature plugins|memories|skills]...
+#          [--permission-arg WORD]...
+#
+# --permission-arg passes one already authorized permission word literally (Claude: after
+# --verbose; Codex: before review), for example --dangerously-bypass-approvals-and-sandbox.
+#
+# Writes into ROUND_DIR:
+#   argv.txt       the command and its arguments, one word per line
+#   session-id     Claude: the UUID passed with --session-id; Codex: the stderr header's ID (absent if none)
+#   producer.exit  the reviewer's exit status
+#   events.jsonl (Claude) or stdout.log (Codex), and stderr.log
+#   answer.md      Claude: the last result event; Codex: stdout of a native attempt. Published through
+#                  answer.md.tmp and a rename, so a partial answer never exists.
+#   extraction.exit, extraction-error.txt (Claude: extraction or publication failure)
+#   copy.exit, copy-error.txt (Codex native: a failed publication; absent on success)
+#   plugins.txt    Claude: "off <id>" or "on <id> <reason>" per enabled plugin, or "unavailable: <reason>"
+# Exit 0 once the reviewer ran, whatever its exit; 2 on a usage or setup error before launch.
+set -u
+
+die() { printf 'reviewer-process: %s\n' "$*" >&2; exit 2; }
+system=${1:-}; shift || true
+[[ $system == claude || $system == codex ]] || die 'first argument must be claude or codex'
+command='' checkout='' prompt='' dir='' model='' effort='' native=''
+keep_plugins='' keep_memories='' keep_skills=''
+permission_args=()
+while (($#)); do
+  [[ $# -ge 2 && -n $2 ]] || die "$1: a value is required"
+  case $1 in
+    --command) command=$2 ;;
+    --checkout) checkout=$2 ;;
+    --prompt) prompt=$2 ;;
+    --dir) dir=$2 ;;
+    --model) model=$2 ;;
+    --effort) effort=$2 ;;
+    --native) native=$2 ;;
+    --permission-arg) permission_args+=("$2") ;;
+    --keep-feature)
+      case $2 in
+        plugins) keep_plugins=1 ;;
+        memories) keep_memories=1 ;;
+        skills) keep_skills=1 ;;
+        *) die '--keep-feature must be plugins, memories or skills' ;;
+      esac ;;
+    *) die "unknown option $1" ;;
+  esac
+  shift 2
+done
+for field in command checkout prompt dir model effort native; do
+  [[ -n ${!field} ]] || die "--$field is required"
+done
+[[ $native == yes || $native == no ]] || die '--native must be yes or no'
+[[ $checkout == /* && $prompt == /* && $dir == /* ]] || die 'checkout, prompt and dir must be absolute'
+[[ -d $checkout && -f $prompt && -d $dir ]] || die 'checkout, prompt file or round dir unavailable'
+(cd "$checkout" && command -v "$command") >/dev/null 2>&1 || die "$command not found in the checkout's directory"
+[[ ! -e $dir/answer.md && ! -L $dir/answer.md ]] || die 'the answer path must be absent before launch'
+
+json_tool=''
+if command -v jq >/dev/null 2>&1; then json_tool=jq
+elif command -v node >/dev/null 2>&1; then json_tool=node
+fi
+
+new_uuid() {
+  if command -v uuidgen >/dev/null 2>&1; then uuidgen | tr 'A-F' 'a-f'
+  elif [[ -r /proc/sys/kernel/random/uuid ]]; then cat /proc/sys/kernel/random/uuid
+  else return 1
+  fi
+}
+
+# Enabled plugins without hooks, as "id" lines; writes plugins.txt. A plugin with
+# hooks/hooks.json or "hooks" in .claude-plugin/plugin.json stays on, and so does
+# one whose install path cannot be read (its hooks cannot be ruled out).
+plugins_off() {
+  local list rows id path
+  if [[ -z $json_tool ]]; then
+    printf 'unavailable: no installed JSON parser (jq or node)\n' > "$dir/plugins.txt"; return
+  fi
+  if ! list=$(cd "$checkout" && "$command" plugin list --json 2> "$dir/plugins-error.txt"); then
+    printf 'unavailable: %s plugin list --json failed\n' "$command" > "$dir/plugins.txt"; return
+  fi
+  if [[ $json_tool == jq ]]; then
+    rows=$(jq -r '.[] | select(.enabled == true) | [.id, (.installPath // "")] | @tsv' <<< "$list" 2>/dev/null) ||
+      { printf 'unavailable: plugin list is not valid JSON\n' > "$dir/plugins.txt"; return; }
+  else
+    rows=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const p of JSON.parse(s))if(p.enabled===true)console.log(p.id+"\t"+(p.installPath||""))})' <<< "$list" 2>/dev/null) ||
+      { printf 'unavailable: plugin list is not valid JSON\n' > "$dir/plugins.txt"; return; }
+  fi
+  # Decide by ID: an ID stays on when any of its installs has hooks or cannot be read.
+  # (No associative arrays: bash 3.2 on macOS lacks them.)
+  local kept='' order='' reason
+  while IFS=$'\t' read -r id path; do
+    [[ -n $id ]] || continue
+    case $'\n'$order in *$'\n'"$id"$'\n'*) ;; *) order+=$id$'\n' ;; esac
+    if [[ -z $path || ! -d $path ]]; then
+      kept+=$id$'\t'$'unknown: no readable install path\n'
+    elif [[ -f $path/hooks/hooks.json ]] || manifest_hooks "$path/.claude-plugin/plugin.json"; then
+      kept+=$id$'\thooks\n'
+    fi
+  done <<< "$rows"
+  : > "$dir/plugins.txt"
+  while IFS= read -r id; do
+    [[ -n $id ]] || continue
+    reason=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<< "$kept")
+    if [[ -n $reason ]]; then
+      printf 'on %s %s\n' "$id" "$reason" >> "$dir/plugins.txt"
+    else
+      printf 'off %s\n' "$id" >> "$dir/plugins.txt"
+      printf '%s\n' "$id"
+    fi
+  done <<< "$order"
+}
+manifest_hooks() {
+  [[ -f $1 ]] || return 1
+  if [[ $json_tool == jq ]]; then jq -e 'has("hooks")' "$1" >/dev/null 2>&1
+  else node -e 'process.exit(Object.prototype.hasOwnProperty.call(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),"hooks")?0:1)' "$1" 2>/dev/null
+  fi
+}
+claude_settings() { # ids to switch off on stdin -> settings JSON
+  if [[ $json_tool == jq ]]; then
+    jq -Rnc '[inputs | select(length > 0)] as $off | {language: "English"} + (if ($off | length) > 0 then {enabledPlugins: ($off | map({key: ., value: false}) | from_entries)} else {} end)'
+  elif [[ $json_tool == node ]]; then
+    node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const off=s.split("\n").filter(Boolean);const o={language:"English"};if(off.length){o.enabledPlugins={};for(const id of off)o.enabledPlugins[id]=false}process.stdout.write(JSON.stringify(o))})'
+  else
+    printf '{"language":"English"}'
+  fi
+}
+
+args=()
+if [[ $system == claude ]]; then
+  session_id=$(new_uuid) || die 'no UUID source (uuidgen or /proc/sys/kernel/random/uuid)'
+  settings=$(plugins_off | claude_settings)
+  args=(--print --output-format stream-json --verbose ${permission_args[@]+"${permission_args[@]}"} --strict-mcp-config --no-chrome --session-id "$session_id" --settings "$settings")
+  [[ $model == cli-default ]] || args+=(--model "$model")
+  [[ $effort == cli-default ]] || args+=(--effort "$effort")
+  printf '%s\n' "$session_id" > "$dir/session-id"
+  out=$dir/events.jsonl
+else
+  args=(${permission_args[@]+"${permission_args[@]}"})
+  [[ -n $keep_plugins ]] || args+=(--disable plugins)
+  [[ -n $keep_memories ]] || args+=(--disable memories)
+  [[ -n $keep_skills ]] || args+=(-c skills.include_instructions=false)
+  args+=(review)
+  [[ $model == cli-default ]] || args+=(-c "model=\"$model\"" -c "review_model=\"$model\"")
+  [[ $effort == cli-default ]] || args+=(-c "model_reasoning_effort=\"$effort\"")
+  args+=(-)
+  out=$dir/stdout.log
+fi
+printf '%s\n' "$command" "${args[@]}" 2>/dev/null > "$dir/argv.txt" || die 'cannot write argv.txt'
+# Setup: the outputs must be writable and the prompt readable before the producer starts,
+# so that a redirection failure is a setup error (exit 2), never a producer exit.
+[[ -r $prompt ]] || die 'prompt file unreadable'
+{ : > "$out" && : > "$dir/stderr.log"; } 2>/dev/null || die 'cannot write the attempt outputs'
+
+producer_exit=0
+( cd "$checkout" || exit 2; "$command" "${args[@]}" < "$prompt" > "$out" 2> "$dir/stderr.log" ) || producer_exit=$?
+printf '%s\n' "$producer_exit" > "$dir/producer.exit"
+
+if [[ $system == codex ]]; then
+  sed -n 's/^session id: \([^[:space:]]*\).*/\1/p' "$dir/stderr.log" | head -n 1 > "$dir/session-id.tmp"
+  if [[ -s $dir/session-id.tmp ]]; then mv "$dir/session-id.tmp" "$dir/session-id"; else rm -f "$dir/session-id.tmp"; fi
+  if [[ $native == yes ]]; then
+    copy_exit=0
+    { cat "$dir/stdout.log" > "$dir/answer.md.tmp" && mv "$dir/answer.md.tmp" "$dir/answer.md"; } 2> "$dir/copy-error.txt" || copy_exit=$?
+    [[ $copy_exit == 0 ]] || printf '%s\n' "$copy_exit" > "$dir/copy.exit"
+  fi
+  exit 0
+fi
+
+# Claude: the last result event, after the producer finished.
+extraction_exit=0
+case $json_tool in
+  jq)
+    jq -ej -s 'map(select(.type == "result")) | last | if .is_error != true and (.result | type == "string" and test("\\S")) then .result else error("missing/invalid final result") end' \
+      "$out" > "$dir/answer.md.tmp" 2> "$dir/extraction-error.txt" || extraction_exit=$? ;;
+  node)
+    node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(x=>x.trim()).map(JSON.parse).filter(x=>x.type==="result");const r=rows[rows.length-1];if(!r||r.is_error===true||typeof r.result!=="string"||!r.result.trim())throw Error("missing/invalid final result");process.stdout.write(r.result);' \
+      "$out" > "$dir/answer.md.tmp" 2> "$dir/extraction-error.txt" || extraction_exit=$? ;;
+  *)
+    extraction_exit=127
+    printf '%s\n' 'No installed JSON parser: extraction unavailable.' > "$dir/extraction-error.txt" ;;
+esac
+if [[ $extraction_exit == 0 ]]; then
+  mv "$dir/answer.md.tmp" "$dir/answer.md" 2>> "$dir/extraction-error.txt" || extraction_exit=$?
+else
+  rm -f "$dir/answer.md.tmp" 2>/dev/null
+fi
+printf '%s\n' "$extraction_exit" > "$dir/extraction.exit"
+exit 0
