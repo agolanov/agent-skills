@@ -70,9 +70,7 @@ A failed required check blocks dependent work and authorizes no amend, squash or
 
 ## 3. Request independent review
 
-Obtain each attempt from independent-review (`--auto` under `--auto`), passing the review kind, target form and target, and the [context file](../independent-review/references/review-wrapper.md#the-context-file) data: requirements, the full finding ledger with evidence and dispositions, carried candidates, check commands with results. Each round gets a fresh round directory beside the loop record, with a random part (`mktemp -d "<record dir>/round-<n>-XXXXXX"`).
-
-Read back only the portions needed to verify the written context file.
+Obtain each attempt from independent-review (`--auto` under `--auto`), passing the review kind, target form and target, and the [context file](../independent-review/references/review-wrapper.md#the-context-file) data: requirements, the full finding ledger with evidence and dispositions, carried candidates, check commands with results. Skip routine full-file readback after writing an attempt's context file. Each round gets a fresh round directory beside the loop record, with a random part (`mktemp -d "<record dir>/round-<n>-XXXXXX"`).
 
 | Review | Target | Added [wrapper line](../independent-review/references/review-wrapper.md#added-lines) |
 | --- | --- | --- |
