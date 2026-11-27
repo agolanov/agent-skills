@@ -83,7 +83,7 @@ Before using the record, check what can be checked against independent run evide
 
 1. The worker brief exists, and its `Status file:` and `Place:` lines equal the record's.
 2. For a window launch, run `alive` and read `capabilities`, checking the recorded checkout and launch identity. A dead worker is an event, not by itself a disagreement.
-3. `Launch words:` is `none` for a subagent or a Codex worker; for a local-only Claude worker it holds only `--strict-mcp-config` and `--no-chrome`, each at most once, in that order, either left out only for a need the brief or task names (an MCP server, the browser). Any other word is a disagreement.
+3. `Launch words:` equals the words the run contract's [lean launch](run-contract.md#launch-and-wait) rule gives, derived again from the brief's agent and place and the needs its brief or task names: `none` for a subagent or a Codex worker; for a local-only Claude worker `--strict-mcp-config --no-chrome`, without `--strict-mcp-config` for a named MCP server and without `--no-chrome` for a browser need. Any difference is a disagreement. A record written before the line existed takes the derived words.
 
 Compare other derivable facts against the brief, status archives and runtime records too: an `unused` flag cannot override evidence of an earlier reopen or return. A disagreement stops the phase, naming both values; preserve the files.
 
