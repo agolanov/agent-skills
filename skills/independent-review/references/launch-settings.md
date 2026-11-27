@@ -1,156 +1,104 @@
 # Launch Settings
 
-Settings configure a launched agent for the role it plays, not the session that launches it. The CLI's configured defaults and the launching session's own model are not substitutes for this policy. Accept `--model MODEL`, `--effort LEVEL`, and equivalent prose independently.
+Settings configure a launched agent for the work it is given, not the session that launches it; the CLI's configured defaults and the launching session's own model are no substitute. One table serves every child actually started and every nested agent. Accept `--model MODEL`, `--effort LEVEL` and equivalent prose independently.
 
 ## Roles
 
-Automatic policy, consolidated 2026-11-01 (family policy, not a pinned version list):
+| Work | Claude / Codex | Effort |
+| --- | --- | --- |
+| Supplied text or code, isolated mechanical edit, mechanically checkable handoff | Haiku / Luna | `medium` |
+| Ordinary implementation, integration and routine fixes, by a subagent or by an owner in any mode; consolidating an approved plan; ordinary coordination once the handoff is simplified | Sonnet / Terra | `high` |
+| Planning, refinement, splitting a spec; architecture, concurrency, subtle correctness; consequential acceptance or merge decision | Opus / Sol | `high`; `xhigh` for demanding owner work |
+| Independent review and cross-check | Opus / Sol, the other system | `high`, also on the final pass |
+| Difficult follow-up research; dual consultation | Fable / Astra | researcher `high` or `xhigh` by difficulty; consultants `high` |
 
-| Role | Launched agent | Claude | Codex | Effort |
-| --- | --- | --- | --- | --- |
-| planner | `planning-task-docs` child, and the `consolidating-plans` worker outside `inline` | latest available Opus | latest available Sol | high |
-| refiner | `refining-task-docs` child, which fixes the findings | latest available Opus | latest available Sol | high |
-| splitter | `splitting-spec-into-stages` child | latest available Opus | latest available Sol | high |
-| implementer | `delivering-task` child in `subagents` or `direct` mode (one document or each unit of its queue), including its later fixes, and the `review-fix-loop` loop owner outside `inline` | latest available Opus | latest available Sol | `high` or `xhigh`, chosen per task by [Effort by task](#effort-by-task) |
-| solo implementer | `delivering-task` child in `solo` mode (one document or each unit of its queue), including its later fixes | family chosen per task by `delivering-task` Solo settings | family chosen per task by `delivering-task` Solo settings | `medium` or `high`, chosen with the model per [Implementation mode](../../delivering-task/SKILL.md#implementation-mode) |
-| reviewer | `independent-review` reviewer in its two places, `background` and `window`; both reviewers of `--dual` in the review and the cross-check phases | latest available Opus | latest available Sol | high |
-| follow-ups fixer | `delivering-task-follow-ups` worker outside `inline`, which fixes the batch and runs the chain | latest available Opus | latest available Sol | high |
-| orchestrator | `delivering-spec-stages` outside `inline` | latest available Opus | latest available Sol | high |
+The two cheaper rows are starting points, judged on cost per completed job with retries and escalations counted; a row that costs more than the row above it goes back up.
 
-The root chooses between the two implementer roles by the implementation mode it decides in `delivering-task`; the other roles, the loop owner's included, do not depend on it.
+Role names other skills use map to rows:
 
-Outside an explicit caller rule (the researcher of difficult findings in `delivering-task-follow-ups`), Fable (Claude) and Astra (Codex) are excluded from automatic choice but allowed explicitly.
+- `planner`, `refiner`, `splitter`: the planning row (Opus / Sol `high`). The `consolidating-plans` worker keeps role `planner` but takes the Sonnet / Terra `high` row.
+- `implementer` and `solo implementer` (one rule for both), the `review-fix-loop` loop owner outside `inline`, `follow-ups fixer`: the row of the most demanding step of the work they are given ([Effort by task](#effort-by-task)). Adjudicating review findings is fixing work, not a consequential acceptance.
+- `orchestrator` (`delivering-spec-stages` outside `inline`) and the orchestrators' phase agents: Opus / Sol `high`; Accept is a consequential acceptance.
+- `reviewer` (`independent-review` in `background` and `window`, both reviewers of `--dual` in both phases): the review row.
+- The follow-ups researcher: the research row.
+
+Fable (Claude) and Astra (Codex) are chosen automatically only by the research row; elsewhere they are allowed explicitly.
 
 ## Effort by task
 
-The session that launches the agent, or that resolves the policy for it, reads the work the agent is given and picks the effort from the most demanding step of that work, not the average step or the file count:
-
-| Most demanding step of the work | Effort |
-| --- | --- |
-| Prose instructions requiring implementation choices, ordinary integration or debugging, or anything less demanding | `high` |
-| Architecture/design decisions, subtle concurrency or similarly demanding correctness reasoning | `xhigh` |
-
-- The choice is the role's policy value (source `policy`). It applies only to an effort field that has no explicit value (a `cli-default` opt-out included), no recorded value and no caller-resolved policy value, in the same way as the effort of [Solo settings](../../delivering-task/SKILL.md#implementation-mode); it never changes the model.
-- The record of the choice names the step that justified it, in one phrase, beside the effort.
-- Resolve and validate the model/effort pair through [Resolution](#resolution) as for any role; an unsupported pair stops before launch.
+The session that launches the agent, or resolves the policy for it, picks the row from the most demanding step of the work the agent is given, not the average step or the file count; on the Opus / Sol row, `xhigh` is for demanding owner work (architecture, subtle concurrency or correctness reasoning the owner must carry itself). This holds for solo and non-solo owners alike: the implementation mode says nothing about difficulty. The choice is a policy value (source `policy`) and applies only to a field with no explicit, recorded or caller-resolved value. The record names the step in one phrase.
 
 ## Precedence
 
-For each field (model, effort) separately: the current explicit value; else the recorded value when continuing the same run (reopen, retry, `--resume`, the same review loop); else the role default. An explicit value for one field leaves the other on its own precedence.
+For each field (model, effort) separately: the current explicit value; else the recorded value when continuing the same run (reopen, retry, `--resume`, the same review loop); else the row's value. An explicit value for one field leaves the other on its own precedence. A resume keeps the resolved pair.
 
-A caller that resolved values from this policy for the agent it launches through another skill, or through its own per-unit sections (as `delivering-task`'s queue does for its units), passes them as policy values, not explicit overrides: the receiving skill records them with source `policy` and does not re-resolve them.
+A caller that resolved values from this policy for the agent it launches through another skill passes them as policy values, not explicit overrides: the receiving skill records them with source `policy` and does not resolve them again.
 
 ## CLI-defaults opt-out
 
-The value `cli-default` for a model or effort (`--model`, `--effort`, `--reviewer-model`, `--reviewer-effort`), or equivalent prose such as "use the CLI's default model", is an explicit opt-out for that field: the launch omits that field's flag or override, the record says `cli-default`, and no report claims the policy applied to it. The opt-out is per field on every launch path, the reviewer's included; the other field keeps its own precedence and is passed explicitly.
-
-Validation (reviewer **Validate**, the child settings check) compares only the fields not opted out, and records the observed value of an opted-out field, or `unavailable`.
+`cli-default` for a model or effort (`--model`, `--effort`, `--reviewer-model`, `--reviewer-effort`), or prose such as "use the CLI's default model", opts that field out on every launch path, the reviewer's included: the launch omits that field's flag or override, the record says `cli-default`, and nothing is compared for it. The other field keeps its own precedence and is passed explicitly.
 
 ## Resolution
 
-Resolve the exact account/provider-available version using evidence relevant to the launch method:
-
-- **CLI:** for Codex, use app-server `model/list` with the launched agent's provider and task configuration, following pagination. For Claude, use model-picker/account/provider information and current official model-configuration documentation. Verify alias mappings; `best` can select Fable. Children in `window` and `background` are CLI launches and use this bullet.
-- **Native:** use the current native tool's model options and effective agent settings. A CLI catalog does not establish native availability. Resolve aliases to the actual model; an alias can inherit the parent's older version.
-
-Choose the newest version of the required family that the account can use; a higher version number in another family does not qualify. The model must belong to the launched system. If the mapping or availability cannot be established, report the unresolved setting rather than guess.
-
-Verify the model/effort pair is supported and permitted for that concrete model before launch. Effort `low` is unsupported for a Claude reviewer: its `/code-review` level is the effort, and at `low` the command reads the diff only ([review wrapper](review-wrapper.md#carrying-the-wrapper)). An unsupported or unresolved pair stops before any window or reviewer launch and is reported, never guessed, coerced or silently replaced. Pass both resolved values explicitly, including `high` when it is the default. Silent model fallback or effort coercion does not satisfy the settings.
+Resolve the newest version of the row's family that the account can use, by the launch method: for a CLI child (`window`, `background`), Codex app-server `model/list` and Claude's model picker, account information and official model documentation; for a `subagent`, the native tool's model options (a CLI catalog does not establish native availability, and an alias can resolve to an older version). A higher version of another family does not qualify, and the model belongs to the launched system. Check that the pair is supported for that model; effort `low` is refused for a Claude reviewer, whose `/code-review` level is its effort ([review wrapper](review-wrapper.md#carrying-the-wrapper)). An unresolved or unsupported pair stops before launch, reported, never guessed or coerced. Pass both values explicitly, `high` included.
 
 ## Record
 
-Resolve once per run, record the concrete values with their source and discovery evidence, and reuse the record for every later launch of that role in the run. When changing system or launch method, re-resolve incompatible recorded values.
-
-Child sessions (planner, splitter, refiner, implementer) record the settings in the runtime brief's identity block, filled by the root, and so does the child of every other worker role outside `inline` (the loop owner, the `consolidating-plans` worker, follow-ups fixer, orchestrator) in its [run-contract](../../child-sessions/references/run-contract.md#brief) brief, after the identity lines:
+Resolve once per run, record the concrete values with their source and discovery evidence, and reuse them for every later launch of that role in the run. Briefs (planner, splitter, refiner, implementer, and every other worker outside `inline` in its [run-contract](../../child-sessions/references/run-contract.md#brief) brief) carry, after the identity lines:
 
 ```text
 Launch settings: model <exact | cli-default> (<policy | explicit | cli-default>), effort <exact | cli-default> (<policy | explicit | cli-default>)[; effort step: <most demanding step, one phrase>]; resolved <YYYY-MM-DD> from <discovery evidence, one phrase>
 ```
 
-The optional `effort step:` clause appears only when [Effort by task](#effort-by-task) chose the effort (source `policy`); it names the justifying step and leaves the source value as it is. An explicit, `cli-default` or recorded effort carries no clause, and a resumed run keeps the line as recorded. An effort that a caller chose by Effort by task and passes as a policy value keeps its step: the caller forwards the step with the value, and the receiving skill writes it into the line without choosing the effort again.
-
-Refiner and implementer briefs also record the settings of the reviewer their cross review starts:
+The `effort step:` clause appears only when [Effort by task](#effort-by-task) chose the value; a caller passing such a value forwards its step. Refiner and implementer briefs also record their cross review's reviewer:
 
 ```text
 Reviewer settings: <reviewer policy | model <M> (explicit) and/or effort <E> (explicit), the rest by reviewer policy>
 ```
 
-The child passes the explicit reviewer values to `review-fix-loop` as `--reviewer-model`/`--reviewer-effort`; with `reviewer policy` it passes none. Before opening, the root checks that an explicit reviewer model belongs to the reviewer system the brief's `Reviewer agent:` line records (the system opposite to the child's agent by default; under `dual` no explicit model exists; the reviewer has no `subagent` place) and that the pair is supported; a mismatch stops before any window.
-
-The reviewer path keeps its `Assignment:` and `Settings evidence:` records in independent-review **Result**.
+The child passes explicit reviewer values to `review-fix-loop` as `--reviewer-model`/`--reviewer-effort`, none with `reviewer policy`. Before opening, the root checks that an explicit reviewer model belongs to the reviewer system of the brief's `Reviewer agent:` line and that the pair is supported; a mismatch stops before any window. The reviewer's own records are independent-review's `Assignment:` and `Settings evidence:` lines.
 
 ## Child settings check
 
-The root verifies the effective model and effort of every child it launches for a role other than the reviewer (whose evidence independent-review **Validate** judges), in every place but `inline` ([Places](#places)), from the child's runtime records, never from invocation flags or the child's self-report.
+The settings evidence of every launched child. It is read after the launch, from what the launch returns or one record it names, never from invocation flags or the child's self-report. No other check, pause, retry or transcript scan.
 
-**Binding a record to an opening.** Brief paths repeat across runs, so the brief path alone does not identify a session. Immediately before every `open` of the run (first open, silent-exit reopen, dead-agent reopen, main-moved reopen, or a window opened by `delivering-task --resume`), the root appends to the runtime brief one line:
+- **Ordinary policy-selected workers.** One line in the parent's report: `Settings: requested <model>/<effort>, observed <model|unverified>/<effort|unverified>`, from what the launch itself returns: Claude's `init` event or result `modelUsage`, Codex's stderr header, the native agent tool's result. A field the launch does not return is `unverified`.
+- **Explicitly selected fields and the reviewer.** One targeted lookup of the record the launch's own session ID names, by [Typed settings fields](#typed-settings-fields). Claude: the ID passed with `--session-id` (or read from the `init` event); for `/code-review` the command's agent records under `<project dir>/<session id>/subagents/` included. A Claude window whose fields are checked this way opens with `--cli-arg --session-id --cli-arg <uuid>`, a fresh UUID on each opening. Codex: the ID in the stderr header; for a review, the delegate whose `parent_thread_id` is that ID (a window's nested `codex review -` writes its stderr into the attempt directory). If the launch returns no ID, or the bound record lacks the field, that field is `unverified` and the lookup ends.
+- **Mismatch.** A known mismatch of the reviewer's effective pair pauses acceptance of that review and goes to the user, who accepts the review with the observed settings or has the attempt retried; a retry spends the attempt as an invalid one does. Under `--auto` the question is routed by child-sessions' [auto.md](../../child-sessions/references/auto.md#deciding) as a launch-settings mismatch. A known mismatch of an explicitly selected value of any other child, or of a policy value, is disclosed in the report, with no pause.
+- **Unverified.** A field marked `unverified` is reported and pauses nothing; a reviewer attempt stays valid and its `Settings evidence:` line names the field.
+- **Opt-out.** A `cli-default` field is not compared; the report states its observed value or `unverified`.
 
-```text
-Opened: <UTC time, ISO 8601 to the second>
-```
+## Typed settings fields
 
-Bind the execution identity before comparing settings. For a brief-based child, the first actual user prompt containing the brief's absolute path must have its own `timestamp` at or after that opening's `Opened:` time and before the brief's next `Opened:` time (no upper bound for the last). Require the launch checkout too; a known runtime-produced CLI session ID further restricts the match. Skip untimestamped leading records (`last-prompt`, `mode` and similar). Environment-context messages and tool/event output do not stand in for the actual prompt. For a background CLI reviewer, bind the actual prompt sent on stdin instead; it need not contain a brief path.
+The fields the targeted lookup reads. Records live under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<project dir>/<session id>.jsonl` and `${CODEX_HOME:-$HOME/.codex}/sessions/**/rollout-*-<id>.jsonl` (on PowerShell, the same locations through `$env:CLAUDE_CONFIG_DIR`/`$env:CODEX_HOME` or `$HOME`, with `Join-Path`).
 
-- **Claude child:** session transcripts `*.jsonl` under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`, with the launch checkout. User prompt text is a string `message.content`, or the `text` of its top-level text blocks; inspect neither `tool_result` contents nor recursively serialized JSON for the brief path. A CLI opening uses only the main transcript: exclude `subagents/agent-*.jsonl` and records marked `isSidechain: true` or with a nonempty `agentId`, even when they share the parent's `sessionId` and `cwd`. The one exception is a Claude reviewer's `/code-review` command: its agent records under `<project dir>/<session id>/subagents/` are the review itself and are checked with the main transcript (see [Nested agents](#nested-agents)). A native opening uses the returned `agent-<agent ID>.jsonl`, bound to the returned ID and parent identity through its parent/metadata records, as [Host mechanisms](../../child-sessions/references/run-contract.md#host-mechanisms) describes. That assigned agent's own sidechain marker is expected; exclude its descendants, not the assigned agent.
-- **Codex child:** rollouts `*.jsonl` under `${CODEX_HOME:-$HOME/.codex}/sessions/`, with `session_meta.payload.cwd` equal to the launch checkout. Prompt text is user-role message text, not tool/event output; an initial environment-context user message need not be the actual prompt. For a regular CLI opening, require a CLI source or a corroborated producer ID matched against `session_meta.payload.id`; shared `session_id` alone is insufficient. Exclude arbitrary `thread_spawn` helpers. For a native opening, bind the returned agent/thread ID and parent ancestry, with the launch checkout, and exclude that agent's descendants.
-- **Background `codex review -`:** bind the `exec` producer's `session_meta.payload.id` to the runtime ID in stderr. Then bind its unique execution delegate: `session_meta.payload.source` is `{"subagent":"review"}`, its top-level `session_meta.payload.parent_thread_id` equals the producer ID, and its `cwd` is the same launch checkout. The delegate has a distinct `id` but shares `session_id`; it owns the stdin prompt and execution `turn_context`. This mandatory review delegate is eligible, unlike arbitrary helper descendants. Keep producer and delegate as two distinct identity roles, not two candidates for one role.
-
-At the final check, zero eligible candidates for any required role is `unavailable: no record`; multiple candidates for that role are `unavailable: ambiguous records <paths>`, even if one has matching settings. A missing or ambiguous mandatory review delegate is unverified. At the early check these outcomes only mean the identity is not yet established. Retain selected and excluded record paths with their binding or exclusion reasons for the final check and report. File mtime or the newest record never establishes identity.
-
-### Typed settings fields
-
-Read these fields only after binding the record to its opening and role:
-
-| Runtime record and role | Model evidence | Effort evidence |
+| Record | Model | Effort |
 | --- | --- | --- |
-| Claude assistant record | `message.model` supplies effective model evidence | Top-level assistant `effort` may corroborate request effort |
-| Claude `api-request` record | `params.model` corroborates assistant model | `params.output_config.effort` |
-| Claude `api-request-blob` record with an object `message` | `message.model` corroborates assistant model | `message.output_config.effort` |
-| Claude review command's agent record (`<project dir>/<session id>/subagents/agent-*.jsonl` of a `/code-review` launch, bound through the stream's or transcript's session ID) | `message.model` | Top-level `effort`, and `output_config.effort` where the record has it |
-| Codex TUI/exec `turn_context` | `payload.model` | `payload.effort` |
-| Bound Codex review execution delegate's `turn_context` and `thread_settings_applied` | `payload.model` and `thread_settings_applied.thread_settings.model` | `payload.effort` and `thread_settings_applied.thread_settings.reasoning_effort` |
-| Codex review producer's startup/header and `thread_settings_applied.thread_settings` | Launch corroboration only | Launch corroboration only |
+| Claude `init` event of the launch | `model` | none |
+| Claude assistant record of the bound session | `message.model` | top-level `effort` |
+| Claude `/code-review` agent record (`<project dir>/<session id>/subagents/agent-*.jsonl`) | `message.model` | top-level `effort`, or `output_config.effort` |
+| Codex `turn_context` of the bound rollout | `payload.model` | `payload.effort` |
+| Codex review delegate (`session_meta.payload.source` `{"subagent":"review"}`, `parent_thread_id` the producer's ID): `turn_context` and `thread_settings_applied` | `payload.model`, `thread_settings.model` | `payload.effort`, `thread_settings.reasoning_effort` |
 
-Inspect every concrete value in the bound opening, including continuations and mid-session changes. For regular CLI sessions inspect the main transcript without arbitrary helpers/sidechains; for a background Codex review inspect the uniquely bound execution delegate and retain producer fields separately as launch corroboration; for a Claude reviewer's `/code-review` inspect every agent record the command starts in that session, where a background launch's main transcript holds no assistant record. For each assignment field not opted out, any conflicting concrete value is a mismatch, including a delegate changed by a `review_model` override when the producer matches. A matching producer never substitutes for missing or mismatching execution settings.
-
-Missing/null in one record is not itself a mismatch. No effective evidence for a required field is `unavailable`; unknown schemas do not authorize recursively searching for effort. Keep per-field [CLI-defaults opt-outs](#cli-defaults-opt-out): an opted-out field is observed, not compared. Child mismatches/unavailable evidence keep the questions below; reviewer validation keeps its invalidation rules.
-
-Every opening of the window in the run has its own record, and each is checked.
-
-When:
-
-1. **Early check:** for a `window`, after Startup and before the first long wait of each opening (without `peek`, after `open`); for a `background` child, after each start and before its wait; for a `subagent`, at the first status of each opening, since the host's foreground join leaves no earlier moment. When the record is not found, not unique or lacks its fields, make three attempts in all, pausing between them with `wait <name> <status-file> 10` (a `background` child: a 10 s shell pause). A pause exiting `0` or `3` ends the retry: one last attempt, then the exit table. Still not there is left to the final check. Only a mismatch acts: the root starts no wait, shows the user the expected and observed values and the record path, and asks whether to continue or stop; the window stays. `delivering-task`'s queue runs this check in its Start half.
-2. **Final check:** in Verify, after a `done` status, over every record of the run. A thin launcher (the loop owner, the `consolidating-plans` worker, follow-ups fixer, orchestrator; [Places](#places)) has no Verify: it runs the final check after its child's `done`, before reporting. A window reviewer runs final settings validation only after its [stop, confirm, capture, validate](window-reviewers.md#stop-confirm-capture-validate) barrier, with reviewer invalidation replacing the child question.
-
-Outcomes:
-
-- **Match** on every record: the report names the effective settings and the record paths.
-- **Mismatch** (a record shows another model or effort, including a mid-session change): Verify does not pass silently. Show expected and observed values and ask the user to accept the result with the observed settings (recorded as accepted in the report) or stop with everything preserved. Nothing is discarded automatically.
-- **Unavailable** (no record, ambiguous records, or the fields are absent): the same question as a mismatch, stating `settings unverified: <reason>`.
-- **Opt-out field:** nothing to compare; the report states the observed value or `unavailable`, with no question.
-
-Under `--auto` the early check's question and the mismatch or unavailable question are routed by child-sessions' [auto.md](../../child-sessions/references/auto.md#deciding), which hands accepting a mismatch to the deciding session; an acceptance there is recorded as accepted by that session, under its `## Decisions`.
-
-## Native filesystem paths
-
-Use the selected runtime's actual home/configuration directory when finding runtime records. On PowerShell, read `$env:CLAUDE_CONFIG_DIR`/`$env:CODEX_HOME` or join `$HOME` with `.claude`/`.codex`, using `Join-Path` and `Get-ChildItem -LiteralPath`; POSIX notation above describes the same locations, not a Bash prerequisite. Preserve full caller configuration. A fake process or requested flag proves transport only; it never proves effective model/effort. Missing runtime fields keep the existing unverified-settings outcome.
+Every concrete value of the bound records counts: one conflicting value is a mismatch, a delegate run on another model by a `review_model` override included; a missing value in one record is not. The Codex producer's header and its own settings corroborate the launch only; the delegate is what ran the review.
 
 ## Places
 
-Every role keeps its policy in every place of the [run contract](../../child-sessions/references/run-contract.md#places):
+Every role keeps its row in every place of the [run contract](../../child-sessions/references/run-contract.md#places):
 
-- **`inline`** (the place `--run inline`): the worker is the current session. No settings are resolved, and explicit `--model`/`--effort` for it are refused before anything starts; in the orchestrators these keys set the implementer instead.
-- **`window`:** unchanged: `open` passes the pair.
-- **`subagent`** (every role but the reviewer, which has no `subagent` place): resolve by the **Native** bullet of **Resolution**. Inspect the actual native tool schema and available agent settings; an opted-out field's native control stays unset. Require controls or an existing agent definition that can select and verify the pair; do not choose an artificially restricted agent type or definition merely to obtain model and effort. Set both explicitly with the current tool's supported controls: in Codex this can be `model` plus `reasoning_effort` with `fork_turns: "none"`, within the actual tool/schema limits; in Claude use supported per-invocation controls or an existing definition. Verify the actual model and effort from runtime metadata. A pair the place cannot select and verify is refused before launch, naming the place and the pair. Sources: [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Claude subagent models and effort](https://code.claude.com/docs/en/sub-agents).
-- **`background`:** resolve by the **CLI** bullet and pass the pair as CLI flags (run contract [Launch and wait](../../child-sessions/references/run-contract.md#launch-and-wait)).
-
-The child settings check covers every opening in every place. The `Opened:` line goes into the brief before every launch of a `subagent` or `background` child and before every fresh child, also one an answer or a restart falls back to, as before an `open`. An answer or a restart that continues the same conversation is no opening and never gets one: its turns land in the opening's record. The early check runs at the time specified in When 1 above.
-
-- **`background`:** the record is the CLI session's transcript or rollout, selected as for a window (**Claude child**, **Codex child**) and bound by the brief path and the `Opened:` line.
-- **`subagent`:** the record is the host's runtime record named in run contract [Host mechanisms](../../child-sessions/references/run-contract.md#host-mechanisms), bound the same way. A record marked `unverified` there gives `settings unverified: <reason>`, the same question as an unavailable record.
+- **`inline`:** the worker is the current session. No settings are resolved; explicit `--model`/`--effort` for it are refused before anything starts, except in the orchestrators, where they set the implementer.
+- **`window`:** `open` passes the pair; a local-only Claude worker also gets the run contract's lean launch words ([Launch and wait](../../child-sessions/references/run-contract.md#launch-and-wait)).
+- **`subagent`:** set both fields with the native tool's controls (Claude's agent tool `model` and `effort`; Codex `model`, `reasoning_effort` and `fork_turns: "none"`); an opted-out field stays unset. A pair the place cannot select is refused before launch, naming the place and the pair.
+- **`background`:** the pair as CLI flags (run contract [Launch and wait](../../child-sessions/references/run-contract.md#launch-and-wait)).
 
 ## Nested agents
 
-A launched agent's settings govern that session only. Agents it starts itself (for example subagents of `superpowers:subagent-driven-development`) follow the skill and host that start them; this policy does not set or verify them. The one exception is a Claude reviewer's `/code-review` command: the agent records it starts are the review itself, so the reviewer's settings are verified on every one of them ([Typed settings fields](#typed-settings-fields)). An orchestrator's phase agents ([run contract](../../child-sessions/references/run-contract.md#nested-calls)) are such agents: this policy neither sets nor verifies their host-default settings. Workers they prepare take their roles whoever starts them: the wait holder runs the early check and Accept the final one. An inline place performed as a subagent worker under a caller has both fields `cli-default`.
+Every nested spawn sets both fields, unless the user opted a field out: on Claude's agent tool `model` and `effort`, on Codex `model`, `reasoning_effort` and `fork_turns: "none"`. The dispatcher's brief carries the applicable rows and that rule on one line, in the run contract's brief, every skill's brief template and the orchestrators' phase briefs:
 
-Sources: [Codex model discovery](https://learn.chatgpt.com/docs/app-server#list-models-modellist), [Claude model configuration](https://code.claude.com/docs/en/model-config).
+```text
+Nested agents: set model and effort on every agent you start (Claude Agent tool: model, effort; Codex: model, reasoning_effort, fork_turns "none"), by these rows: <rows of the Roles table, each as "<work>: <Claude>/<Codex> <effort>">
+```
+
+The orchestrators' Prepare and Accept phase agents take Opus / Sol `high`. A Claude reviewer's `/code-review` agents are the review itself: their records are read with the reviewer's ([Typed settings fields](#typed-settings-fields)).
+
+Sources: [Codex model discovery](https://learn.chatgpt.com/docs/app-server#list-models-modellist), [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Claude model configuration](https://code.claude.com/docs/en/model-config), [Claude subagent models and effort](https://code.claude.com/docs/en/sub-agents).
