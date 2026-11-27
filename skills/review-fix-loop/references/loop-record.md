@@ -1,6 +1,6 @@
 # Loop Record
 
-Reuse an existing task log outside the checkout when possible. This is a short Markdown example, not a parser format. Fill it with inspected facts; do not copy illustrative status/evidence as a result.
+The one format of the loop record, kept outside the checkout (an existing task log is reused). A Markdown example, not a parser format: fill it with inspected facts.
 
 With the `dual` assignment, findings carry the merged IDs `D<n>` of the [dual review](../../independent-review/references/dual.md) with their raisers and source IDs, the record keeps `Next D`, and each round adds its `Dual record` line. Each next round that is a dual review (round 1, the final pass, a disposition round) passes the full finding ledger (every `D<n>` line with its disposition, the carried candidates) and `Next D` to the dual review as its [ledger input](../../independent-review/references/dual.md#4-matching). A scoped round is a single-system round by the system opposite to the loop owner's, whose new findings the loop owner numbers `D<n>` from `Next D`, recorded `raised by <system> <source ID>; no cross-check`; a cross-check rejection keeps the raiser, source ID, the finding as raised, the verifier's evidence and each re-raise's evidence.
 
@@ -24,7 +24,7 @@ Unavailable coverage: <None | checks/reasons>
 Exclusions: <unrelated files and preserved index/worktree state>
 Assignment: <background|window>/<codex|claude>[ via <command>], model <exact>, effort <exact>; engine native: codex review | native: /code-review <level | none (cli-default)>
 <or> Assignment: dual (<background|window>): codex[ via <command>] <model>/<effort>; claude[ via <command>] <model>/<effort>
-Selection/runtime evidence: <catalog/schema and actual runtime/log evidence; dual: per reviewer>
+Settings evidence: <requested and observed model/effort, the record read, unverified fields; dual: per reviewer>
 Round limit: 20 <or explicit user limit; raised to <n> at a checkpoint>
 Reviewer settings by target: initial settings on every round; <explicit user final-pass settings, if any>
 Completed rounds: 0
@@ -34,7 +34,7 @@ Pending round: 1; invalid attempts: 0 of 2 <dual: spent attempts per reviewer pe
 Next D: <dual: next free D<n>, starting at 1>
 
 ## Round 1
-Effective reviewer settings: <per system: exact model/effort; dual loop's scoped round: the one reviewer, <system> <model>/<effort>; selection/runtime evidence; retained on retry>
+Effective reviewer settings: <per system: exact model/effort; dual loop's scoped round: the one reviewer, <system> <model>/<effort>; settings evidence; retained on retry>
 Target: <review kind; range <base>..<head> | files <paths> at <head>; added wrapper line: security | none | decisions only>
 Reviewed commit: <HEAD>
 Context file: <absolute path of the attempt's context.md>
