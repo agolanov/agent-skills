@@ -29,6 +29,13 @@ child-session send <name> <text>       Empty text sends only Enter.
 child-session key <name> <key>         Send one key without Enter: Escape, Up, Down or one digit 0-9.
 child-session peek <name> [lines]
 child-session alive <name>             Exit 0 while the agent is running, else 1.
+child-session startup <name> <status-file>
+  Checks status, process, then visible screen. Prints the status, WORKING, INSPECT with the
+  screen, or UNOBSERVABLE for a plain terminal. An exited child without status returns 3.
+  A blank or loading screen is sampled for up to 60 seconds. No input is sent.
+child-session event <name> <status-file> [<name> <status-file>]...
+  Reads the first name's .result and reports record, launch and each relevant child's
+  current liveness and first status. Use the exact pairs originally passed to the watcher.
 child-session wait <name> <status-file> [seconds]   Wait up to 43200 s by default.
 child-session wait --watch [--stall SECONDS] [--rearm NAME]... <name> <status-file> [<name> <status-file>]... [seconds]
   Watches the set until its first event, checked each round with launches in set order: a valid first
@@ -306,7 +313,8 @@ initialize_runtime() {
   else RUNTIME_DIR=${TMPDIR:-/tmp}/child-sessions-$UID; fi
   [[ $RUNTIME_DIR == /* ]] || die 'runtime directory must be absolute'
   [[ ! -L $RUNTIME_DIR ]] || die 'runtime directory must not be a symbolic link'
-  mkdir -p -- "$RUNTIME_DIR"
+  if [[ ${1:-} == inspect && ! -e $RUNTIME_DIR ]]; then return 0; fi
+  [[ ${1:-} == inspect ]] || mkdir -p -- "$RUNTIME_DIR"
   [[ -d $RUNTIME_DIR && -O $RUNTIME_DIR ]] || die 'runtime directory must belong to the current user'
   RUNTIME_DIR=$(cd -P "$RUNTIME_DIR" && pwd)
   local at=$RUNTIME_DIR
@@ -314,7 +322,7 @@ initialize_runtime() {
     [[ ${at##*/} != .git && ! -e $at/.git ]] || die 'runtime must be outside the checkout and Git administration'
     at=${at%/*}; [[ -n $at ]] || at=/
   done
-  /bin/chmod 700 "$RUNTIME_DIR"
+  [[ ${1:-} == inspect ]] || /bin/chmod 700 "$RUNTIME_DIR"
   export RUNTIME_DIR
 }
 herdr_connection() {
@@ -702,6 +710,41 @@ cmd_alive() {
   (( result == 0 )) || return "$result"
   runtime_op alive "$PREFIX"
 }
+
+# The caller supplies and retains the status path. Never follow a path supplied by
+# the displayed screen or a result record. Only the current first line is evidence.
+observed_status() {
+  local line=''
+  irregular_path "$1" && die 'status path is not a regular file'
+  if [[ -f $1 ]]; then
+    [[ -r $1 ]] || die 'status file is unreadable'
+    # Plain Bash read drops embedded NULs and could turn malformed bytes into a status.
+    if IFS= read -r -d '' line < <(head -n 1 -- "$1"); then line=''; fi
+    line=${line%$'\n'}
+    line=${line%$'\r'}
+  fi
+  if [[ $line =~ ^STATUS:\ (done|blocked|failed)$ ]]; then printf '%s\n' "${BASH_REMATCH[1]}"
+  else printf '%s\n' '-'; fi
+}
+
+# The pane can disappear while its agent is still alive. Use the launch record
+# and the process identity, retaining unknown for inconclusive observations.
+observe_process() {
+  local found file pid start current code=0
+  OBS_LIVE=unknown OBS_BACKEND=''
+  found=$(runtime_op find "$1") || return 0
+  file=${found#*$'\n'}
+  OBS_BACKEND=$(record_field "$file" backend)
+  case $(record_field "$file" phase) in
+    exited) OBS_LIVE=gone ;;
+    running)
+      pid=$(record_field "$file" agent_pid); start=$(record_field "$file" agent_start)
+      [[ $pid =~ ^[0-9]+$ && -n $start ]] || return 0
+      current=$(process_identity "$pid") || code=$?
+      if (( code == 0 )) && [[ $current == "$start" ]]; then OBS_LIVE=alive
+      elif (( code <= 1 )); then OBS_LIVE=gone; fi ;;
+  esac
+}
 cmd_wait() {
   local name=$1 status_file=$2 seconds=$3
   [[ $seconds =~ ^[0-9]+$ ]] || die 'wait seconds must be a nonnegative integer'
@@ -945,6 +988,118 @@ launch_screen() { # <name>: prints the visible screen of a resolved launch; nonz
     tmux) tmux_call capture-pane -p -t "$OWN_PANE" ;;
     *) return 1 ;;
   esac
+}
+
+# History above an active spinner may contain old tool output. Below the spinner
+# accept only known UI rows; a new question, dialog or unknown row needs inspection.
+startup_screen_state() {
+  local line text working=0 count=0 loading=0
+  local codex='^• Working \(([0-9]+[hms] )+(•|·) esc to interrupt\)$'
+  local claude='^(✻|✶|✢|✳|✽|✼) (Thinking|Working)(…|\.\.\.) \(esc to interrupt\)$'
+  local context='^GPT-[^[:space:]]+ [^[:space:]]+ · Context [0-9]+% used · .+$'
+  local hints='^(← for agents · )?\? for shortcuts([[:space:]]+⚠ [0-9]+ warnings? · f2 to view)?$'
+  text=$(strip_csi)
+  while IFS= read -r line; do
+    line=${line//$'\xc2\xa0'/ }
+    line=${line#"${line%%[![:space:]]*}"}; line=${line%"${line##*[![:space:]]}"}
+    [[ -n $line ]] || continue
+    count=$((count + 1))
+    if [[ $line =~ $codex || $line =~ $claude ]]; then working=1
+    elif (( working )); then
+      case $line in '└ Tip: '*|'›'|'› Ask Codex to do anything') continue ;; esac
+      [[ $line =~ $context || $line =~ $hints ]] || working=0
+    elif [[ $line == 'Loading…' || $line == 'Loading...' ]]; then loading=1; fi
+  done <<< "$text"
+  if (( working )); then printf 'WORKING\n'
+  elif (( count == 0 || (count == 1 && loading) )); then printf 'LOADING\n'
+  else printf 'INSPECT\n'; fi
+}
+
+cmd_startup() {
+  local name=$1 path=$2 deadline=$((SECONDS + 60)) remaining status screen state
+  [[ -n $path && $path != *$'\n'* && $path != *$'\r'* ]] || die 'startup needs a one-line status path'
+  while true; do
+    status=$(observed_status "$path")
+    if [[ $status != - ]]; then printf 'STATUS: %s\n' "$status"; return; fi
+    observe_process "$name"
+    [[ -n $OBS_BACKEND ]] || die "no proven owned record for window $name"
+    if [[ $OBS_LIVE == gone ]]; then
+      # A child may publish its final status between the first read and its exit.
+      status=$(observed_status "$path")
+      if [[ $status != - ]]; then printf 'STATUS: %s\n' "$status"; return; fi
+      printf 'EXITED: agent in window %s is gone, no status\n' "$name"; return 3
+    fi
+    if [[ $OBS_BACKEND == terminal ]]; then printf 'UNOBSERVABLE\n'; return; fi
+    screen=$(launch_screen "$name") || die "cannot capture the visible screen of window $name"
+    state=$(startup_screen_state <<< "$screen")
+    if [[ $state == WORKING && $OBS_LIVE == alive ]]; then printf 'WORKING\n'; return; fi
+    remaining=$((deadline - SECONDS))
+    if [[ $state != LOADING ]] || (( remaining <= 0 )); then printf 'INSPECT\n%s\n' "$screen"; return; fi
+    (( remaining <= 5 )) || remaining=5
+    sleep "$remaining"
+  done
+}
+
+# The record is one atomic snapshot in write_result's fixed field order. A
+# successful wake can append one delivery note. Treat every field as data.
+read_event_record() {
+  local file=$1 raw='' row index=0 IFS=' '
+  local -a fields=(launch status_file exit line watcher launches) values=()
+  irregular_path "$file" && die 'watch result is not a regular file'
+  [[ -e $file ]] || return 0
+  [[ -r $file ]] || die 'watch result is unreadable'
+  if IFS= read -r -d '' raw < "$file"; then die 'unexpected NUL in watch result'; fi
+  raw=${raw%$'\n'}
+  while IFS= read -r row; do
+    row=${row%$'\r'}
+    if (( index < 6 )); then
+      [[ $row == "${fields[index]}: "* ]] || die 'malformed watch result'
+      values[index]=${row#*: }
+    elif (( index != 6 )) || [[ $row != 'wake: typed' && $row != 'wake: caller pane gone' ]]; then
+      die 'unexpected line in watch result'
+    fi
+    index=$((index + 1))
+  done <<< "$raw"
+  (( index >= 6 )) || die 'incomplete watch result'
+  [[ ${values[4]} =~ ^[1-9][0-9]*$ && ${values[5]} == "${WATCH_NAMES[*]}" ]] || die 'watch result has invalid watcher or launch set'
+  EVENT_LAUNCH=${values[0]} EVENT_CODE=${values[2]} EVENT_LINE=${values[3]}
+  [[ -n $EVENT_LINE ]] || die 'missing event line in watch result'
+  case $EVENT_CODE in
+    0|3|4)
+      for ((index = 0; index < ${#WATCH_NAMES[@]}; index++)); do
+        [[ $EVENT_LAUNCH != "${WATCH_NAMES[index]}" ]] || break
+      done
+      (( index < ${#WATCH_NAMES[@]} )) && [[ ${values[1]} == "${WATCH_FILES[index]}" ]] ||
+        die 'watch result launch or status path differs from the retained pair'
+      ;;
+    *)
+      [[ $EVENT_CODE =~ ^[1-9][0-9]{0,2}$ ]] && (( EVENT_CODE <= 255 )) || die 'unrecognized watch exit'
+      [[ -z $EVENT_LAUNCH && -z ${values[1]} ]] || die 'unexpected launch or path in watch result' ;;
+  esac
+}
+
+cmd_event() {
+  local EVENT_CODE=absent EVENT_LAUNCH='' EVENT_LINE='' index
+  local -a statuses=()
+  (( $# >= 2 && $# % 2 == 0 )) && [[ $1 != --* ]] || die 'event needs retained name/status pairs'
+  WATCH_COMMAND=event
+  parse_watch_args "$@"
+  read_event_record "$RUNTIME_DIR/${WATCH_NAMES[0]}.result"
+  # Read every relevant status before inspecting any process.
+  for ((index = 0; index < ${#WATCH_NAMES[@]}; index++)); do
+    [[ -z $EVENT_LAUNCH || $EVENT_LAUNCH == "${WATCH_NAMES[index]}" ]] || continue
+    statuses[index]=$(observed_status "${WATCH_FILES[index]}")
+  done
+  printf 'record: %s\nlaunch: %s\n' "$EVENT_CODE" "$EVENT_LAUNCH"
+  case $EVENT_CODE in
+    absent|0|3|4|124) ;;
+    *) EVENT_LINE=${EVENT_LINE//[[:cntrl:]]/ }; printf 'line: %s\n' "${EVENT_LINE:0:240}" ;;
+  esac
+  for ((index = 0; index < ${#WATCH_NAMES[@]}; index++)); do
+    [[ -n ${statuses[index]:-} ]] || continue
+    observe_process "${WATCH_NAMES[index]}"
+    printf 'child: %s %s %s\n' "${WATCH_NAMES[index]}" "$OBS_LIVE" "${statuses[index]}"
+  done
 }
 
 # Stall state per launch, indexed like WATCH_NAMES: stall-watched (its recorded
@@ -1589,7 +1744,7 @@ cmd_capabilities() {
   printf ',"checkout":'; json_string "$(record_field "$file" checkout)"
   printf ',"open":true,"alive":true,"wait":true,"close":true,"list":true,"peek":%s,"send":%s,"key":%s,"split":%s,"window_close":%s}\n' "$controls" "$controls" "$controls" "$split" "$controls"
 }
-initialize_runtime
+case ${1:-} in startup|event) initialize_runtime inspect ;; *) initialize_runtime ;; esac
 
 case ${1:-} in
   open)
@@ -1613,6 +1768,8 @@ case ${1:-} in
   key) [[ $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_key "$2" "$3" ;;
   peek) [[ $# == 2 || $# == 3 ]] || { usage; exit 2; }; valid_name "$2"; cmd_peek "$2" "${3:-60}" ;;
   alive) [[ $# == 2 ]] || { usage; exit 2; }; valid_name "$2"; cmd_alive "$2" ;;
+  startup) [[ $# == 3 ]] || die 'startup needs a name and status path'; valid_name "$2"; cmd_startup "$2" "$3" ;;
+  event) shift; cmd_event "$@" ;;
   wait)
     if [[ ${2:-} == --watch ]]; then shift 2; cmd_watch "$@"
     else [[ $# == 3 || $# == 4 ]] || { usage; exit 2; }; valid_name "$2"; cmd_wait "$2" "$3" "${4-43200}"; fi ;;

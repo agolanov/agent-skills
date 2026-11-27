@@ -1,20 +1,8 @@
 # Status file contract
 
-The child writes this file at the absolute path in its brief when finished or stuck. The root reads it and never edits its contents. Before answering `blocked`, the root renames it to `<file>-blocked-<n>` with an unused number; the child writes a new report at the original path.
+The child publishes its report at the absolute path in the brief. Its first line is exactly `STATUS: done`, `STATUS: blocked` or `STATUS: failed`. All three give `wait` exit 0.
 
-For a worker, the first line is exactly one of:
-
-```text
-STATUS: done
-STATUS: blocked
-STATUS: failed
-```
-
-No leading text, indentation, trailing text, or combined alternatives. `wait` exits 0 for any of these three lines; the root must distinguish them. A missing or invalid line is not completion.
-
-An orchestrator's phase agent may also write `STATUS: waiting`: a worker runs or is to be started or continued. This line belongs to phase agents only and is not a terminal line for `wait`. Its entire status is exactly its last message: `STATUS: waiting`, then `Handoff record: <absolute path>`, then the record's `## Waiting` block verbatim; none of the sections below. See [Nested calls](run-contract.md#nested-calls) for phase endings.
-
-Use the following fields and sections in this order. Replace the first line with one of the three exact lines above; `<...>` describes the section content, not literal output.
+Use the fields below in order. Use `None` for an empty section. Include Artifacts only when requested, and Decisions only for answers decided without the user under [auto.md](auto.md#decisions).
 
 ```text
 STATUS: done
@@ -26,40 +14,33 @@ HEAD: <full SHA>
 <git log --oneline <base>..HEAD>
 
 ## Checks
-<command → actual result; required evidence paths>
+<command, actual result and required evidence paths>
 
 ## Review
-<role-dependent result: implementer's final refine verdict beside the derived reviewer verdict, reviewer's saved report with `Verdict: derived by the caller`, or caller-defined cross-check outcome; actual progress/reason when blocked or failed>
+<role-dependent result>
 
 ## Out of scope
-<one line per finding: what — where (path:line) — why it is out of scope>
+<what — where (path:line) — why it is out of scope>
 
 ## Artifacts
-<one absolute path per line of files the child created or changed for the calling task>
+<one absolute path per file created or changed for the task>
 
 ## Decisions
-<one line per answer given without the user under --auto, the child's own and its children's: - <question> — <answer> — <who answered> — <basis>>
+- <question> — <answer> — <who answered> — <basis>
 
 ## Questions
-<for blocked: the question, options, and the child's recommendation>
+<when blocked: question, options and recommendation>
 ```
 
-Two sections are optional, otherwise omitted: `## Artifacts`, present only when the calling task asks for it, lists files the child created or changed, one absolute path per line; `## Decisions`, present when the child or its children decided anything without the user under `--auto`, lists those decisions as [auto.md](auto.md#decisions) says.
+On a block or failure, record the current checkout, partial work and reason. Identify checks or reviews that did not run. Include decisions made by descendants. When the task requests reusable suite evidence, link every suite record in Checks, including partial and failed runs. The caller verifies [suite handoff](../../independent-review/references/checkout-state.md#run-and-hand-off-a-suite) before reuse.
 
-Keep every field and section except the optional `## Artifacts` and `## Decisions`. Use `None` where empty; if a check or review was not run, say so rather than inventing a verdict. In `blocked` or `failed`, report the current branch/checkout/HEAD, partial commits and checks, and what prevents progress. A `done` report records results; the calling task decides what checks and review are required before completion.
-
-When the task requests reusable suite evidence, `Checks` links each absolute suite-record path, including partial or failed runs. The caller applies the [suite handoff acceptance step](../../independent-review/references/checkout-state.md#run-and-hand-off-a-suite) before claiming reuse; the root still preserves the child's report unchanged.
+A phase agent handing a worker back to its orchestrator uses a separate format. Its status and last message are identical: `STATUS: waiting`, then `Handoff record: <absolute path>`, then the record's `## Waiting` block verbatim. This applies to a running worker or one awaiting start or continuation. Only the three worker status lines above end a helper wait. See [Nested calls](run-contract.md#nested-calls).
 
 ## Role-dependent results
 
-An **implementer** keeps the existing final refine result in `## Review`: `CLEAN`, or `CLEAN EXCEPT DISPUTED` with the disputed findings listed.
-
-A **reviewer** uses `STATUS: done` when its review assignment finished, including when it found changes. For a native review, `## Review` names the saved report (the absolute answer file) and says `Verdict: derived by the caller`; the reviewer writes no verdict of its own, since the session that ran the review derives it from the native report. A cross-check using a caller-defined report records that report's raw outcome and references its answer instead of inventing a loop verdict. Done describes completion of reviewing, independently of findings, result validity or verification coverage.
-
-For reviewers, BRANCH/CHECKOUT/HEAD identify the reviewed tree; `## Commits` is `None`; `## Checks` lists actual commands/results separately from inherited evidence; `## Artifacts` is required by the reviewer brief and names the absolute answer file. A blocked/failed reviewer records actual progress and its reason in the existing sections, with `## Questions` explaining a block, and invents no final verdict. Controller dialog counts belong to the controller's result/output, not a child-written claim.
+- **Implementer.** In Review, give the final refine result alongside the derived reviewer verdict. Use `CLEAN` or `CLEAN EXCEPT DISPUTED` with the disputed findings. Deferring a finding preserves the derived verdict.
+- **Reviewer.** Use `done` when the assignment finishes, including with findings. Identify the reviewed branch, checkout and HEAD. Commits is `None`. Separate your checks from inherited evidence. Put the absolute answer file in Artifacts. For native review, name it in Review and write `Verdict: derived by the caller`. For a caller-defined cross-check, give its raw outcome and answer path. On a block or failure, report progress and reason without a final verdict. The controller reports its own dialog counts.
 
 ## Publication and reading
 
-Write the report completely before exposing a terminal first line (for example, write a temporary file beside it, then rename it to the status path). The root may read as soon as that first line appears.
-
-The root reads only the first line to choose a branch, then the named sections needed for that branch. `Questions` explains a block; `Checks` and `Review` carry diagnostic results; `Commits`, `Checks`, `Review`, and `Out of scope` support the calling task's completion checks. The final derived review verdict remains unchanged when findings are deferred.
+Publish the complete report atomically, for example by renaming a finished sibling file. The parent reads the exact first line, then the sections its task needs. For `blocked`, read Questions and rename the file to an unused `<file>-blocked-<n>` before sending the answer. The child publishes a fresh report at the original path. The parent never edits a child's report.

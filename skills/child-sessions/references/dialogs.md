@@ -1,0 +1,13 @@
+# Handling a window dialog
+
+Use only recorded controls. Without the required peek and input capabilities, the user handles dialogs in the window. A spinner alone means the child is working. If a dialog title or command is cut off, `peek <name> 120` once. Escalate a still-incomplete or unclassifiable dialog unanswered.
+
+- **Folder trust.** Keep the window open. Show the exact folder and explain the persistent trust entry. Only the user can grant new trust, even under `--auto`, directly or by authorizing this exact action. Record the decision and effect. Never switch places to bypass trust or edit trust records.
+- **Command approval.** Read the whole command. Approve once only if the brief authorizes it and every effect is a file read/write inside the child's checkout, its recorded disposable runtime/fixture directories, or explicitly granted ignored paths in the main checkout. A commit on the child's own branch is also allowed when authorized. Resolve every path from the command or visible prior output, including variables, substitutions, globs and traversal. Uncertain scope goes to the user unanswered. Exclude network, installs, signals, privilege escalation, direct writes to `.git*`, `.claude/`, `.codex/` or hooks, and Git state changes beyond that commit. Decline a clearly out-of-scope command first, then show the user the window, whole command and reason.
+- **Content question.** Follow the caller's authority and [auto routing](auto.md#deciding) when active.
+
+Handle one choice at a time. Use bare Enter (`send <name> ""`) only on the highlighted one-time approval, authorized trust option or explicit No. Move with `key <name> Up|Down` and peek to confirm the highlight. Claude also accepts `Escape` to decline. Never type option digits or select persistent command approval.
+
+After each answer, peek for a changed command or counter, or a cleared dialog. For a stale highlight or unchanged dialog, pause with `wait <name> <status-file> 5` and re-peek up to three times. Dispatch exits 0 and 3 immediately. If the same request persists, leave it unanswered and run `alive`. Exit 1 takes the exit-3 recovery path. If alive, show the possible duplicate to the user before any further key. Classify each stacked dialog independently.
+
+If a decline leaves the child at an empty prompt, send one line naming the command and reason and telling it to continue without it or write `STATUS: blocked`. Resume waiting when the dialogs clear. Report escalations and declines as they happen, with the window, full command where applicable and reason. Count answered, declined and escalated dialogs in the final report.

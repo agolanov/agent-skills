@@ -123,6 +123,7 @@ function Invoke-ChildSessionNative {
     } finally { $p.Dispose();$stdout.Dispose();$stderr.Dispose() }
 }
 function Get-ChildSessionRuntime {
+    param([switch]$ReadOnly)
     if ($env:CHILD_SESSION_RUNTIME_DIR) { $root=$env:CHILD_SESSION_RUNTIME_DIR }
     else { $root=Join-Path ([IO.Path]::GetTempPath()) 'child-sessions' }
     if (-not [IO.Path]::IsPathRooted($root)) { throw 'Runtime directory must be absolute.' }
@@ -132,7 +133,7 @@ function Get-ChildSessionRuntime {
         if ([IO.Path]::GetFileName($at) -ieq '.git' -or (Test-Path -LiteralPath (Join-Path $at '.git'))) { throw 'Runtime must be outside checkout/Git administration.' }
         $parent=[IO.Path]::GetDirectoryName($at);if ($parent -eq $at) { break };$at=$parent
     }
-    [IO.Directory]::CreateDirectory($root) | Out-Null
+    if (-not $ReadOnly) { [IO.Directory]::CreateDirectory($root) | Out-Null }
     $script:Runtime=$root; return $root
 }
 function Read-ChildSessionRecord {
@@ -612,6 +613,118 @@ function Get-ChildSessionScreen {
     if ($result.ExitCode -ne 0) { throw 'herdr pane read failed.' }
     return $script:Utf8Lenient.GetString($result.Stdout)
 }
+function Get-ChildSessionTerminalStatus {
+    param([string]$Path)
+    if (Test-ChildSessionIrregularPath $Path) { throw 'Retained status must be a regular file.' }
+    try {
+        $stream=[IO.File]::Open($Path,'Open','Read',([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try {
+            # Longest valid first line, including CRLF. Leave the report body unread.
+            $reader=[IO.StreamReader]::new($stream,$script:Utf8Lenient,$false)
+            $prefix=New-Object char[] 17
+            $count=$reader.ReadBlock($prefix,0,$prefix.Length)
+            $line=[string]::new($prefix,0,$count).Split([char]10)[0]
+        } finally { $stream.Dispose() }
+    } catch [IO.FileNotFoundException] { return '-' } catch [IO.DirectoryNotFoundException] { return '-' }
+    if ($line -cmatch '\ASTATUS: (done|blocked|failed)\r?\z') { return $Matches[1] }
+    return '-'
+}
+function Get-ChildSessionStartupScreenState {
+    param([string]$Screen)
+    $visible=[regex]::Replace($Screen,'\x1b\[[0-?]*[ -/]*[@-~]','')
+    $rows=@($visible.Split([char]10) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if (-not $rows.Count -or ($rows.Count -eq 1 -and $rows[0] -cin @('Loading…','Loading...'))) { return 'loading' }
+    # History above a spinner is normal. Only known UI rows can follow it.
+    $working=$false
+    foreach ($row in $rows) {
+        if ($row -cmatch '\A• Working \(([0-9]+[hms] )+[•·] esc to interrupt\)\z' -or
+            $row -cmatch '\A[✻✶✢✳✽✼] (Thinking|Working)(…|\.\.\.) \(esc to interrupt\)\z') { $working=$true;continue }
+        if ($working -and $row -cnotmatch '\A(└ Tip: .+|›( Ask Codex to do anything)?|GPT-[^·]+ · Context [0-9]+% used · .+|(← for agents[ \t]+·[ \t]+)?\? for shortcuts([ \t]+⚠[ \t]+[0-9]+ warnings? · f2 to view)?)\z') { $working=$false }
+    }
+    if ($working) { return 'WORKING' }
+    return 'INSPECT'
+}
+function Invoke-ChildSessionStartup {
+    param($Set)
+    $name=$Set.Names[0];$start=Get-ChildSessionClock
+    while ($true) {
+        $status=Get-ChildSessionTerminalStatus $Set.Files[0]
+        if ($status -cne '-') { [Console]::WriteLine('STATUS: '+$status);return 0 }
+        $r=Read-ChildSessionRecord $name
+        if (-not $r) { throw ('No owned launch record for '+$name+'.') }
+        $alive=Test-ChildSessionAlive $r
+        if (-not $alive -and ($r.phase -cne 'starting' -or $r.closed)) {
+            $status=Get-ChildSessionTerminalStatus $Set.Files[0]
+            if ($status -cne '-') { [Console]::WriteLine('STATUS: '+$status);return 0 }
+            [Console]::WriteLine('EXITED: agent in window '+$name+' is gone, no status');return 3
+        }
+        if ($r.backend -ceq 'terminal') { [Console]::WriteLine('UNOBSERVABLE');return 0 }
+        Assert-ChildSessionPane $r
+        $screen=Get-ChildSessionScreen $r
+        $state=Get-ChildSessionStartupScreenState $screen
+        if ($state -ceq 'WORKING') {
+            if ($alive) { [Console]::WriteLine($state);return 0 }
+            $state='INSPECT'
+        }
+        $remaining=60-((Get-ChildSessionClock)-$start)
+        if ($state -ceq 'INSPECT' -or $remaining -le 0) {
+            [Console]::WriteLine('INSPECT')
+            [Console]::Write($screen)
+            if ($screen -and -not $screen.EndsWith("`n")) { [Console]::WriteLine() }
+            return 0
+        }
+        Start-Sleep -Milliseconds ([int][Math]::Ceiling(1000*[Math]::Min(5,$remaining)))
+    }
+}
+function Invoke-ChildSessionEvent {
+    param($Set)
+    $path=Join-Path $script:Runtime ($Set.Names[0]+'.result')
+    $exitText='absent';$launch='';$diagnostic='';$indices=0..($Set.Names.Count-1)
+    if (Test-ChildSessionIrregularPath $path) { throw 'Watcher result must be a regular file.' }
+    try {
+        $stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try { $record=([IO.StreamReader]::new($stream,$script:Utf8,$false)).ReadToEnd() } finally { $stream.Dispose() }
+    } catch [IO.FileNotFoundException] { $record=$null } catch [IO.DirectoryNotFoundException] { $record=$null }
+    if ($null -ne $record) {
+        $format='\Alaunch: (?<launch>[A-Za-z0-9_-]*)\r?\n' +
+            'status_file: (?<file>[^\r\n\x00]*)\r?\n' +
+            'exit: (?<code>0|[1-9][0-9]{0,2})\r?\n' +
+            'line: (?<line>[^\r\n\x00]+)\r?\n' +
+            'watcher: [1-9][0-9]*\r?\n' +
+            'launches: (?<names>[A-Za-z0-9_ -]+)\r?\n' +
+            '(?:wake: (?:typed|caller pane gone)\r?\n)?\z'
+        $fields=[regex]::Match($record,$format)
+        if (-not $fields.Success -or -not [string]::Equals($fields.Groups['names'].Value,($Set.Names -join ' '),[StringComparison]::Ordinal)) { throw 'Malformed watcher result or different launch set.' }
+        $launch=$fields.Groups['launch'].Value
+        $file=$fields.Groups['file'].Value
+        $exitText=$fields.Groups['code'].Value
+        $line=$fields.Groups['line'].Value
+        if ([int]$exitText -gt 255) { throw 'Invalid exit in watcher result.' }
+        if ($exitText -cin @('0','3','4')) {
+            $index=[Array]::IndexOf($Set.Names,$launch)
+            if ($index -lt 0 -or -not [string]::Equals($Set.Files[$index],$file,[StringComparison]::Ordinal)) { throw 'Watcher result does not match the retained launch and status file.' }
+            $indices=@($index)
+        } elseif ($launch -or $file) { throw 'Unexpected launch in watcher result.' }
+        if (-not $launch -and $exitText -cne '124') { $diagnostic=$line.Substring(0,[Math]::Min(240,$line.Length)) }
+    }
+    # Observe all retained status files before checking any process.
+    $statuses=@{}
+    foreach ($i in $indices) { $statuses[$i]=Get-ChildSessionTerminalStatus $Set.Files[$i] }
+    [Console]::WriteLine('record: '+$exitText)
+    [Console]::WriteLine('launch: '+$launch)
+    if ($diagnostic) { [Console]::WriteLine('line: '+$diagnostic) }
+    foreach ($i in $indices) {
+        $name=$Set.Names[$i]
+        try {
+            $r=Read-ChildSessionRecord $name
+            if (Test-ChildSessionAlive $r) { $alive='alive' }
+            elseif (-not $r -or ($r.phase -ceq 'starting' -and -not $r.closed)) { $alive='unknown' }
+            else { $alive='gone' }
+        } catch { $alive='unknown' }
+        [Console]::WriteLine('child: '+$name+' '+$alive+' '+$statuses[$i])
+    }
+    return 0
+}
 function Test-ChildSessionWaitingScreen {
     param([string]$Text)
     # A child waiting for free ends its turn with the notice
@@ -1015,9 +1128,9 @@ function Invoke-ChildSessionWakeRun {
 }
 function Invoke-ChildSessionDispatch {
     param([AllowEmptyCollection()][string[]]$Vector)
-    $null=Get-ChildSessionRuntime
     if ($Vector.Count -eq 0) { throw 'A lifecycle command is required.' }
     $command=$Vector[0];$rest=@();if ($Vector.Count -gt 1) { $rest=@($Vector[1..($Vector.Count-1)]) }
+    $null=Get-ChildSessionRuntime -ReadOnly:($command -cin @('startup','event'))
     if ($command -ceq 'open') { Start-ChildSession $rest;return 0 }
     if ($command -cin @('runtime-dir','list')) {
         if ($rest.Count -ne 0) { throw 'Command takes no arguments.' }
@@ -1028,6 +1141,12 @@ function Invoke-ChildSessionDispatch {
     if ($command -ceq 'wait' -and $rest.Count -gt 0 -and $rest[0] -ceq '--watch') {
         $set=@();if ($rest.Count -gt 1) { $set=@($rest[1..($rest.Count-1)]) }
         return (Invoke-ChildSessionWatch (Read-ChildSessionWatchArguments $set 'wait --watch'))
+    }
+    if ($command -cin @('startup','event')) {
+        if (-not $rest.Count -or $rest.Count % 2 -or $rest[0].StartsWith('-') -or ($command -ceq 'startup' -and $rest.Count -ne 2)) { throw ($command+' requires launch and status-file pairs.') }
+        $set=Read-ChildSessionWatchArguments $rest $command
+        if ($command -ceq 'startup') { return (Invoke-ChildSessionStartup $set) }
+        return (Invoke-ChildSessionEvent $set)
     }
     if ($command -ceq 'wake') { return (Start-ChildSessionWake $rest) }
     # Internal: the detached half of wake.

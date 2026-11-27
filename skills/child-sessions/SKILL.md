@@ -1,168 +1,73 @@
 ---
 name: child-sessions
-description: Runs a Claude Code or Codex child session from a brief file, in a visible terminal window, a native subagent or a background CLI process, and waits for its status file. Use when work must run in a separate agent session, or when another skill needs to open, answer, continue or close one.
+description: Coordinates a separate Claude Code or Codex session when a task needs a child in a window, a native subagent or a background process.
 ---
 
 # Child Sessions
 
-Run a child in a visible window; coordinate through a brief, terminal input, and a child-written status file. This skill controls the session lifecycle. The calling task supplies the scope and any integration authority.
+The caller sets the task, permissions and completion checks. The child gets a brief and writes its result to a status file.
 
 ## Run places
 
-This file runs a child in a `window`. A child in a `subagent` or a `background` CLI process follows [run-contract.md](references/run-contract.md), which also holds the brief lines, questions, permissions and refusals the three places share. When no system is chosen, the caller passes `--agent` with its own system ([run contract](references/run-contract.md#places)); the helper's own default stays as it is.
+For a window, follow this file. For a native subagent or background CLI, follow the [run contract](references/run-contract.md#launch-and-wait). All three share its [place selection](references/run-contract.md#places), [brief fields](references/run-contract.md#brief), [permissions](references/run-contract.md#permissions) and [refusals](references/run-contract.md#refused-combinations). If the caller chose no system, pass its own system as `--agent`.
 
-Under `--auto` read [auto.md](references/auto.md) too: the brief says `Auto: yes`, the child asks nobody in its window, and the root routes each question by auto.md's [Deciding](references/auto.md#deciding) instead of asking the user.
+Under `--auto`, put `Auto: yes` in the brief. The child asks nobody directly. Route questions through [Deciding](references/auto.md#deciding).
 
 ## Locate and open
 
-Resolve the installed `SKILL.md` to its absolute path, then read [platform-runtime.md](references/platform-runtime.md) for the native entrypoint, Windows invocation, runtime storage, backend selection and exact capabilities. Retain that vector for the run. POSIX uses its sibling `scripts/child-session`; native Windows uses the installed PowerShell with `scripts/child-session.ps1` through `Invoke-ChildSessionDispatch`. WSL remains Linux; MSYS/Cygwin is refused by the POSIX entrypoint. Call the absolute owner, never an unrelated `child-session` on PATH.
+1. Resolve the installed skill's absolute path. Use its [native entrypoint](references/platform-runtime.md): `scripts/child-session` on POSIX (including WSL), or `scripts/child-session.ps1` through `Invoke-ChildSessionDispatch` on native Windows. Keep that invocation for the run. MSYS/Cygwin is unsupported.
+2. Call `runtime-dir`. Under that private directory, outside monitored repositories, write the [brief](references/brief-writing.md) and choose an absent absolute [status path](references/status-file.md). Choose a unique name matching `[A-Za-z0-9_-]+`.
+3. Run `open --agent <system> [options] <name> <absolute checkout> <absolute brief>`. Use literal arguments. Pass the caller's model, effort and [launch settings](references/run-contract.md#launch-and-wait), with one `--cli-arg WORD` per extra word. Omitted model and effort use CLI defaults.
+4. Read `capabilities <name>`. Keep its JSON, launch ID, checkout, backend IDs and PID/start evidence. Use those records for every control. On a plain terminal, tell the user at launch that questions and dialogs need direct attention in the window and counts are **not observable**. Repeat only when ending or escalating the wait. Report the unverified native macOS launch/process coverage where applicable.
 
-Before opening, read [brief-writing.md](references/brief-writing.md) and [status-file.md](references/status-file.md). Call `runtime-dir` and put the brief/status outside monitored repositories beneath that resolved private directory. Choose an absent absolute status path and a unique name matching `[A-Za-z0-9_-]+`.
-
-```bash
-# POSIX, after resolving the installed owner and its compatible runtime.
-runtime_dir=$("$child_session" runtime-dir) || exit 2
-"$child_session" open --agent codex "$name" "$checkout" "$brief"
-"$child_session" capabilities "$name"
-```
-
-Native PowerShell examples and the literal string-array recipe are in platform-runtime.md. `checkout` and `brief` are absolute paths. Preserve literal spaces, Unicode and shell metacharacters with the native vector/recipe; never evaluate task strings. Optional `--model M` and `--effort E` retain CLI defaults when omitted; each repeatable `--cli-arg WORD` appends one literal word to the agent's command line after them, never split or evaluated (the run contract's [lean launch](references/run-contract.md#launch-and-wait) words, a `--session-id <uuid>` pair); the caller chooses the agent ([Run places](#run-places)); the helper defaults to Claude. The helper preserves existing default CLI flags and whitespace-only argument overrides.
-
-An explicit compatible `CHILD_SESSION_BACKEND=herdr|tmux|terminal` wins. Otherwise use a proven current herdr connection, then installed tmux on POSIX, then the existing terminal's verified native interface. A shared app-server can retain `HERDR_ENV=1` and IDs of a closed pane: these alone do not prove a connection. With `CODEX_THREAD_ID` or `CLAUDE_CODE_SESSION_ID`, the helper matches exactly one live `agent_session` of that system and ID and resolves its current workspace/pane. Cwd, title and focus never select a replacement. No match or ambiguous/unavailable identity falls back with diagnostics in automatic mode; explicit herdr stops. Without a caller session ID, only the existing live injected workspace/pane path is available; stale IDs cannot be recovered by guessing. Recovery is local to that helper call. Later controls use the owned launch record, and each Herdr child receives its own pane IDs. Herdr opens tabs by default; `--split right|down` keeps the existing alone-in-tab rule and otherwise emits the fallback note. No installation is part of this workflow.
-
-Record `launch_id`, checkout and launch identity, backend IDs, PID/start evidence and capability JSON. Controls target those records, never a title search. On a plain terminal tell the user at launch: questions/dialogs in that visible window need direct attention because the controller cannot observe them. Dialog counts are **not observable**. Repeat this notice only in a report ending/escalating waiting. The stock macOS launch/process path is unverified here; report that coverage limit.
-
-**Startup.** After every `open` (the first, a reopen, a resume) whose recorded `peek` and `key`/`send` are true, watch the start before the first long wait: `peek "$name" 40`, pausing with `wait "$name" "$status_file" 5` between peeks, until the child shows its own work (a spinner, a tool call, its first output) or 60 seconds pass. Handle each dialog on screen through [Dialogs](#dialogs); a new checkout usually opens with the agent's folder-trust dialog. A pause exiting `0` or `3` goes to the exit table below.
+**Startup.** After every open, reopen or resume, call `startup <name> <status-file>` once. It checks status and liveness and watches the window for up to 60 seconds. On `WORKING` or `UNOBSERVABLE`, proceed to wait. On `INSPECT`, read the returned screen. If it shows work, proceed to wait. Handle any [dialog](#dialogs) before waiting. If it is still starting, pause five seconds between checks within the original 60-second budget. Dispatch an exact status line or exit 3 immediately. Report command errors.
 
 ## Wait
 
-**Quiet wait.** The user watches a child in its own window, status file or run directory, and asks this session when they want a status. From launch until the final report, a parent's text to the user is only: the launch lines its skill words, the waiting notice, a question or dialog that needs the user's decision, a declined or escalated dialog, and a stop or failure. Everything else a wake shows (a peeked screen, the child's progress, its commits and checks so far, the result of one unit, stage, phase or review round) goes into the run's records and reaches the user once, in the final report. This binds every parent in every place: a thin launcher, a wait holder, and an orchestrator over units, stages or rounds. A direct question from the user is answered as asked.
+**Quiet wait.** Every parent records progress for the final report. Until then, send only the caller's launch lines, the waiting notice, decisions needed from the user, declined or escalated dialogs, and stops or failures. Answer direct user questions.
 
 ### Rungs
 
-Choose the rung once per run at its first long wait, after the first Startup. Keep it for later waits unless a watcher failure requires the present loop. An **interactive session** is the agent CLI's own TUI in its own pane or terminal (the user's session or a `window` child); a **native subagent** starts through a host agent tool; a **print session** is `claude --print` or `codex exec` (including a `background` child that itself waits).
-
-| Rung | Mechanism | Turns while waiting | Proof |
-|---|---|---|---|
-| 1 | Host background watcher; completion notification re-invokes the session | 0 | [Host mechanisms](references/run-contract.md#host-mechanisms), `Free wait: host notification`, says `observed` for this host and session kind. Unlisted or `unverified` means unavailable. |
-| 2 | Detached watcher types a wake line into the session's own pane | 0 | The run's first `wake` exits `0`, proving the caller pane and classifiable input. |
-| Present loop | Bounded calls in the foreground | As today | Used when neither free rung is proven. |
-
-An interactive session waiting on a window child uses rung 1 when host notification is proven. Otherwise it **runs `wake` once** before choosing the present loop. The command itself checks the caller pane and input, so run it even when the caller pane has yet to be proven. Use rung 2 on success. On a refusal listed below, use the present loop and include the actual refusal in `Wait:`.
-
-A native subagent and a print session use the present loop and **never call `wake`**: the helper would prove the parent's pane and type into the parent. No rung puts another agent between the session and its child. A wake after the cache lifetime rewrites the context once; no rung keeps a session awake for its cache.
-
-The calling task's final report includes one of these lines (a watcher-failure switch adds the present-loop line after the original rung):
-
-- `Wait: rung 1, host notification (<host and version>, <session kind>; Host mechanisms: observed)`
-- `Wait: rung 2, wake line (<backend> pane <id>; proven by wake; unverified: <items from Host mechanisms>)`
-- `Wait: present loop (<reason>)`, where reason is `native subagent`, `print session`, `no host notification on <host>; <wake refusal message>`, or `watcher failure: <record line or "no record">`.
+For a window, choose the wait once. An interactive CLI uses a verified host notification first, otherwise tries `wake` once in its own pane. A native subagent, print session or interactive CLI without a proven watcher uses the foreground loop. See [rung selection and the final Wait line](references/window-wait.md#rungs).
 
 ### Free wait
 
-For window children keep **one watcher per wait**, its handle, the watched launches and status paths. Several children are one watcher over the set in caller order, ending at the first event; handle each event by that child's rules. Derive and retain the result path yourself at start: `<runtime-dir>/<first watched name>.result`.
-
-- **Rung 1:** start `"$child_session" wait --watch <name> <status-file> [<name> <status-file>]...` as a host background command (Claude Code: Bash `run_in_background: true`). The handle is the host task identifier.
-- **Rung 2:** run `"$child_session" wake <name> <status-file> [<name> <status-file>]...` in the foreground. Exit `0` with `WAKE: watcher <pid> result <path>` proves and starts it; the handle is `<pid>`. Exit `2` with `wake: the terminal backend cannot type`, `wake: no proven caller pane` or `wake: caller input cannot be classified` means no rung 2 for this run: quote the message in the report and use the present loop.
-
-Both commands add `--rearm <name>` where the stall rule requires it, and omit `--stall` and seconds (defaults: stall 180 s, deadline 43200 s). Only after the watcher starts, print this notice as the last line and end the turn:
-
-`[child-session waiting] <what it waits for>; watcher <handle>; any input wakes this session.`
-
-On rung 2 only append ` A draft left in the input holds the wake.` A watcher dying without waking anyone is an accepted risk covered by this notice; no second process guards it. A child screen ending with the notice never stalls, so the child's own free wait wakes nobody above it.
-
-**Every wake starts with evidence in this order**, including input from the user:
-
-1. Read the result record at the path you retained when starting the watcher, never a path or launch taken from a wake line, notification or user message.
-2. Read `head -n 1` of the status file of the record's launch; read every watched status first line if the record names none or is absent. Accept only launches in your watched set.
-3. Run `alive <launch>` for that launch (every watched launch when none is named).
-
-A valid status first line wins: use the status table below. Otherwise dispatch the record's `exit`: `3` and `124` use the exit table; `4` uses the stall rule, taking the caller's step for `124` first when it has one. A caller's step for a `wait` exit applies to the same recorded exit.
-
-If the record is absent and the watcher is alive (rung 1: the host task still runs; rung 2: `kill -0 <pid>` or the platform's process query), there is no event: answer what was asked, print the notice again, end the turn and start no watcher. **Record absent and watcher gone, or `exit: 2`, is a watcher failure.** After the evidence reads, `alive` exit `1` takes exit-table row `3`; `alive` exit `0` finishes this wait and all later waits of the run on the present loop, reported explicitly. Try no second watcher after failure.
-
-**Stall rule (`4`).** Run `peek <launch> 40`. A dialog goes to [Dialogs](#dialogs). If the screen has nothing you may answer (the user thinking in a planner window, an idle prompt), tell the user nothing about the stall or the screen and type nothing into the child. The next watcher names it with `--rearm <name>`. Remove that launch's re-arm once you send it anything or its next event is not a stall.
-
-After an event leaves children working, start one watcher over those still working, on the same rung. If start is refused with `already has a live watcher` (the preceding wake line is still pending), pause with `wait <name> <status-file> 5` and retry at most three times, then treat it as a watcher failure.
+Start one watcher over the active children, print the waiting notice and end the turn. On every wake, call `event <name> <status-file> [<name> <status-file>]...` with the retained pairs. Dispatch a valid child status first. See [Free wait](references/window-wait.md#free-wait) for commands, the notice and watcher events.
 
 ### Present loop
 
-Use foreground `wait` calls of **150 seconds on Claude Code**, including when the coordinator is a subagent, and **240 seconds on Codex**. Check the host's effective foreground limit and observed runtime evidence with margin before opening. For a 150-second helper wait, set the Bash tool's `timeout` explicitly to **175000 ms** when the installed schema permits it; the default 120000 ms is too short. An earlier experiment backgrounded a 540-second wait at 180 seconds; that observation is no guarantee for untested hosts. The helper's never-seen startup grace is 120 seconds: a host unable to hold a call longer than that cannot hold this loop. Refuse before opening the window and use only the caller's existing authorized fallback. Repeated fresh short waits reset that grace and do not satisfy the loop.
-
-Codex example:
-
-```bash
-"$child_session" wait "$name" "$status_file" 240
-```
-
-Codex's `exec_command.yield_time_ms` (up to 30000 ms) controls when the tool yields; it is **not an execution timeout**. If it returns `session_id`, poll that same foreground command with `write_stdin` in intervals of at most 60 seconds until it exits. A tool yield is not exit 124. Only after the command exits, handle its actual code:
-
-The watcher of Free wait is the only background job a wait may use; hooks, wakeup tools, manual sleep polling and any other background job are still no wait. If the host unexpectedly backgrounds a wait, retain its original task handle and diagnostics, settle that owned wait through a supported host mechanism, and report the capability failure. Start no competing waiter.
-
-Over a set use one foreground `wait --watch <name> <status-file> [<name> <status-file>]... <seconds>` per turn, 150 seconds on Claude Code or 240 on Codex, with no `--stall`, in place of plain `wait`.
+Use a foreground `wait` for 150 seconds on Claude Code or 240 seconds on Codex. Check the [host timeout and foreground wait rules](references/window-wait.md#present-loop) before opening the window.
 
 ### Exits and statuses
 
-On rung 1 or 2 the exit is the result record's `exit` line.
-
-| Exit | Required action |
+| Wait exit | Action |
 |---|---|
-| `0` | Read only the first status line first (`head -n 1 -- "$status_file"`). Dispatch by the exact status below, then read the relevant named sections. Exit 0 alone does not mean success. |
-| `124` | When recorded `peek` is supported, inspect with `peek "$name" 40` and handle a known choice through [Dialogs](#dialogs). Otherwise continue bounded file-based waiting. A timeout alone requires no answer/approval and no repeated launch notice. |
-| `3` | Use `peek` only when supported; otherwise show owned launch/exit diagnostics. Reopen **once** using the recovery procedure below. |
-| `4` | Apply the stall rule in Free wait to the record's launch. |
-| Other | Report the command error and preserve the session and checkout for diagnosis. |
+| 0 | Use the exact current status (`event` already checked it on a wake). Read only the sections needed below. Completion requires a valid status. |
+| 124 | If supported, `peek <name> 40` for a dialog. Otherwise continue file-based waiting. |
+| 3 | Peek if supported, otherwise show recorded launch/exit diagnostics. [Recover once](#recover-a-silent-exit). |
+| 4 | Apply the [stall rule](references/window-wait.md#free-wait). |
+| Other | Report the error. Preserve the session and checkout. |
 
-| Exact first line | Required action |
+| First line | Action |
 |---|---|
-| `STATUS: done` | Read the sections the calling task needs (for example Commits, Checks, Review, Out of scope), then perform its completion checks. |
-| `STATUS: blocked` | Read Questions, present the question/options/recommendation, and obtain the answer; under `--auto` the answer comes by [auto.md](references/auto.md#deciding)'s routing, and an answer decided there reaches the user only to be typed in, below. Rename the file to `<file>-blocked-<n>` using an unused number **before** sending the answer. When `send` is supported, send one line or a file-reading instruction. Otherwise present the actual answer/file for direct user entry into the visible child, then continue file-based waiting; keep the live agent open. Wait for a fresh status at the original path. |
-| `STATUS: failed` | Show the reported failure and relevant status sections, preserve the status file, window, and checkout, and stop. The user decides the next action. |
-
-The root never rewrites a child status. Read the first line before selecting sections; avoid repeatedly loading the whole report.
+| `STATUS: done` | Read the requested result sections and perform the caller's completion checks. |
+| `STATUS: blocked` | Read Questions. Get the user's answer or route it under `--auto`. Before sending, rename the report to an unused `<file>-blocked-<n>`. Send one line or an instruction to read a file. Without `send`, give the user the actual answer or file to enter in the visible window. Keep the child open and wait for a fresh report at the original path. |
+| `STATUS: failed` | Report the failure and stop for the user's decision. Preserve the status, window and checkout. |
 
 ## Dialogs
 
-Use this section only when recorded `peek` and the needed `key`/`send` capabilities are true. Without those controls, keep the complete-command inspection and permission authority below unchanged: no guessed remote approval; the user handles visible dialogs directly.
-
-A dialog is pending when the bottom of the peeked screen shows a choice the agent is waiting on: a numbered option list with a selection marker and a prompt such as "Do you want to proceed?", an approval request naming a command, or the agent's own question to the user. A working spinner without a choice is work in progress. When the top of the dialog (its title or border) or any line of its command is cut off, peek once more with `peek "$name" 120`; still cut, the dialog goes to the user unanswered.
-
-The agent CLI's folder-trust dialog (Claude Code's "Accessing workspace" with "Yes, I trust this folder"; Codex's directory-trust question) creates a persistent trust entry. Authority to use the chosen checkout permits using existing trust; it does not create trust. Leave a new dialog unanswered, show the user its exact folder and known persistent effect, and obtain a separate user decision, including under `--auto`: the root cannot supply that consent. The user may act directly or explicitly authorize that exact dialog action; report the decision and known persistent effect. Keep the live agent open: cancelling this dialog can end it. Do not automatically edit, remove or clean trust records, or dump unrelated global settings. Ordinary command approvals retain the bounds below. A fresh worktree or reviewer clone may therefore pause an auto chain for this decision; do not switch places or presume inherited trust to bypass it.
-
-The root approves a permission dialog on its own only after reading the whole command on screen, and only when all of these hold. Every path the command reads or writes lies inside the child's own checkout named in its brief, a recorded resolved runtime or fixture directory that the child's task created for disposable fixtures, or the ignored-material paths the brief grants in the main checkout (a sibling directory that merely shares a prefix with one of these names lies outside). Paths count only as resolved: each is literal, or its value is visible in the same command or in the child's visible earlier output (for example the output of `mktemp -d`); an unresolved variable or command substitution, a glob that can match outside the allowed directories (for example at `/tmp` level), or a `..` that leaves them makes the dialog unclassifiable. The command's only effects are reading and writing files under those paths, plus commits on the child's own branch: it does not push, touches the main checkout or docs main checkout only at the granted paths, changes no Git state of any other repository, deletes nothing outside those paths, uses no network, sends no process signals or kills, installs no packages, escalates no privileges, moves no Git ref other than the child's own branch, changes no stash, Git config or worktree list (a worktree shares refs, stash and config with the main checkout), and writes no agent or Git configuration files directly (`.git*`, `.claude/`, `.codex/`, hooks); the objects and refs that a commit on the child's own branch writes into the Git directory belong to that allowed commit and are no configuration write. And the child's brief allows the operation itself, since its prohibitions (for example rebase, merge or push) still apply inside those paths and an approval never grants authority the child lacks. Everything else is out of scope: decline it first, so the child is not left blocked, then show it to the user with the whole command and the reason it lies outside the child's authority. A dialog the root cannot classify goes to the user unanswered. The child's content questions follow the calling task's rule: answer within its authority or ask the user; under `--auto`, [auto.md](references/auto.md#deciding) routes them.
-
-Answer one dialog per action; a dialog answer uses only bare Enter, `Up`, `Down` and `Escape` (the line after a decline, below, and answers to content questions are not dialog answers). Approve only when the highlighted option is the approving one (plain "Yes", or the trust option of a folder-trust dialog), with `send "$name" ""`. When the highlight is elsewhere, move it with `key "$name" Up` or `key "$name" Down` and peek: a capture still showing the old highlight is stale, so pause and re-peek as after an answer (below) instead of pressing again, and send the bare Enter only once the approving option shows highlighted. Decline with the agent's cancel key, `key "$name" Escape` in Claude Code, or by highlighting its explicit No option and sending the bare Enter. Option digits are never typed, least of all through `send`: in Claude Code a digit selects at once and `send`'s trailing Enter lands on the next, unread dialog. Each approval covers one command; an "always allow" / "don't ask again" option is never chosen.
-
-After each answer (Enter, cancel or No), peek until the screen no longer shows the answered dialog: its counter or command changed, or no dialog remains. A capture still showing it is stale, never the next dialog: pause with `wait "$name" "$status_file" 5` and peek again, at most three times. This pause is not the present loop: the bounded-wait rule (calls longer than 120 seconds) still governs the present loop itself. A pause exiting `0` or `3` goes to the exit table above; `124` means keep re-peeking. A screen still showing the same command with no counter or the same counter may be a new identical request: leave it unanswered and run `alive "$name"`. Exit 1 means the child is gone: handle it as exit `3` above (peek diagnostics, the single reopen of [Recover a silent exit](#recover-a-silent-exit), and the calling task's exit-3 accounting). Exit 0: show it to the user as a possibly new identical request and wait for the decision before any key. In a stack ("2 of 3"), read and classify each dialog on its own before its key: a decline does not stop the next in-scope approval, and an approval does not carry over. When no dialog remains, return to the wait: a new watcher on rung 1 or 2, or the present loop.
-
-A decline can end the agent's turn: in Claude Code, Escape or "No, and tell Claude what to do differently" leaves it idle at an empty input prompt, with no choice and no spinner. When the re-peek after a decline shows the child waiting at its empty input prompt, send one line with `send "$name" "<text>"` that names the declined command and the reason, and tells it to continue without that command or to write `STATUS: blocked` with its question. This line is the only text the root types for a declined dialog.
-
-An approved dialog is only counted. Declined or escalated dialogs are shown to the user as they happen, in full: window, whole command, reason. The calling task's final report counts the dialogs answered, declined and escalated.
+When a screen asks for input, follow [Handling a window dialog](references/dialogs.md) before sending any key. Keep ambiguous requests unanswered. A new folder-trust decision always goes to the user. Without terminal controls the user handles dialogs directly.
 
 ## Recover a silent exit
 
-After exit 3, retain the original task instructions in the runtime brief and append this exact continuation instruction before reopening:
+Append this exact line to the original brief:
 
 > Continue from the current state of the checkout: read git log and git status first.
 
-Stop proven owned processes with `close "$name"` when supported (report a retained window separately), confirm `alive` exit 1, then `open` with the same agent/options, name, checkout, and augmented brief. Wait again. **An unchanged brief is not a continuation. A second silent exit ends the task:** show diagnostics and preserve the remaining window and checkout. A reported `STATUS: failed` is never an automatic reopen trigger.
+Close proven owned processes if supported, report any retained window and confirm `alive` exits 1. Reopen with the same agent, options, name, checkout and amended brief. On a second silent exit, show diagnostics, preserve the window and checkout, and stop.
 
 ## Other operations and environment
 
-`wait --watch <name> <status-file> [<name> <status-file>]... [seconds]` watches a set through its first event, exits `0`/`3`/`124`/`4` and writes `<runtime-dir>/<first watched name>.result`. `wake` takes the same set and types one line into the proven caller pane when its input is empty; it refuses when the terminal cannot type, no caller pane is proven or the input cannot be classified. The PowerShell entrypoint stalls and wakes through herdr only.
+`list` shows owned launches. `alive <name>` checks the recorded process. `send <name> <text>` sends one line and Enter. Put multiline content in a file. After completion checks, `close <name>` stops owned processes and closes the window when supported. Keep the checkout and branch.
 
-`send <name> <text>` types one line and Enter; multiline content belongs in a file. `send <name> ""` sends a bare Enter. `key <name> <key>` sends one key without Enter: `Escape`, `Up`, `Down` or one digit `0`–`9`. `peek <name> [lines]` reads visible terminal output. `alive <name>` returns 0 while the recorded agent runs, even after its window is gone, 1 otherwise; a surviving shell window does not prove liveness, and `send`/`key` refuse input once the agent's launcher is gone. `runtime-dir` resolves private storage; `capabilities <name>` returns the recorded operation booleans and launch identity. `list` lists validated owned sessions and checkouts. After the calling task has completed its checks, `close <name>` stops only proven owned processes and closes an independently owned window when supported; it does not remove the checkout or branch.
-
-| Variable | Meaning |
-|---|---|
-| `CHILD_SESSION_BACKEND` | Force compatible `herdr`, `tmux` or `terminal`. |
-| `CHILD_SESSION_AGENT` | Default agent, `claude` or `codex`, or `<system>:<command>` ([launch command](references/run-contract.md#launch-command)). |
-| `CHILD_SESSION_TMUX_SESSION` | Tmux session name; default `child-sessions`. |
-| `CHILD_SESSION_TAB=0` | Disable best-effort Windows Terminal tab creation. |
-| `CHILD_SESSION_CLAUDE_ARGS` | Replace Claude's default `--permission-mode bypassPermissions`. |
-| `CHILD_SESSION_CODEX_ARGS` | Replace Codex's default `--dangerously-bypass-approvals-and-sandbox`. |
-| `CHILD_SESSION_RUNTIME_DIR` | Explicit final private runtime directory; unsafe configuration fails without fallback. |
-| `XDG_RUNTIME_DIR` | Valid POSIX runtime parent; otherwise resolved system temporary facility. Windows uses native temp. |
-| `HERDR_ENV`, `HERDR_WORKSPACE_ID`, `HERDR_PANE_ID` | Herdr detection/workspace; `HERDR_PANE_ID` is the source pane for `--split`. |
-
-Argument overrides are whitespace-separated words without shell evaluation. Window helpers and background recipes remove only the fourteen exact parent-session metadata names in [Child environment](references/run-contract.md#child-environment), case-sensitive on POSIX and case-insensitive on Windows. Preserve all other variables, including provider/auth/platform configuration, unknown names, `CLAUDE_CONFIG_DIR` and `CODEX_HOME`. Scrubbing affects only the child process/server launch environment, never the caller's environment.
+For backend selection, runtime storage, terminal capabilities and native Windows invocation, see [Platform runtime](references/platform-runtime.md). PowerShell stalls and wakes through herdr only. For CLI overrides and the exact parent metadata removed from a child's environment, see [Launch command](references/run-contract.md#launch-command) and [Child environment](references/run-contract.md#child-environment).

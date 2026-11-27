@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+# Foreground wrapper; the caller retains its native host task handle.
+
+# Reads keep exact LF counts by byte-comparing the reconstructed record.
+# Bash cannot retain NUL; cmp rejects it rather than silently normalizing it.
+load_record() {
+  local path=$1
+  [[ -f $path && ! -L $path ]] || return 2
+  record=$(cat -- "$path") || return 2
+  printf '%s\n' "$record" | cmp - "$path" >/dev/null
+  local -a compare_exits=("${PIPESTATUS[@]}")
+  (( compare_exits[0] == 0 && compare_exits[1] == 0 )) || return 2
+  [[ $record != $'\xef\xbb\xbf'* && $record != *$'\r'* ]] && valid_utf8 "$record" || return 2
+}
+valid_utf8() {
+  local LC_ALL=C text=$1 i=0 byte low high count continuation
+  while (( i < ${#text} )); do
+    printf -v byte '%d' "'${text:i:1}"
+    (( i += 1 ))
+    if (( byte < 128 )); then continue; fi
+    low=128; high=191
+    if (( byte >= 194 && byte <= 223 )); then count=1
+    elif (( byte >= 224 && byte <= 239 )); then
+      count=2
+      (( byte != 224 )) || low=160
+      (( byte != 237 )) || high=159
+    elif (( byte >= 240 && byte <= 244 )); then
+      count=3
+      (( byte != 240 )) || low=144
+      (( byte != 244 )) || high=143
+    else return 2; fi
+    while (( count > 0 )); do
+      (( i < ${#text} )) || return 2
+      printf -v continuation '%d' "'${text:i:1}"
+      (( continuation >= low && continuation <= high )) || return 2
+      (( i += 1 )); (( count -= 1 )); low=128; high=191
+    done
+  done
+  return 0
+}
+read_launch() {
+  load_record "$run_dir/launch.time" && [[ $record =~ ^[0-9]+$ && ${#record} -le 18 ]] || return 2
+  launch_time=$((10#$record))
+}
+read_identity() {
+  load_record "$run_dir/wrapper.identity" || return 2
+  [[ $record == *$'\n'* ]] || return 2
+  wrapper_pid=${record%%$'\n'*}; wrapper_start=${record#*$'\n'}
+  [[ $wrapper_pid =~ ^[1-9][0-9]*$ && -n $wrapper_start && $wrapper_start != *$'\n'* ]] || return 2
+  if [[ ${OSTYPE:-} == linux* ]]; then
+    [[ $wrapper_start =~ ^[1-9][0-9]*$ ]] || return 2
+  else
+    [[ $wrapper_start != ' '* && $wrapper_start != *' ' ]] || return 2
+  fi
+}
+check_complete() {
+  local completed_exit
+  [[ -e "$run_dir/wrapper.done" || -L "$run_dir/wrapper.done" ]] || return 1
+  read_launch && read_identity || return 2
+  load_record "$run_dir/wrapper.done" && [[ $record == complete ]] || return 3
+  load_record "$run_dir/producer.exit" && [[ $record =~ ^[+-]?[0-9]+$ ]] || return 3
+  completed_exit=$record
+  load_record "$run_dir/session.id" && [[ $record != *$'\n'* ]] || return 3
+  printf 'producer_exit: %s\nsession_id: %s\n' "$completed_exit" "$record" || return 2
+  return 0
+}
+# OS-read leaf only: keep raw text/files, exit and existence observations.
+read_process_observation() {
+  local process_pid=$1 read_exit
+  observation_count=$(( ${observation_count:-0} + 1 ))
+  observation_stdout="$run_dir/watch-process-$$-$observation_count.stdout"
+  observation_stderr="$run_dir/watch-process-$$-$observation_count.stderr"
+  observed_present=0; observed_present_after=0; observed_exit=0; observed_text=''
+  if [[ ${OSTYPE:-} == linux* ]]; then
+    [[ ! -d /proc/$process_pid ]] || observed_present=1
+    cat -- "/proc/$process_pid/stat" > "$observation_stdout" 2> "$observation_stderr"
+    observed_exit=$?
+    [[ ! -d /proc/$process_pid ]] || observed_present_after=1
+  else
+    LC_ALL=C ps -p "$process_pid" -o stat= -o lstart= > "$observation_stdout" 2> "$observation_stderr"
+    observed_exit=$?
+  fi
+  printf '%s\n' "$observed_exit" > "$run_dir/watch-process-$$-$observation_count.exit" || return 2
+  if (( observed_exit == 0 )); then
+    observed_text=$(cat -- "$observation_stdout"); read_exit=$?
+    (( read_exit == 0 )) || return 2
+  fi
+}
+inspect_process() {
+  local process_pid=$1 suffix state
+  local -a fields
+  read_process_observation "$process_pid" || return 2
+  process_start=''
+  if [[ ${OSTYPE:-} == linux* ]]; then
+    (( observed_present_after != 0 )) || return 1
+    (( observed_present != 0 && observed_exit == 0 )) || return 2
+    [[ $observed_text == *") "* ]] || return 2
+    suffix=${observed_text##*) }
+    read -r -a fields <<< "$suffix"
+    (( ${#fields[@]} >= 20 )) || return 2
+    state=${fields[0]}; process_start=${fields[19]}
+    [[ $state =~ ^[A-Za-z]$ && $process_start =~ ^[1-9][0-9]*$ ]] || return 2
+  else
+    if (( observed_exit == 1 )) && [[ ! -s "$observation_stdout" && ! -s "$observation_stderr" ]]; then return 1; fi
+    (( observed_exit == 0 )) && [[ ! -s "$observation_stderr" ]] || return 2
+    load_record "$observation_stdout" || return 2
+    [[ $record != *$'\n'* ]] || return 2
+    while [[ $record == ' '* ]]; do record=${record# }; done
+    state=${record%% *}; process_start=${record#"$state"}
+    while [[ $process_start == ' '* ]]; do process_start=${process_start# }; done
+    while [[ $process_start == *' ' ]]; do process_start=${process_start% }; done
+    [[ $state =~ ^[A-Za-z][A-Za-z0-9+\<\>NsLl]*$ && -n $process_start ]] || return 2
+  fi
+  [[ $state != [ZX]* ]] || return 1
+  return 0
+}
+watch_main() {
+  local complete_exit inspect_exit launch_time now deadline wrapper_pid wrapper_start
+  [[ $watch_seconds =~ ^([1-9]|[1-5][0-9]|60)$ && $run_dir == /* ]] || return 2
+  inspect_process "$$" || return 2
+  deadline=$((SECONDS + watch_seconds))
+  while :; do
+    check_complete; complete_exit=$?
+    (( complete_exit == 1 )) || return "$complete_exit"
+    read_launch || return 2
+    if [[ ! -e "$run_dir/wrapper.identity" ]]; then
+      now=$(date +%s) || return 2
+      [[ $now =~ ^[0-9]+$ && ${#now} -le 18 ]] || return 2
+      now=$((10#$now))
+      (( now >= launch_time && now - launch_time < 30 )) || return 2
+    else
+      read_identity || return 2
+      inspect_process "$wrapper_pid"; inspect_exit=$?
+      if (( inspect_exit == 2 )); then
+        # Reobserve directory existence after a failed Linux read/parse.
+        if [[ ${OSTYPE:-} == linux* ]]; then
+          read_process_observation "$wrapper_pid" || return 2
+          (( observed_present_after != 0 )) || inspect_exit=1
+        fi
+        check_complete; complete_exit=$?
+        (( complete_exit == 1 )) || return "$complete_exit"
+        (( inspect_exit != 1 )) || return 3
+        return 2
+      fi
+      if (( inspect_exit == 1 )) || [[ $process_start != "$wrapper_start" ]]; then
+        check_complete; complete_exit=$?
+        (( complete_exit == 1 )) || return "$complete_exit"
+        return 3
+      fi
+    fi
+    if (( SECONDS >= deadline )); then return 124; fi
+    sleep 1 || return 2
+  done
+}
+
+run_producer() {
+  local out producer_exit recorded_id child_variable
+  local -a perm vector
+  if [ "$agent" = claude ]; then
+    if [ -n "${CHILD_SESSION_CLAUDE_ARGS+x}" ]; then read -r -a perm <<< "${CHILD_SESSION_CLAUDE_ARGS//$'\n'/ }"
+    else perm=(--permission-mode bypassPermissions); fi
+    vector=("$command" --print --output-format stream-json --verbose "${perm[@]}")
+    [ -z "$session_id" ] || vector+=(--resume "$session_id")
+    [ "$model" = cli-default ] || vector+=(--model "$model")
+    [ "$effort" = cli-default ] || vector+=(--effort "$effort")
+    vector+=("${cli_args[@]}")
+    out=events.jsonl
+  else
+    if [ -n "${CHILD_SESSION_CODEX_ARGS+x}" ]; then read -r -a perm <<< "${CHILD_SESSION_CODEX_ARGS//$'\n'/ }"
+    else perm=(--dangerously-bypass-approvals-and-sandbox); fi
+    vector=("$command" exec)
+    [ -z "$session_id" ] || vector+=(resume)
+    vector+=("${perm[@]}")
+    [ "$model" = cli-default ] || vector+=(-c "model=\"$model\"")
+    [ "$effort" = cli-default ] || vector+=(-c "model_reasoning_effort=\"$effort\"")
+    [ -z "$session_id" ] || vector+=("$session_id")
+    vector+=(-)
+    out=stdout.log
+  fi
+  # Fail wrapper setup before starting the CLI, preserving the absence of producer.exit.
+  cd -- "$checkout" || die 'Checkout unavailable'
+  exec 3< "$run_dir/prompt.md" 4> "$run_dir/$out" 5> "$run_dir/stderr.log" || die 'Cannot open producer files'
+  producer_exit=0
+  (
+    for child_variable in CLAUDECODE CLAUDE_CODE_SESSION_ID \
+      CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_MESSAGING_SOCKET \
+      CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_EFFORT CODEX_THREAD_ID \
+      CODEX_COMPANION_SESSION_ID CODEX_COMPANION_TRANSCRIPT_PATH \
+      CODEX_SESSION_ID CODEX_TOOL_CALL_ID CLAUDE_PID \
+      CLAUDE_CODE_SESSION_ATTENDED CLAUDE_CODE_ENTRYPOINT; do
+      unset "$child_variable" || exit $?
+    done
+    exec "${vector[@]}" <&3 >&4 2>&5 3<&- 4>&- 5>&-
+  ) || producer_exit=$?
+  exec 3<&- 4>&- 5>&-
+  printf '%s\n' "$producer_exit" > "$run_dir/producer.exit" || exit $?
+  if [ "$agent" = claude ]; then
+    sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$run_dir/events.jsonl" > "$run_dir/session.matches" || exit $?
+  else
+    sed -n 's/^session id: //p' "$run_dir/stderr.log" > "$run_dir/session.matches" || exit $?
+  fi
+  recorded_id=$(sed -n '1p' "$run_dir/session.matches") || exit $?
+  [[ $recorded_id != *$'\r'* && $recorded_id != *$'\n'* && $recorded_id != $'\xef\xbb\xbf'* ]] || exit 2
+  printf '%s\n' "$recorded_id" > "$run_dir/session.id" || exit $?
+  printf 'complete\n' > "$run_dir/wrapper.done.tmp" || exit $?
+  mv -- "$run_dir/wrapper.done.tmp" "$run_dir/wrapper.done" || exit $?
+}
+
+die() { printf 'background: %s\n' "$*" >&2; exit 2; }
+
+main() {
+  local action=${1:-} run_dir='' prompt='' checkout='' agent='' model=cli-default effort=cli-default
+  local session_id='' watch_seconds=60 command word seen=' ' launch_time now
+  local -a cli_args=()
+  case ${OSTYPE:-} in msys*|cygwin*|win32*) die 'Use background.ps1 on native Windows';; esac
+  case $action in prepare|run|wait) shift;; *) die 'Expected prepare, run or wait';; esac
+  while (( $# )); do
+    [[ $# -ge 2 && -n $2 ]] || die "Missing value for $1"
+    if [[ $1 != --cli-arg && $seen == *" $1 "* ]]; then die "Duplicate option: $1"; fi
+    seen+="$1 "
+    case "$action/$1" in
+      */--run-dir) run_dir=$2;;
+      prepare/--prompt) prompt=$2;;
+      run/--checkout) checkout=$2;;
+      run/--agent) agent=$2;;
+      run/--model) model=$2;;
+      run/--effort) effort=$2;;
+      run/--resume) session_id=$2;;
+      run/--cli-arg) cli_args+=("$2");;
+      wait/--seconds) watch_seconds=$2;;
+      *) die "Unknown $action option: $1";;
+    esac
+    shift 2
+  done
+  [[ $run_dir == /* && $run_dir != / && $run_dir != */ ]] || die '--run-dir requires an absolute directory path'
+  umask 077
+  if [[ $action == prepare ]]; then
+    [[ $prompt == /* && -f $prompt ]] || die '--prompt requires an absolute file path'
+    mkdir -- "$run_dir" || die 'Cannot create a fresh run directory'
+    cp -- "$prompt" "$run_dir/prompt.md" || die 'Prompt copy failed'
+    inspect_process "$$" || die 'Process inspection unavailable'
+    now=$(date +%s) || die 'Launch timestamp unavailable'
+    [[ $now =~ ^[0-9]+$ && ${#now} -le 18 ]] || die 'Invalid launch timestamp'
+    printf '%s\n' "$now" > "$run_dir/launch.time" || die 'Cannot persist launch.time'
+    return 0
+  fi
+  [[ -d $run_dir && -O $run_dir && ! -L $run_dir ]] || die 'Owned run directory unavailable'
+  if [[ $action == wait ]]; then watch_main; return $?; fi
+
+  [[ $checkout == /* && -d $checkout ]] || die '--checkout requires an absolute directory path'
+  command=$agent
+  if [[ $agent == *:* ]]; then command=${agent#*:}; agent=${agent%%:*}; fi
+  [[ $agent == claude || $agent == codex ]] || die '--agent requires claude or codex, optionally SYSTEM:COMMAND'
+  [[ $command =~ ^[A-Za-z0-9._/+-]+$ ]] || die 'Invalid launch command'
+  [[ $agent == claude || ${#cli_args[@]} == 0 ]] || die 'Codex takes no --cli-arg'
+  if [[ $command == */* && $command != /* ]]; then command=$checkout/$command; fi
+  command=$(cd -- "$checkout" && type -P -- "$command") || die "Launch command unavailable: $agent"
+  [[ $command == /* ]] || command=$checkout/$command
+  [[ -f $command && -x $command ]] || die 'Launch command is not executable'
+  [[ -f $run_dir/prompt.md && ! -L $run_dir/prompt.md ]] || die 'Prepared prompt unavailable'
+  read_launch || die 'Prepared timestamp unavailable'
+  # mkdir exclusively claims this preparation even when two hosts call run together.
+  mkdir -- "$run_dir/run.claim" || die 'Run already claimed'
+  for word in wrapper.identity wrapper.identity.tmp wrapper.done wrapper.done.tmp producer.exit session.id session.matches stderr.log stdout.log events.jsonl; do
+    [[ ! -e $run_dir/$word && ! -L $run_dir/$word ]] || die "Run directory has prior output: $word"
+  done
+  inspect_process "$$" || die 'Wrapper process identity unavailable'
+  printf '%s\n%s\n' "$$" "$process_start" > "$run_dir/wrapper.identity.tmp" || die 'Cannot write wrapper identity'
+  mv -- "$run_dir/wrapper.identity.tmp" "$run_dir/wrapper.identity" || die 'Cannot publish wrapper identity'
+  run_producer
+}
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then main "$@"; exit $?; fi
