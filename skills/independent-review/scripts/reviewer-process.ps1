@@ -118,7 +118,8 @@ function Invoke-ReviewerLaunch {
         [Parameter(Mandatory)][string]$Model,
         [Parameter(Mandatory)][string]$Effort,
         [Parameter(Mandatory)][ValidateSet('yes', 'no')][string]$Native,
-        [ValidateSet('plugins', 'memories', 'skills')][string[]]$KeepFeature = @()
+        [ValidateSet('plugins', 'memories', 'skills')][string[]]$KeepFeature = @(),
+        [string[]]$PermissionArg = @()
     )
     $ErrorActionPreference = 'Stop'
     $answer = Join-Path $Directory 'answer.md'
@@ -148,13 +149,16 @@ function Invoke-ReviewerLaunch {
             $lines.Clear(); $lines.Add('unavailable: ' + $_.Exception.Message)
         }
         [IO.File]::WriteAllLines((Join-Path $Directory 'plugins.txt'), $lines)
-        foreach ($word in @('--print', '--output-format', 'stream-json', '--verbose', '--strict-mcp-config', '--no-chrome',
+        foreach ($word in @('--print', '--output-format', 'stream-json', '--verbose')) { $vector.Add($word) }
+        foreach ($word in $PermissionArg) { $vector.Add($word) }
+        foreach ($word in @('--strict-mcp-config', '--no-chrome',
                 '--session-id', $sessionId, '--settings', (ConvertTo-Json -InputObject $settings -Compress -Depth 4))) { $vector.Add($word) }
         if ($Model -cne 'cli-default') { $vector.Add('--model'); $vector.Add($Model) }
         if ($Effort -cne 'cli-default') { $vector.Add('--effort'); $vector.Add($Effort) }
         [IO.File]::WriteAllText((Join-Path $Directory 'session-id'), $sessionId + "`n")
         $outputName = 'events.jsonl'
     } else {
+        foreach ($word in $PermissionArg) { $vector.Add($word) }
         if ($KeepFeature -notcontains 'plugins') { $vector.Add('--disable'); $vector.Add('plugins') }
         if ($KeepFeature -notcontains 'memories') { $vector.Add('--disable'); $vector.Add('memories') }
         if ($KeepFeature -notcontains 'skills') { $vector.Add('-c'); $vector.Add('skills.include_instructions=false') }

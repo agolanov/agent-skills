@@ -1,10 +1,10 @@
 # Checkout state and verification evidence
 
-Use ordinary Git evidence at every suite, review, cross-check, retry, resume and clean/path gate. Local repositories and agents are trusted; these checks protect against accidental changes. They need Git and the installed shell, with no Python prerequisite. Keep evidence outside every checkout being checked.
+Ordinary Git evidence guards every suite, review, cross-check, retry, resume and clean/path gate. Local repositories and agents are trusted; these checks catch accidental changes. They need Git and the installed shell, no Python. Evidence lives outside every checked checkout.
 
 ## Record and compare Git evidence
 
-For each boundary record the absolute checkout, command, cwd, actual exit, stdout and stderr of all four commands:
+A boundary is these four commands for one absolute checkout, each with its command, cwd, actual exit, stdout and stderr, in a fresh external directory:
 
 ```text
 git -C CHECKOUT rev-parse HEAD
@@ -13,166 +13,99 @@ git -C CHECKOUT diff --binary --no-ext-diff --no-textconv
 git -C CHECKOUT diff --cached --binary --no-ext-diff --no-textconv
 ```
 
-Set `GIT_OPTIONAL_LOCKS=0` for these reads. Use a fresh external directory for each boundary. Preserve stdout bytes, including NULs and binary patches; do not pass them through a text pipeline or command substitution. Retain failed commands and diagnostics. A launch error or nonzero Git exit makes that boundary unavailable, never clean. Obtain all four successful results before starting the dependent action.
-
-At entry and continuation, verify `git -C CHECKOUT rev-parse --show-toplevel`, the actual branch (`symbolic-ref --quiet --short HEAD`, or the caller's expected detached state) and the recorded HEAD against the requested task identity. Record their outputs/exits too. Inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and `GIT_COMMON_DIR` can redirect these commands: diagnose them or clear them only in the current command process before checking. An unexpected checkout, branch, index override or HEAD blocks the dependent action until reconciled; `-C` alone does not establish identity.
-
-On POSIX, bind absolute `checkout` and fresh external `evidence` directories. Run in a command shell that saves failures before continuing (without `errexit`):
+Run them with `GIT_OPTIONAL_LOCKS=0` and with `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and `GIT_COMMON_DIR` cleared in that process only. Keep stdout as bytes (NULs and binary patches included), never through a text pipeline or command substitution. A launch error or nonzero exit makes the boundary unavailable, never clean; all four must succeed before the dependent action.
 
 ```bash
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
-export GIT_OPTIONAL_LOCKS=0
-git -C "$checkout" rev-parse HEAD >"$evidence/head.stdout" 2>"$evidence/head.stderr"
-printf '%s\n' "$?" >"$evidence/head.exit"
-git -C "$checkout" status --porcelain=v1 -z --untracked-files=all >"$evidence/status.stdout" 2>"$evidence/status.stderr"
-printf '%s\n' "$?" >"$evidence/status.exit"
-git -C "$checkout" diff --binary --no-ext-diff --no-textconv >"$evidence/worktree-diff.stdout" 2>"$evidence/worktree-diff.stderr"
-printf '%s\n' "$?" >"$evidence/worktree-diff.exit"
-git -C "$checkout" diff --cached --binary --no-ext-diff --no-textconv >"$evidence/cached-diff.stdout" 2>"$evidence/cached-diff.stderr"
-printf '%s\n' "$?" >"$evidence/cached-diff.exit"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR; export GIT_OPTIONAL_LOCKS=0
+git -C "$checkout" rev-parse HEAD >"$evidence/head.stdout" 2>"$evidence/head.stderr"; echo $? >"$evidence/head.exit"
+git -C "$checkout" status --porcelain=v1 -z --untracked-files=all >"$evidence/status.stdout" 2>"$evidence/status.stderr"; echo $? >"$evidence/status.exit"
+git -C "$checkout" diff --binary --no-ext-diff --no-textconv >"$evidence/worktree-diff.stdout" 2>"$evidence/worktree-diff.stderr"; echo $? >"$evidence/worktree-diff.exit"
+git -C "$checkout" diff --cached --binary --no-ext-diff --no-textconv >"$evidence/cached-diff.stdout" 2>"$evidence/cached-diff.stderr"; echo $? >"$evidence/cached-diff.exit"
 ```
 
-On native Windows, use the verified installed PowerShell executable. This recipe uses pwsh 7.6.9's byte-preserving direct native stdout redirection; run it in that shell, with absolute `checkout` and fresh external `evidence` directories. Resolve the executable first; a launch/redirection exception is unavailable evidence even if an old `$LASTEXITCODE` exists.
+On native Windows run the same four in PowerShell 7 with the resolved `git` application, `$ErrorActionPreference = 'Stop'`, `$PSNativeCommandUseErrorActionPreference = $false`, the four variables removed from `Env:`, direct `>`/`2>` redirection (byte-preserving in PowerShell 7) and `$LASTEXITCODE` written to each `.exit` file; a launch or redirection exception is unavailable evidence. Another shell uses its own byte-preserving file and process APIs; an unsupported shell stays explicit, and no runtime is installed for this.
 
-```powershell
-$git = (Get-Command git -CommandType Application -ErrorAction Stop).Source
-$ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $false
-foreach ($name in 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR') { Remove-Item -LiteralPath ('Env:' + $name) -ErrorAction SilentlyContinue }
-$env:GIT_OPTIONAL_LOCKS = '0'
-& $git -C $checkout rev-parse HEAD > "$evidence/head.stdout" 2> "$evidence/head.stderr"
-$LASTEXITCODE | Set-Content -LiteralPath "$evidence/head.exit" -Encoding ascii
-& $git -C $checkout status --porcelain=v1 -z --untracked-files=all > "$evidence/status.stdout" 2> "$evidence/status.stderr"
-$LASTEXITCODE | Set-Content -LiteralPath "$evidence/status.exit" -Encoding ascii
-& $git -C $checkout diff --binary --no-ext-diff --no-textconv > "$evidence/worktree-diff.stdout" 2> "$evidence/worktree-diff.stderr"
-$LASTEXITCODE | Set-Content -LiteralPath "$evidence/worktree-diff.exit" -Encoding ascii
-& $git -C $checkout diff --cached --binary --no-ext-diff --no-textconv > "$evidence/cached-diff.stdout" 2> "$evidence/cached-diff.stderr"
-$LASTEXITCODE | Set-Content -LiteralPath "$evidence/cached-diff.exit" -Encoding ascii
-```
+At entry and continuation also record `git rev-parse --show-toplevel`, the branch (`symbolic-ref --quiet --short HEAD`, or the caller's expected detached state) and HEAD, and check them against the task identity; a mismatch blocks until reconciled.
 
-Record the commands/cwd alongside these files and inspect all exits before proceeding. For another installed shell, use its ordinary file/process APIs to preserve stdout bytes and record real exits. Keep any unsupported shell case explicit; do not install a runtime to satisfy this reference.
-
-Record before and after each phase, then compare corresponding stdout files as bytes, for example with `cmp` on POSIX or `fc.exe /b` on Windows. Retain each comparison's output and real exit: 0 is equal, 1 is different, and a comparison error is unavailable evidence. Any difference requires inspection and disposition, including a status-only difference. Report **unchanged recorded Git evidence**, not proof that all filesystem bytes were unchanged. In a parallel review use one shared before/after set; in clone mode record and compare both checkouts separately.
+Compare before and after stdout as bytes (`cmp`, `fc.exe /b`), keeping each comparison's exit: 0 equal, 1 different, other unavailable. Any difference, status-only included, is inspected and disposed of. A parallel review uses one shared before/after set; clone mode records both checkouts. Report **unchanged recorded Git evidence**, never proof that all bytes stayed unchanged.
 
 ## Direct-use preflight
 
-Use the four-command boundary immediately before each clean/path gate; an earlier result is not a later gate. Confirm the recorded HEAD is the required commit. A **clean gate** requires successful commands, empty status and empty worktree/cached diffs. A direct review with a dirty result reviews the committed state, per **Uncommitted changes** in [direct use](../SKILL.md#direct-use). Preserve unrelated work.
+Take a fresh boundary immediately before each gate and confirm HEAD is the required commit. A **clean gate** needs four successful commands, empty status and empty diffs; a dirty direct review reviews the committed state ([direct use](../SKILL.md#direct-use)). Path gates parse the raw NUL-delimited status (two status columns, a space, a path; rename and copy entries carry a second path, both counted) and compare exact repository-relative paths, case and spaces included, never substrings; a status that cannot be parsed or conflicts with the diffs stops the gate.
 
-For path gates, parse the raw NUL-delimited porcelain v1 status, not its displayed lines. Each entry starts with two status columns and a space, followed by a repository-relative path; rename/copy entries have a second NUL-delimited path. Include both rename/copy paths. Compare exact paths with the caller's file set, preserving case, spaces and other literal characters; substring matching is insufficient. If the status cannot be parsed faithfully or conflicts with the diffs, stop that gate and inspect the evidence.
+- **Follow-ups-only gate:** every affected path equals the one follow-ups file.
+- **Own-paths gate:** no affected path equals a caller-owned file; unrelated dirty paths pass.
 
-- A **follow-ups-only gate** requires every affected path to equal the one follow-ups file.
-- An **own-paths gate** requires no affected path to equal any caller-owned file; unrelated dirty paths pass that gate.
-- Stage and commit only explicitly task-owned paths. A path gate grants no write, merge or push authority.
+Stage and commit only explicitly task-owned paths. A gate grants no write, merge or push authority.
 
-**OPTIONAL COMPATIBILITY:** the retained `scripts/checkout-state.py` is the unchanged legacy Python helper. Existing callers/tests may explicitly use its capture/compare/module interfaces on a compatible installed runtime. It is not the default gate, a native Windows requirement or a fallback that turns failed Git evidence into clean evidence. Legacy records retain their own schema and limits; keep their evidence separate from ordinary Git outputs.
-
-The first Python recipe below preserves the legacy `(checkout-state.py, capture_dir)` interface. It reads an existing successful legacy capture; recipe and output stay outside the checkout:
-
-```python
-import json
-import runpy
-import sys
-
-sys.dont_write_bytecode = True
-state = runpy.run_path(sys.argv[1])
-record, _ = state['read_record'](sys.argv[2])
-print(json.dumps(state['preflight'](record)))
-```
-
-For this optional recipe, retain the capture/recipe exits and errors; an exception, diagnostic capture or nonzero exit is unavailable. The result's `uncommitted` boolean and base64 `paths` retain their legacy meanings. Decode paths and use the exact-path gate rules above. Legacy successful evidence does not expand the ordinary Git guarantee.
+The retained `scripts/checkout-state.py` is optional legacy for existing callers on a compatible runtime: never the default gate, a Windows requirement or a fallback that makes failed Git evidence clean. Its records keep their own schema; a phase begun with it keeps it until resolved.
 
 ## Other read-only Git gates
 
-Use ordinary Git for branch, ancestry, root, commit and artifact checks too, with `GIT_OPTIONAL_LOCKS=0`, literal argument arrays/quoting and actual exits. Examples:
-
-```bash
-GIT_OPTIONAL_LOCKS=0 git -C "$directory" rev-parse --show-toplevel
-GIT_OPTIONAL_LOCKS=0 git -C "$review_tree" log --oneline "$base..$branch"
-GIT_OPTIONAL_LOCKS=0 git -C "$docs_tree" diff --no-ext-diff --no-textconv --quiet "$branch" HEAD -- "$artifact"
-```
-
-For a comparison such as `diff --quiet`, exit 0 means equal and 1 means different; an error is neither. For lookups, distinguish a documented absence result from a command/setup failure. Retain stderr and stop dependent actions when required evidence is unavailable. There is no mandatory wrapper, private-index capture or normalization/stat-refresh ceremony. Explicit mutating actions keep their existing authority.
+Branch, ancestry, root, commit and artifact checks use ordinary Git with `GIT_OPTIONAL_LOCKS=0`, literal arguments and actual exits (for example `git -C "$tree" log --oneline "$base..$branch"`, `git diff --quiet "$branch" HEAD -- "$artifact"`). For a comparison, 0 is equal, 1 different, other an error; for a lookup, a documented absence is not a failure. Unavailable evidence stops the dependent action.
 
 ## Evidence limits
 
-These are ordinary trusted-local checks, not an atomic snapshot or adversarial filesystem proof. They can miss ignored files, changes to already-untracked file contents, assume-unchanged/skip-worktree paths, bytes hidden by Git normalization/filters, nested repository/submodule contents and transient writes restored before the next boundary. The ordinary repository configuration applies. A clean outer result does not certify clean submodules. No result authorizes writes to those surfaces.
-
-Carry these limits in state/suite/review records. A finding verdict, result validity and verification coverage are separate decisions. Disclose any additional known gap rather than claiming that Git output equality proved raw-byte equality.
+These checks are not an atomic snapshot. They miss ignored files, content changes of already-untracked files, assume-unchanged and skip-worktree paths, bytes hidden by Git filters or normalization, nested repositories and submodules, and transient writes restored before the next boundary. Carry these limits in every state, suite and review record, and disclose any further known gap. Finding verdict, result validity and verification coverage are separate decisions.
 
 ## Phase recovery and resume
 
-**Pending window phase:** before the Git recovery below, use the retained owner/name/launch records to confirm fresh `alive` exit exactly 1 for **every** participant whose phase has unconfirmed shutdown. Missing ownership/name records or another exit keeps caller control `blocked: reviewer shutdown unconfirmed` (system-qualified with `state.md` in dual review), including beside a diagnostic proven difference. Preserve affected attempts, clone/source mappings, diagnostics, phase baseline and spent counts. No Git recovery comparison, write adjudication, retry or new baseline proceeds while a participant may be alive. See the [window completion barrier](window-reviewers.md#stop-confirm-capture-validate) and its ownership/descendant limits. Ordinary non-window recovery is unchanged.
+**Pending window phase first.** Before any Git recovery, every participant of a phase with unconfirmed shutdown needs a fresh `alive` exit exactly 1 from its retained owner and name records ([window barrier](window-reviewers.md#stop-confirm-capture-validate)). Missing records or another exit keep the caller `blocked: reviewer shutdown unconfirmed` (system-qualified with `state.md` in a dual review), even beside a proven difference; nothing is compared, adjudicated, retried or rebaselined meanwhile.
 
-On every continuation of that pending phase, including a resumed caller's single-reviewer round, confirm all participants stopped first, then freshly capture/compare every monitored tree against the saved before. Only this stopped-process boundary permits proven-write adjudication or normal invalid-completion/retry rules. Retain any previously proven difference and other conditions alongside final evidence. If unchanged, retain the invalid-completion outcome and charge it once under existing caller rules, preserving any spend already recorded; resume never double-charges or resets/extends budgets. A retained shell/window with `alive` exit 1 is reported independently.
+Then compare a fresh boundary of every monitored tree with the phase's saved before, which is kept until the phase is resolved:
 
-Keep the successful before evidence until a phase is resolved. Clone mode tracks both the reviewed clone and original checkout, naming which changed or is unavailable.
+- **Failed before:** nothing launched, no attempt spent; obtain the baseline first.
+- **Failed after:** record every other condition; without a proven difference the result is `invalid: state verification unavailable: <error>`, spending the review's budget (a suite failure blocks before reviewers and spends none).
+- **Retry, rerun, reuse or new baseline:** unchanged evidence continues; a difference returns `checkout changed` for the original phase's adjudication; persistent unavailability blocks. An unchanged continuation keeps the invalid outcome, charged once; no resume double-charges or resets a budget.
+- **Same-HEAD resume** (`scratch` or `invalidating`): needs unchanged evidence against the pre-interruption baseline before the answer is applied.
+- **New-HEAD reconciliation:** needs an explicit reconciled baseline, a new target and no unexplained residual change; old review answers do not apply, and suite applicability is refreshed.
 
-- Failed **before** evidence: launch nothing and spend no attempt. Resolve the error and obtain the pending phase's baseline; do not attribute a later authorized commit to an earlier reviewer.
-- Failed **after** evidence: record every other completion/settings/coverage condition. Absent a proven difference, return `invalid: state verification unavailable: <error>`. A review spends its existing invalid-attempt budget; a suite failure blocks before reviewers and spends none. Parallel attempts retain separate validity and budgets.
-- Before retry, rerun, reuse or a replacement baseline, compare the next successful four-command results to the interrupted phase's saved before results. Unchanged evidence permits continuation; a difference returns `checkout changed` for the original phase's adjudication. Persistent unavailability blocks.
-- Same-HEAD resume, both `scratch` and `invalidating`, requires unchanged recorded evidence against the pre-interruption baseline before applying the answer and existing reuse/spend rules. Keep the answer unapplied while changes remain unexplained.
-- Authorized new-HEAD reconciliation requires an explicit reconciled baseline, a new target and no unexplained residual changes. Resolve an interrupted phase first; preserve old evidence and spent attempts. Refresh suite applicability through a new acceptance record or necessary checks for the reconciled target; old review answers do not apply to it.
-
-A demonstrated difference retains `checkout changed` precedence even beside errors; pending window shutdown still blocks caller control until the lifecycle precondition above is met. Preserve outputs, available unexpected content and diffs externally, identify their source and let the caller adjudicate only after that precondition. A read failure alone is not a write claim. Never reset or fold unexpected writes into commits automatically.
-
-An interrupted legacy-helper phase keeps its original evidence method until it is resolved or explicitly reconciled by its caller; ordinary Git outputs cannot silently certify equality with a legacy capture. New phases use the ordinary Git boundary by default.
+A proven difference keeps `checkout changed` precedence even beside errors. Preserve outputs, unexpected content and diffs externally with their source; a read failure alone is no write claim. Never reset unexpected writes or fold them into commits.
 
 ## Resolve checks and bind suite evidence
 
-At entry resolve exact ordered complete-suite and targeted commands, cwd, requirement source, intended coverage and mandatory phase/producer requirements. Approved spec Verification is primary; mandatory project gates/defaults still apply, and README supplies otherwise undefined commands. Resolve conflicts before dependent work; preserve explicit commands and unavailable coverage. If no complete suite exists, record exactly `no complete suite defined`.
-
-Inspect retained run records before scheduling checks, including implementation runs before loop entry. Forward the resolved requirements, run/acceptance paths and remaining required checks to every worker; consumers use this contract rather than a separate reuse rule. A reviewer receives the commands and their results as data in its [context file](review-wrapper.md#the-context-file) and inspects no records: the session that runs the review owns the suite, its records and their acceptance, and an independent review does not itself require re-executing an applicable suite. A user/project requirement for a fresh independent run or a named phase remains binding. When such a requirement names the reviewer as the one who runs a check, the obligation cannot move to the session: the wrapper carries its reviewer-run line with those commands, and the obligation is met only by runtime records that show each command and how it ended, never by the report's word; without them it stays `pending`.
+At entry resolve the exact ordered complete-suite and targeted commands with cwd, requirement source, intended coverage and mandatory phase/producer obligations: approved spec Verification first, then mandatory project rules, then README for commands nothing else defines. Resolve conflicts first; record unavailable coverage, or `no complete suite defined`. Inspect retained run records, implementation runs included, before scheduling checks, and forward the resolved set, run/acceptance paths and remaining checks to every worker. A reviewer gets commands and results as data in its [context file](review-wrapper.md#the-context-file); the session running the review owns the suite and its records. A requirement that names the reviewer as the one who runs a check stays the reviewer's, met only by runtime records showing each command and how it ended, else `pending`.
 
 ### Merge-candidate checks
 
-A required check whose requirement names the merge candidate as its phase (for example `Phase: merge candidate` in a spec's Verification item, in the document's own language) is a **merge-candidate check**. Its obligation falls due on the merge candidate: the reviewed branch standing on the current main, after review and before the merge. Until then every record, context file and result carries it with its command as `pending: merge candidate`, a coverage state of its own beside the four of [Run records and applicability](#run-records-and-applicability) step 5: implementation and review leave it unrun, and it is not a coverage gap. Once it has run, its records follow this contract like any other check's; a later change of the candidate (a rebase onto a moved main, a fix commit) makes it `pending: merge candidate` again unless the acceptance sequence retains its evidence for the new HEAD.
+A required check whose Verification item names the merge candidate as its phase (for example `Phase: merge candidate`) is due on the merge candidate: the reviewed branch on the current main, after review and before the merge. Until then every record, context file and result carries it as `pending: merge candidate` with its command; it is no coverage gap. A later change of the candidate makes it pending again unless the acceptance retains its evidence for the new HEAD.
 
 ### Run records and applicability
 
-Keep each original run record immutable. Record its absolute tested checkout, branch/HEAD and working/index state (including tested dirty inputs), exact ordered commands, cwd/source, actual stdout/stderr/exits, successful historical before/after Git outputs and their comparisons. Name the relevant runtime, tests, fixtures, shared setup, runners, configuration and dependency inputs for its coverage, dependency resolution and profile/environment facts, known writes and disposition/restoration evidence, environment changes and ordinary Git evidence limits. Unknown facts stay unknown.
+A run record is immutable: tested checkout, branch, HEAD and working/index state (dirty inputs included), ordered commands, cwd, outputs and exits, before/after boundaries with comparisons, relevant runtime, fixture, dependency, configuration and environment facts, known writes and limits. Unknown facts stay unknown.
 
-Reuse stays in the **same absolute tested checkout**. Evidence from another checkout or clone establishes no input/environment equivalence; direct-use clones obtain missing checks there. For every proposed reuse write a separate acceptance record outside monitored trees, naming original runs and tested states, the current committed target, current successful boundaries, intervening changes, per-check applicability and fresh checks. Use this sequence:
+Reuse stays in the same absolute tested checkout. Each reuse gets a separate acceptance record:
 
-1. Inspect actual run records and referenced outputs, not only summaries. Claimed passing coverage requires successful commands and historical boundaries. A fresh capture cannot reconstruct a missing historical boundary.
-2. Resolve pending phase recovery/write adjudication **before scheduling replacement checks**, even when step 1 rejected the old run as coverage. Rejecting a run does not resolve its interrupted phase. Under [Phase recovery and resume](#phase-recovery-and-resume), first compare fresh successful four-command evidence to that phase's retained before boundary in every monitored tree and adjudicate differences; retain the comparison/disposition as the recovery prerequisite. A replacement check's before capture alone, or a comparison performed after it starts, does not satisfy this earlier gate. Then compare current evidence to the last accepted boundary, inspecting and disposing of **every** difference, including status-only/index changes. An authorized commit transition is an explicit new target, not unchanged Git evidence.
-3. Inspect the complete intervening diff against the tested working state, including the pre-run staged/unstaged content when testing preceded its commit. Establish which checked inputs changed. Clean status, equal HEAD/status, tree IDs or helper hashes alone are insufficient; failed commands and unexplained residual content prevent acceptance.
-4. Retain coverage of unchanged inputs. For changed inputs, run affected checks where inspected code/test relationships bound the impact; broad or unknown effects require the corresponding complete suite. Changes to shared setup, fixtures, runners, dependencies, configuration or profile invalidate relevant results. Unknown dependency/profile/environment equivalence prevents reuse of affected coverage. Record known relevant inputs on Git's uncovered surfaces and their evidence or gaps.
-5. Publish applicability to the new target separately, preserving original run identities and actual execution claims. Every resolved command/coverage item and phase/producer obligation is `retained`, `fresh`, `pending` or `failed/unavailable`. Keep all links/intervening changes inspectable through repeated handoffs. A required check remains required; failed or pending coverage needs applicable passing evidence before it can be complete. Classify coverage from records already obtained at that handoff; a scheduled full run remains pending in scoped prompts/results until its passing record exists.
+1. Inspect the actual records and outputs; passing coverage needs successful commands and historical boundaries.
+2. Resolve pending phase recovery first, then compare a current boundary with the last accepted one and dispose of every difference.
+3. Inspect the complete intervening diff against the tested state; equal HEAD or tree IDs alone are not enough.
+4. Keep coverage of unchanged inputs; rerun checks whose inputs changed, the complete suite when the effect is broad or unknown.
+5. Publish per check `retained`, `fresh`, `pending` or `failed/unavailable`, preserving the original run identities.
 
-A passing dirty pre-commit run may cover an authorized task-state commit when inspection proves those exact checked inputs were committed, with no further relevant change or conflicting phase/producer requirement. Record the dirty tested state separately from the new commit. Commit identity alone requires no execution and grants no authority to retain unexplained writes or old review answers.
-
-For a bounded local test-body cleanup, prior complete-suite coverage may cover unaffected tests/runtime after the **entire changed test file** and relevant static checks pass. Inspect shared setup, runners, dependencies, configuration and profile as unchanged; a test filename is not enough. Report composed retained/fresh complete coverage, with the original full command's earlier tested state, rather than claiming it executed on the new commit.
-
-A concise acceptance example (human-readable, not a parser schema):
+A passing dirty run covers a task-state commit when inspection proves exactly those inputs were committed. After a bounded test-only cleanup, prior complete coverage covers unaffected tests once the whole changed test file and relevant static checks pass. A completed writing suite on unchanged HEAD may be retained after restoration is proven against its before-suite evidence; suite writes otherwise need adjudication and restoration or an authorized task commit before review. A failed required check blocks dependent work and grants no amend, squash or unreviewed corrective commit.
 
 ```text
-Original runs: absolute immutable record paths; original tested states
+Original runs: absolute record paths; original tested states
 Current target: checkout, branch, full committed SHA and successful Git boundary
-Recovery prerequisite: none | resolved, retained phase baseline and pre-replacement comparison/disposition paths | pending, blocks replacement checks
-Intervening change: retained diff/evidence paths and disposition of every difference
-Applicability: per resolved check, unchanged coverage and inspected relevant inputs
-Fresh checks: record paths with actual command/cwd/exit and affected coverage
-Required phase/producer: requirement source and satisfied or pending obligation
-Coverage: retained | fresh | pending | failed/unavailable, per required item
-Limits: ordinary Git evidence limits and additional known gaps
+Recovery prerequisite: none | resolved, comparison/disposition paths | pending, blocks replacement checks
+Intervening change: diff/evidence paths and disposition of every difference
+Applicability: per check, unchanged coverage and inspected inputs
+Fresh checks: record paths with command/cwd/exit and coverage
+Required phase/producer: source and satisfied or pending obligation
+Coverage: retained | fresh | pending | failed/unavailable, per item
+Limits: Git evidence limits and other known gaps
 ```
-
-For a completed writing suite on unchanged HEAD, either caller answer (`scratch` or `invalidating`) followed by successful restoration comparison to the original before-suite evidence permits retaining the run. Keep the original changed comparison, restoration proof, actual exits/coverage and all other applicability conditions; advance without rerunning that writing suite. Neither answer spends reviewer attempts for a suite phase. New-HEAD reconciliation refreshes applicability by acceptance or necessary checks after recovery, preserving old evidence and spent attempts; old review answers do not apply to a new target.
-
-Suite writes require caller adjudication and restoration or an authorized task commit before review. Missing facts, failed captures and unresolved writes prevent reuse: obtain required checks within existing authority or disclose incomplete verification. A failed required check blocks dependent work without granting amend, squash or unreviewed corrective-commit authority.
 
 ### Run and hand off a suite
 
-Use this recipe from the first complete suite whose result is intended for review-fix-loop, including implementation checks before loop entry. The suite owner resolves checks, phase/producer obligations and applicability. A delegated brief carries `Suite evidence:` with this reference's absolute path, an external records directory and retained run/acceptance paths (`None` when absent); resolve them before launch, and require this recipe before the child's first complete suite.
+Use from the first complete suite meant for review-fix-loop, implementation checks included. A delegated brief carries `Suite evidence:` with this reference's path, an external records directory and retained run/acceptance paths (`None` when absent).
 
-1. **Inspect retained runs.** Inspect supplied and task records and apply the acceptance sequence before scheduling another suite. Record the recovery prerequisite as none, resolved with comparison/disposition paths, or pending; pending recovery blocks replacement checks even when the old run cannot supply coverage. Then resolve missing coverage and explicit phase/producer obligations. A missing summary link alone does not invalidate complete retained evidence.
-2. **Prepare and capture.** For required executions, allocate a fresh external run directory. Record ordered commands, cwd/source, tested checkout/branch/HEAD and working/index state, coverage, phase/producer and known dependency/profile/environment facts. Verify identity and successfully capture all four before commands with raw outputs, diagnostics and actual exits under [Record and compare Git evidence](#record-and-compare-git-evidence). Failed before evidence launches no suite.
-3. **Run and capture.** Execute resolved commands in their recorded cwd; retain stdout/stderr/actual exits and launch failures. After completion, including failure, capture the after boundary and compare all four outputs as bytes. Retain failures/differences and apply [Phase recovery and resume](#phase-recovery-and-resume) before replacing an unresolved baseline.
-4. **Publish the run.** Write the immutable run record with original tested inputs/identity, command results/outputs, boundaries/comparisons, environment/dependency facts, writes and limits. Link its absolute path beside the command/result in the producer's `Checks`, including failed/partial completion. Recording a failed check does not make it passing.
-5. **Accept for the current target.** Inspect actual records and referenced files, freshly capture the current boundary and apply the acceptance sequence. Put retained/fresh/pending/failed coverage and phase/producer obligations in a separate acceptance record. For a missing summary link, link genuine files in that record or obtain a corrected producer report, preserving the original report. Missing historical evidence stays missing; run necessary checks only within existing authority. Forward actual run/acceptance paths and remaining checks to every worker; reviewers get the commands and their results as data in their context files. Interrupted phases retain recovery obligations.
+1. **Inspect retained runs** by the acceptance sequence above; pending recovery blocks replacement checks.
+2. **Prepare and capture.** A fresh external run directory; record commands, cwd, tested identity and state, coverage and obligations; capture the before boundary (a failed one runs nothing).
+3. **Run and capture.** Run in the recorded cwd, keep outputs and exits, then capture and compare the after boundary, also after a failure.
+4. **Publish the run** as an immutable record, linked beside its result in the producer's `Checks`, failed runs included.
+5. **Accept for the current target** in a separate acceptance record, and forward run/acceptance paths and remaining checks to every worker.
 
 ## Verification marker
 
-Report `Verification: complete | incomplete: <specific required checks or coverage gaps>` beside findings verdicts, and in attempt results. Aggregate applicable retained/fresh coverage and relevant retained review/cross-check gaps for the current committed target; name pending and failed/unavailable requirements and phase/producer obligations. Include command, cwd, exit/reason and missing setup. Superseded invalid attempts replaced by valid retries do not poison current coverage.
-
-`complete` means every resolved required check/coverage item has applicable passing evidence, including required phase/producer obligations, within the stated boundaries. Distinguish actual full-command execution on its original tested state from composed retained/fresh coverage; a new SHA alone requires no suite execution. Keep `no complete suite defined` visible beside the marker; it is not itself a failed check. A permitted clone-only missing-setup exception still means incomplete; any required check not attempted remains missing coverage. A [merge-candidate check](#merge-candidate-checks) still `pending: merge candidate` is named beside the marker and leaves it as the other required checks set it. A host review command or scan that could not start, complete or apply (for example `/security-review` in a checkout without `origin/HEAD`) is a tool limitation, not a required check: the reviewer's own security review covers it, it stays disclosed in coverage records, it leaves the marker as the required checks set it, and the checkout's refs, remotes and Git configuration stay as they are. Validity, Verification and findings verdict are separate: direct CLEAN can coexist with incomplete verification, while the loop cannot close clean with failed/unrun required checks.
+Report `Verification: complete | incomplete: <specific required checks or coverage gaps>` beside every findings verdict and in attempt results. `complete` means every required check and phase/producer obligation has applicable passing evidence for the current committed target; name each pending, failed or unavailable one with command, cwd and exit or reason. Keep `no complete suite defined` visible beside the marker; it is not a failed check. A [merge-candidate check](#merge-candidate-checks) still pending is named beside the marker and does not change it. A host review command that could not start or apply (such as `/security-review` without `origin/HEAD`) is a disclosed tool limitation, not a required check; refs, remotes and Git configuration stay as they are. A clone-only missing-setup exception still means incomplete. Superseded invalid attempts do not poison current coverage. Validity, Verification and verdict are separate: a direct CLEAN may stand beside incomplete verification, while the loop cannot close clean with a failed or unrun required check.

@@ -3,6 +3,10 @@
 #
 # usage: reviewer-process <claude|codex> --command PATH --checkout DIR --prompt FILE --dir ROUND_DIR
 #          --model M|cli-default --effort E|cli-default --native yes|no [--keep-feature plugins|memories|skills]...
+#          [--permission-arg WORD]...
+#
+# --permission-arg passes one already authorized permission word literally (Claude: after
+# --verbose; Codex: before review), for example --dangerously-bypass-approvals-and-sandbox.
 #
 # Writes into ROUND_DIR:
 #   argv.txt       the command and its arguments, one word per line
@@ -21,6 +25,7 @@ system=${1:-}; shift || true
 [[ $system == claude || $system == codex ]] || die 'first argument must be claude or codex'
 command='' checkout='' prompt='' dir='' model='' effort='' native=''
 keep_plugins='' keep_memories='' keep_skills=''
+permission_args=()
 while (($#)); do
   [[ $# -ge 2 && -n $2 ]] || die "$1: a value is required"
   case $1 in
@@ -31,6 +36,7 @@ while (($#)); do
     --model) model=$2 ;;
     --effort) effort=$2 ;;
     --native) native=$2 ;;
+    --permission-arg) permission_args+=("$2") ;;
     --keep-feature)
       case $2 in
         plugins) keep_plugins=1 ;;
@@ -114,12 +120,13 @@ args=()
 if [[ $system == claude ]]; then
   session_id=$(new_uuid) || die 'no UUID source (uuidgen or /proc/sys/kernel/random/uuid)'
   settings=$(plugins_off | claude_settings)
-  args=(--print --output-format stream-json --verbose --strict-mcp-config --no-chrome --session-id "$session_id" --settings "$settings")
+  args=(--print --output-format stream-json --verbose ${permission_args[@]+"${permission_args[@]}"} --strict-mcp-config --no-chrome --session-id "$session_id" --settings "$settings")
   [[ $model == cli-default ]] || args+=(--model "$model")
   [[ $effort == cli-default ]] || args+=(--effort "$effort")
   printf '%s\n' "$session_id" > "$dir/session-id"
   out=$dir/events.jsonl
 else
+  args=(${permission_args[@]+"${permission_args[@]}"})
   [[ -n $keep_plugins ]] || args+=(--disable plugins)
   [[ -n $keep_memories ]] || args+=(--disable memories)
   [[ -n $keep_skills ]] || args+=(-c skills.include_instructions=false)
