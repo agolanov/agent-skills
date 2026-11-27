@@ -20,7 +20,9 @@ export LANG=${LANG:-C.UTF-8}
 
 usage() {
   cat <<'USAGE'
-child-session open [--agent claude|codex[:COMMAND]] [--model M] [--effort E] [--split right|down] <name> <cwd> <brief-file>
+child-session open [--agent claude|codex[:COMMAND]] [--model M] [--effort E] [--cli-arg WORD]... [--split right|down] <name> <cwd> <brief-file>
+  --cli-arg appends one literal word to the agent's command line, after the permission arguments and
+  --model/--effort, in the order given; the word is never split or evaluated. Repeat it per word.
   --split asks for a herdr pane beside HERDR_PANE_ID; it opens a tab or tmux window instead, with a note on
   stderr, when the opener's tab has another pane, HERDR_PANE_ID is unset or the backend is tmux.
 child-session send <name> <text>       Empty text sends only Enter.
@@ -546,6 +548,7 @@ cmd_open() {
     [[ -z "$model" ]] || args+=(-m "$model")
     [[ -z "$effort" ]] || args+=(-c "model_reasoning_effort=$effort")
   fi
+  args+=(${CLI_ARGS[@]+"${CLI_ARGS[@]}"})
   args+=("Read the brief at $brief completely and carry it out.")
 
   # Non-interactive startup preserves the caller's PATH (including custom CLIs).
@@ -1590,13 +1593,14 @@ initialize_runtime
 
 case ${1:-} in
   open)
-    shift; split=; model=; effort=
+    shift; split=; model=; effort=; CLI_ARGS=()
     while [[ ${1:-} == --* && ${1:-} != -- ]]; do
       [[ $# -ge 2 && -n $2 ]] || die "${1}: a value is required"
       case $1 in
         --agent) AGENT=$2 ;;
         --model) model=$2 ;;
         --effort) effort=$2 ;;
+        --cli-arg) CLI_ARGS+=("$2") ;;
         --split) [[ $2 == right || $2 == down ]] || die '--split must be right or down'; split=$2 ;;
         *) die "unknown option $1" ;;
       esac
