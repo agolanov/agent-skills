@@ -35,7 +35,7 @@ Every suite phase has before/after Git evidence (both trees in clone mode). A su
 
 Both reviewers get the [wrapper](review-wrapper.md#the-wrapper) of the review kind with the dual line, and context files with the same content; round 1, the final pass and direct use keep the security line. Native reports carry no IDs: this session assigns each reviewer's source IDs in report order in its `findings.md` (`codex F1`, `claude F1`).
 
-The phase runs both reviewers in parallel (one after the other under a reviewer-run obligation) inside one shared Git boundary of every monitored tree:
+The phase runs both reviewers in parallel inside one shared Git boundary of every monitored tree; under a reviewer-run obligation they run one after the other, each on its own boundary, and a write found after the first stops the phase before the second starts:
 
 - **`--run window`:** each call is one [window reviewer](window-reviewers.md); register both as current-phase peers, open both before either wait, and stop and confirm **both** before the shared after capture.
 - **`--run background`:** two background jobs in one host background command, each one [CLI launch](cli-reviewers.md#launch) with `--native yes` and its own attempt directory, then wait for both:
@@ -67,7 +67,7 @@ A unique finding that repeats a ledger cross-check rejection by the same reviewe
 
 ## 5. Cross-check
 
-Each unique in-scope finding that is not a `repeat` goes to the other reviewer: one cross-check call per verifier, in a fresh process, carrying all the other reviewer's unique findings. Two verifiers form a parallel phase as in step 3; one direction runs alone; an explicitly assigned complete-check obligation makes them run one after the other without the concurrency line. No unique finding, no cross-check.
+Each unique in-scope finding that is not a `repeat` goes to the other reviewer: one cross-check call per verifier, in a fresh process, carrying all the other reviewer's unique findings. Two verifiers form a parallel phase as in step 3; one direction runs alone; an explicitly assigned complete-check obligation makes them run one after the other without the concurrency line, each on its own boundary, a write after the first stopping the phase before the second. No unique finding, no cross-check.
 
 Fill the [cross-check prompt](cross-check-prompt.md) per verifier and launch it through independent-review in place of the wrapper (`--native no`), in `cross-check/<verifier>/attempt-<n>/`. Its report checks: a `CROSS-CHECK REPORT` block, wherever it appears, gives every listed source ID `confirmed` or `rejected`, a severity and checkable evidence (code quoted with path:line, a run with command and result, or a quoted requirement); a rejection of a finding with a runnable reproduction gives that run's command and result and shows against a quoted requirement that it demonstrates no violation. A listed ID without verdict or evidence, or a reproduction rejected unrun, makes the attempt `invalid: evidence-free cross-check of <ID>`; the retry sends the same list. The prompt's check commands add no blanket suite run.
 

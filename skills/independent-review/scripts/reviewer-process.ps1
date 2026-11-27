@@ -135,15 +135,22 @@ function Invoke-ReviewerLaunch {
             Push-Location -LiteralPath $Checkout
             try { $listed = & $Command plugin list --json 2>$null; $listExit = $LASTEXITCODE } finally { Pop-Location }
             if ($listExit -ne 0) { throw ($Command + ' plugin list --json failed') }
+            # Decide by ID: an ID stays on when any of its installs has hooks or cannot be read.
+            $keep = [ordered]@{}
             foreach ($plugin in @(ConvertFrom-Json -InputObject ($listed -join "`n"))) {
                 if ($plugin.enabled -ne $true) { continue }
+                $id = [string]$plugin.id
+                if (-not $keep.Contains($id)) { $keep[$id] = $null }
                 $path = [string]$plugin.installPath
                 $manifest = if ($path) { Join-Path $path '.claude-plugin/plugin.json' } else { $null }
-                if (-not $path -or -not [IO.Directory]::Exists($path)) { $lines.Add('on ' + $plugin.id + ' unknown: no readable install path') }
+                if (-not $path -or -not [IO.Directory]::Exists($path)) { $keep[$id] = 'unknown: no readable install path' }
                 elseif ([IO.File]::Exists((Join-Path $path 'hooks/hooks.json')) -or
                         ([IO.File]::Exists($manifest) -and (ConvertFrom-Json ([IO.File]::ReadAllText($manifest))).psobject.Properties.Name -contains 'hooks')) {
-                    $lines.Add('on ' + $plugin.id + ' hooks')
-                } else { $lines.Add('off ' + $plugin.id); $off[[string]$plugin.id] = $false }
+                    if ($keep[$id] -notlike 'unknown*') { $keep[$id] = 'hooks' }
+                }
+            }
+            foreach ($id in @($keep.Keys)) {
+                if ($keep[$id]) { $lines.Add('on ' + $id + ' ' + $keep[$id]) } else { $lines.Add('off ' + $id); $off[$id] = $false }
             }
             if ($off.Count) { $settings['enabledPlugins'] = $off }
         } catch {

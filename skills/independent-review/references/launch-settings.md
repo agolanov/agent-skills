@@ -12,7 +12,7 @@ Settings configure a launched agent for the work it is given, not the session th
 | Independent review and cross-check | Opus / Sol, the other system | `high`, also on the final pass |
 | Difficult follow-up research; dual consultation | Fable / Astra | researcher `high` or `xhigh` by difficulty; consultants `high` |
 
-The two cheaper rows are starting points, judged on cost per completed job with retries and escalations counted; a row that costs more than the row above it goes back up.
+The two cheaper rows are starting points, judged on cost per completed job with retries and escalations counted; a cheaper row that costs more per completed job than the next more capable row goes up to it.
 
 Role names other skills use map to rows:
 

@@ -55,7 +55,7 @@ done
 [[ $native == yes || $native == no ]] || die '--native must be yes or no'
 [[ $checkout == /* && $prompt == /* && $dir == /* ]] || die 'checkout, prompt and dir must be absolute'
 [[ -d $checkout && -f $prompt && -d $dir ]] || die 'checkout, prompt file or round dir unavailable'
-command -v "$command" >/dev/null 2>&1 || die "$command not found"
+(cd "$checkout" && command -v "$command") >/dev/null 2>&1 || die "$command not found in the checkout's directory"
 [[ ! -e $dir/answer.md && ! -L $dir/answer.md ]] || die 'the answer path must be absent before launch'
 
 json_tool=''
@@ -88,18 +88,29 @@ plugins_off() {
     rows=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const p of JSON.parse(s))if(p.enabled===true)console.log(p.id+"\t"+(p.installPath||""))})' <<< "$list" 2>/dev/null) ||
       { printf 'unavailable: plugin list is not valid JSON\n' > "$dir/plugins.txt"; return; }
   fi
-  : > "$dir/plugins.txt"
+  # Decide by ID: an ID stays on when any of its installs has hooks or cannot be read.
+  # (No associative arrays: bash 3.2 on macOS lacks them.)
+  local kept='' order='' reason
   while IFS=$'\t' read -r id path; do
     [[ -n $id ]] || continue
+    case $'\n'$order in *$'\n'"$id"$'\n'*) ;; *) order+=$id$'\n' ;; esac
     if [[ -z $path || ! -d $path ]]; then
-      printf 'on %s unknown: no readable install path\n' "$id" >> "$dir/plugins.txt"
+      kept+=$id$'\t'$'unknown: no readable install path\n'
     elif [[ -f $path/hooks/hooks.json ]] || manifest_hooks "$path/.claude-plugin/plugin.json"; then
-      printf 'on %s hooks\n' "$id" >> "$dir/plugins.txt"
+      kept+=$id$'\thooks\n'
+    fi
+  done <<< "$rows"
+  : > "$dir/plugins.txt"
+  while IFS= read -r id; do
+    [[ -n $id ]] || continue
+    reason=$(awk -F'\t' -v id="$id" '$1 == id { print $2; exit }' <<< "$kept")
+    if [[ -n $reason ]]; then
+      printf 'on %s %s\n' "$id" "$reason" >> "$dir/plugins.txt"
     else
       printf 'off %s\n' "$id" >> "$dir/plugins.txt"
       printf '%s\n' "$id"
     fi
-  done <<< "$rows"
+  done <<< "$order"
 }
 manifest_hooks() {
   [[ -f $1 ]] || return 1
@@ -137,7 +148,7 @@ else
   args+=(-)
   out=$dir/stdout.log
 fi
-printf '%s\n' "$command" "${args[@]}" > "$dir/argv.txt"
+printf '%s\n' "$command" "${args[@]}" 2>/dev/null > "$dir/argv.txt" || die 'cannot write argv.txt'
 # Setup: the outputs must be writable and the prompt readable before the producer starts,
 # so that a redirection failure is a setup error (exit 2), never a producer exit.
 [[ -r $prompt ]] || die 'prompt file unreadable'

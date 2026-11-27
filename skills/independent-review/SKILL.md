@@ -42,7 +42,7 @@ Every native attempt carries the wrapper and a context file `<attempt dir>/conte
 
 **What the session owns.** The session that runs the review owns everything procedural:
 
-- **Suite.** Resolve, inspect and run the required checks before the launch by the [suite contract](references/checkout-state.md#resolve-checks-and-bind-suite-evidence), and keep the run and acceptance records. The reviewer gets the commands and their results as data in `Check commands`, never record paths.
+- **Suite.** Resolve, inspect and run the required checks before the launch by the [suite contract](references/checkout-state.md#resolve-checks-and-bind-suite-evidence), and keep the run and acceptance records. A caller's scoped round may launch with passing affected checks and broader coverage explicitly pending; a final review needs complete applicable coverage or the missing runs. The reviewer gets the commands and their results as data in `Check commands`, never record paths.
 - **A run the requirement gives to the reviewer.** A requirement that names the reviewer as the one who runs a check stays the reviewer's: the wrapper carries the reviewer-run line, and the obligation is met only by runtime records showing each command and how it ended; without them it stays `pending`.
 - **Unchanged checkout.** Only the before/after Git evidence of **Launch** proves it; the wrapper's "Do not change the checkout" is a request.
 - **Verdict and findings.** The session writes `findings.md` and derives the verdict ([Findings and derived verdict](references/review-wrapper.md#findings-and-derived-verdict)).

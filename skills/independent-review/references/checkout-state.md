@@ -79,10 +79,10 @@ Reuse stays in the same absolute tested checkout. Each reuse gets a separate acc
 1. Inspect the actual records and outputs; passing coverage needs successful commands and historical boundaries.
 2. Resolve pending phase recovery first, then compare a current boundary with the last accepted one and dispose of every difference.
 3. Inspect the complete intervening diff against the tested state; equal HEAD or tree IDs alone are not enough.
-4. Keep coverage of unchanged inputs; rerun checks whose inputs changed, the complete suite when the effect is broad or unknown.
+4. Keep coverage of unchanged inputs; rerun checks whose inputs changed, the complete suite when the effect is broad or unknown. Changed shared setup, fixtures, runners, dependencies, configuration or profile invalidates the results that use them, and unknown dependency, profile or environment equivalence is missing coverage, not reuse; record relevant inputs on Git's uncovered surfaces.
 5. Publish per check `retained`, `fresh`, `pending` or `failed/unavailable`, preserving the original run identities.
 
-A passing dirty run covers a task-state commit when inspection proves exactly those inputs were committed. After a bounded test-only cleanup, prior complete coverage covers unaffected tests once the whole changed test file and relevant static checks pass. A completed writing suite on unchanged HEAD may be retained after restoration is proven against its before-suite evidence; suite writes otherwise need adjudication and restoration or an authorized task commit before review. A failed required check blocks dependent work and grants no amend, squash or unreviewed corrective commit.
+A passing dirty run covers a task-state commit when inspection proves exactly those inputs were committed. After a bounded test-only cleanup, prior complete coverage covers unaffected tests once the whole changed test file and relevant static checks pass and shared setup, runners, dependencies, configuration and profile are inspected as unchanged (a test filename is not enough); report it as composed coverage, not a new full run. A completed writing suite on unchanged HEAD may be retained after restoration is proven against its before-suite evidence; suite writes otherwise need adjudication and restoration or an authorized task commit before review. A failed required check blocks dependent work and grants no amend, squash or unreviewed corrective commit.
 
 ```text
 Original runs: absolute record paths; original tested states

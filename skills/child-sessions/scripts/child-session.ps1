@@ -262,7 +262,7 @@ function Start-ChildSession {
     $model='';$effort='';$split='';$i=0
     $cliArgs=New-Object Collections.Generic.List[string]
     while ($i -lt $Vector.Count -and $Vector[$i].StartsWith('--') -and $Vector[$i] -ne '--') {
-        if ($i+1 -ge $Vector.Count -or $Vector[$i+1] -eq '') { throw 'Open option requires a value.' }
+        if ($i+1 -ge $Vector.Count -or ($Vector[$i+1] -eq '' -and $Vector[$i] -cne '--cli-arg')) { throw 'Open option requires a value.' }
         switch -CaseSensitive ($Vector[$i]) {
             '--agent' { $agent=$Vector[$i+1] }
             '--model' { $model=$Vector[$i+1] }

@@ -1595,7 +1595,7 @@ case ${1:-} in
   open)
     shift; split=; model=; effort=; CLI_ARGS=()
     while [[ ${1:-} == --* && ${1:-} != -- ]]; do
-      [[ $# -ge 2 && -n $2 ]] || die "${1}: a value is required"
+      [[ $# -ge 2 ]] && [[ $1 == --cli-arg || -n $2 ]] || die "${1}: a value is required"
       case $1 in
         --agent) AGENT=$2 ;;
         --model) model=$2 ;;
