@@ -27,6 +27,7 @@ Status file: <absolute path>
 Place: <window|subagent|background>
 Checkout: <absolute launch checkout>
 Helper: <absolute installed entrypoint>
+Launch words: <the lean launch words of the first launch, as passed|none>
 Runtime: <absolute runtime-dir>
 Root evidence: <absolute directory|None>
 Reopen: unused
@@ -52,6 +53,8 @@ None
 
 `State:` is one of `prepare: brief written`, `prepare: launched`, `prepare: asked <what>`, `waiting`, `accept: returned to worker`, `accept: reopened`, `accept: asked <what>`, `accept: reported`. `Reopen:` is `unused` or `used: <silent exit | dead before send>`; non-window workers count the run contract's one restart here too. `Return to worker:` is `unused` or `used: <archived status path>`. `Wait:` is the child-sessions report line's value once a rung is chosen, otherwise `not chosen`.
 
+**Launch words.** Written by the phase that first launches the worker, before that launch, and never rewritten: the run contract's [lean launch](run-contract.md#launch-and-wait) words as passed (`none` for a subagent or a Codex worker). Every reopen, restart and resumed start passes the same words, a `--session-id` word with a fresh UUID.
+
 **Waiting.** The launches still working and the first action to perform, in the [Waiting](#waiting) format. An empty block is `None` when no worker remains.
 
 **Facts.** Each task skill lists its own labelled lines. Everything else a later phase needs is read from the worker brief's labelled lines, the checkout and runtime records, rather than copied here.
@@ -70,7 +73,7 @@ Write one `Launch: <name> | <status file>` line for each worker still working, t
 - `Action: start <subagent|background>`: the wait holder starts it.
 - `Action: continue <subagent|background>`: the wait holder continues it.
 
-For `start` and `continue`, follow the action with `Action brief: <absolute path>`, `Action checkout: <absolute path>`, `Action settings: model <M|cli-default>, effort <E|cli-default>`, `Action permissions: <run contract Permissions arguments; none for a subagent>`, and `Action launch words: <the run contract's lean launch words; none for a subagent or a Codex worker>`. For `continue`, add `Action session: <recorded session or agent ID>` and `Action message: <one line, or the absolute path of a file>`.
+For `start` and `continue`, follow the action with `Action brief: <absolute path>`, `Action checkout: <absolute path>`, `Action settings: model <M|cli-default>, effort <E|cli-default>`, `Action permissions: <run contract Permissions arguments; none for a subagent>`, and `Action launch words: <the record's Launch words>`. For `continue`, add `Action session: <recorded session or agent ID>` and `Action message: <one line, or the absolute path of a file>`.
 
 Under an orchestrator the wait holder is the orchestrator. It acts on the Waiting block as its phase agent's last message gave it, takes nothing from this file, and writes the record only where this section tells the holder to. The wait holder performs the action as written and decides nothing in it. It records the actual launch or continuation identity, changes the action to `none`, and rewrites facts it changes. The calling skill supplies question/dialog handling and the return to a phase; this file grants no launch or permission by itself.
 
