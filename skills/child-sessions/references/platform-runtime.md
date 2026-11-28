@@ -19,17 +19,19 @@ Linux plain terminals support the xterm/zutty `-e` interface. The stock macOS Te
 
 ## Native Windows invocation
 
-In an existing native PowerShell command tool, dot-source the resolved owner and pass literal string arrays. `Invoke-ChildSessionDispatch` returns the lifecycle exit code; catch exceptions as command errors. Do not put a task string through `Invoke-Expression`, `cmd /c` or Bash interpolation.
+Set `$child` to the absolute installed entrypoint. Dot-source it and call `Invoke-ChildSessionDispatch @('runtime-dir')` before writing the brief. For the [window launch](../SKILL.md#locate-and-open), pass the literal argument array in `$openArgs` and run this block in one PowerShell tool process. The dispatcher prints evidence and returns the lifecycle exit code. Never evaluate task strings through `Invoke-Expression`, `cmd /c` or Bash interpolation.
 
 ```powershell
-$child = 'C:\absolute\skills\child-sessions\scripts\child-session.ps1'
-. $child
-$runtimeExit = Invoke-ChildSessionDispatch @('runtime-dir')
-$openExit = Invoke-ChildSessionDispatch @('open','--agent','codex','--model',$model,'--effort',$effort,'--',$name,$checkout,$brief)
-$capsExit = Invoke-ChildSessionDispatch @('capabilities',$name)
-$waitExit = Invoke-ChildSessionDispatch @('wait',$name,$status,'240')
-$closeExit = Invoke-ChildSessionDispatch @('close',$name)
-$aliveExit = Invoke-ChildSessionDispatch @('alive',$name)
+try {
+    . $child
+    $code = Invoke-ChildSessionDispatch (@('open') + $openArgs)
+    if ($code -eq 0) { $code = Invoke-ChildSessionDispatch @('capabilities', $name) }
+    if ($code -eq 0) { $code = Invoke-ChildSessionDispatch @('startup', $name, $statusFile) }
+    exit $code
+} catch {
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 2
+}
 ```
 
 For a separate process, invoke the verified installed `pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ABS\scripts\child-session.ps1 COMMAND ...` with the command tool's literal argv support and retain its actual process exit. The dispatcher array recipe avoids another native argument boundary when a tool offers only PowerShell code. There is no per-call request-file protocol.

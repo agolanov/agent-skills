@@ -34,7 +34,7 @@ HEAD: <full SHA>
 
 On a block or failure, record the current checkout, partial work and reason. Identify checks or reviews that did not run. Include decisions made by descendants. When the task requests reusable suite evidence, link every suite record in Checks, including partial and failed runs. The caller verifies [suite handoff](../../independent-review/references/checkout-state.md#run-and-hand-off-a-suite) before reuse.
 
-A phase agent handing a worker back to its orchestrator uses a separate format. Its status and last message are identical: `STATUS: waiting`, then `Handoff record: <absolute path>`, then the record's `## Waiting` block verbatim. This applies to a running worker or one awaiting start or continuation. Only the three worker status lines above end a helper wait. See [Nested calls](run-contract.md#nested-calls).
+A phase agent handing a worker back to its orchestrator uses a separate format. Its status and last message are identical: `STATUS: waiting`, then `Handoff record: <absolute path>`, then the record's `## Waiting` block verbatim. This applies to a running worker or one awaiting start or continuation. Only the three worker status lines above end a helper wait. See [Phase endings](nested-calls.md#phase-endings).
 
 ## Role-dependent results
 

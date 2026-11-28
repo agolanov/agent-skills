@@ -126,8 +126,8 @@ Run the implementer in the place Preflight 2 decided.
 
 ### Window
 
-1. Call the resolved script: `open --agent <agent> [--model M] [--effort E] [--cli-arg WORD]... <name> <path> <brief>`, quoting paths, passing the brief's recorded Launch settings as `--model` and `--effort` and omitting a field that is `cli-default`, and for a Claude agent the run contract's [lean launch](../child-sessions/references/run-contract.md#launch-and-wait) words as `--cli-arg` values. Write these words on the brief's `Launch words:` line and the handoff record's [`Launch words:`](../child-sessions/references/handoff-record.md#format) line before the launch (a root that writes no record keeps them on the brief) and pass the same words on every reopen and resume, a `--session-id` word with a fresh UUID. On explicit resume reuse the recorded window, the recorded Launch settings and the continuation brief; close any owned stale window before reopening, never an unrelated session.
-2. Read this launch's capabilities and perform child-sessions' Locate and open **Startup**.
+1. Use the [window launch sequence](../child-sessions/SKILL.md#locate-and-open) with `open --agent <agent> [--model M] [--effort E] [--cli-arg WORD]... <name> <path> <brief>`, quoting paths, passing the brief's recorded Launch settings as `--model` and `--effort` and omitting a field that is `cli-default`, and for a Claude agent the run contract's [lean launch](../child-sessions/references/run-contract.md#launch-and-wait) words as `--cli-arg` values. Write these words on the brief's `Launch words:` line and the handoff record's [`Launch words:`](../child-sessions/references/handoff-record.md#format) line before the launch (a root that writes no record keeps them on the brief) and pass the same words on every reopen and resume, a `--session-id` word with a fresh UUID. On explicit resume reuse the recorded window, the recorded Launch settings and the continuation brief; close any owned stale window before reopening, never an unrelated session.
+2. Read the capabilities and handle the Startup result returned by the launch call.
 
 ### Subagent and background
 

@@ -48,15 +48,16 @@ Before every opening, retries included, read the owner's validated `review-*` li
    printf '%s\n' "$uuid" >> "$attempt_dir/session-ids"
    CHILD_SESSION_CLAUDE_ARGS='' "$child_session" open --agent "$reviewer_agent" "${settings[@]}" \
      --cli-arg --strict-mcp-config --cli-arg --no-chrome --cli-arg --session-id --cli-arg "$uuid" \
-     "$name" "$reviewed_tree" "$attempt_dir/brief.md"
-   "$child_session" capabilities "$name"
+     "$name" "$reviewed_tree" "$attempt_dir/brief.md" &&
+     "$child_session" capabilities "$name" &&
+     "$child_session" startup "$name" "$attempt_dir/status.md"
    ```
 
    On native PowerShell save the variable's existence and value, set it to one space for the call (Windows PowerShell 5.1 deletes a variable assigned an empty string, and the helper reads whitespace as no arguments), and restore it in `finally`.
 
 ## Wait
 
-5. Wait by child-sessions' [Wait](../../child-sessions/SKILL.md#wait), its Startup watch and single reopen after a silent exit included (step 4's `open`, a new UUID). A native Codex review window is never reopened: its nested review may outlive the driver, so a silent exit is that attempt's unsuccessful completion, gated by step 7, and a retry is a new attempt directory. When the dual review opens two windows, one watcher covers both in opening order and ends at the first event; a `done` or unsuccessful reviewer leaves the set, a `blocked` one rejoins after its answer; the wait ends when both have a terminal outcome.
+5. Handle step 4's [Startup result](../../child-sessions/SKILL.md#locate-and-open), then follow child-sessions' [Wait](../../child-sessions/SKILL.md#wait) and its single reopen after a silent exit (step 4 with a new UUID). A native Codex review window is never reopened: its nested review may outlive the driver, so a silent exit is that attempt's unsuccessful completion, gated by step 7, and a retry is a new attempt directory. When the dual review opens two windows, one watcher covers both in opening order and ends at the first event; a `done` or unsuccessful reviewer leaves the set, a `blocked` one rejoins after its answer; the wait ends when both have a terminal outcome.
 6. Dialogs follow child-sessions [Dialogs](../../child-sessions/SKILL.md#dialogs), new folder trust included as its own user decision, also under `--auto`; the controller keeps the [dialog record](#dialogs). The nested `codex review` may raise approval dialogs: a limitation, not an invalid attempt. A `STATUS: blocked` goes to the caller as a question (direct use: the user; under `--auto` by [auto.md](../../child-sessions/references/auto.md#deciding)). `STATUS: failed`, or a second silent exit (the first for a native Codex window), is an unsuccessful completion; a dual peer still working keeps its wait.
 
 ## Stop, confirm, capture, validate

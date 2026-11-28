@@ -17,10 +17,18 @@ Under `--auto`, put `Auto: yes` in the brief. The child asks nobody directly. Ro
 
 1. Resolve the installed skill's absolute path. Use its [native entrypoint](references/platform-runtime.md): `scripts/child-session` on POSIX (including WSL), or `scripts/child-session.ps1` through `Invoke-ChildSessionDispatch` on native Windows. Keep that invocation for the run. MSYS/Cygwin is unsupported.
 2. Call `runtime-dir`. Under that private directory, outside monitored repositories, write the [brief](references/brief-writing.md) and choose an absent absolute [status path](references/status-file.md). Choose a unique name matching `[A-Za-z0-9_-]+`.
-3. Run `open --agent <system> [options] <name> <absolute checkout> <absolute brief>`. Use literal arguments. Pass the caller's model, effort and [launch settings](references/run-contract.md#launch-and-wait), with one `--cli-arg WORD` per extra word. Omitted model and effort use CLI defaults.
-4. Read `capabilities <name>`. Keep its JSON, launch ID, checkout, backend IDs and PID/start evidence. Use those records for every control. On a plain terminal, tell the user at launch that questions and dialogs need direct attention in the window and counts are **not observable**. Repeat only when ending or escalating the wait. Report the unverified native macOS launch/process coverage where applicable.
+3. Build `open_args` as `--agent <system> [options] -- <name> <absolute checkout> <absolute brief>`, one literal word per element. Pass the caller's model, effort and [launch settings](references/run-contract.md#launch-and-wait), with one `--cli-arg WORD` per extra word. Omitted model and effort use CLI defaults.
+4. For each open, reopen or resume, submit the following sequence in **one shell tool call**. Honor any caller check at the step it guards. Keep the output and exit code. If the tool yields, collect the same call. On native Windows use the [PowerShell sequence](references/platform-runtime.md#native-windows-invocation).
 
-**Startup.** After every open, reopen or resume, call `startup <name> <status-file>` once. It checks status and liveness and watches the window for up to 60 seconds. On `WORKING` or `UNOBSERVABLE`, proceed to wait. On `INSPECT`, read the returned screen. If it shows work, proceed to wait. Handle any [dialog](#dialogs) before waiting. If it is still starting, pause five seconds between checks within the original 60-second budget. Dispatch an exact status line or exit 3 immediately. Report command errors.
+   ```bash
+   "$child_session" open "${open_args[@]}" &&
+     "$child_session" capabilities "$name" &&
+     "$child_session" startup "$name" "$status_file"
+   ```
+
+Keep the capability JSON, launch ID, checkout, backend IDs and PID/start evidence. Check the launch identity before using its controls. On a plain terminal, tell the user at launch that questions and dialogs need direct attention in the window and counts are **not observable**. Repeat only when ending or escalating the wait. Report the unverified native macOS launch/process coverage where applicable.
+
+**Startup.** Handle the result already returned by `startup`, which checks status, liveness and the visible window for up to 60 seconds. On `WORKING` or `UNOBSERVABLE`, proceed to wait. On `INSPECT`, read the returned screen. If it shows work, proceed to wait. Handle any [dialog](#dialogs) before waiting. If it is still starting, pause five seconds between checks within the original 60-second budget. Dispatch an exact status line or a startup exit 3 immediately. Report command errors.
 
 ## Wait
 

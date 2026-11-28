@@ -4,7 +4,7 @@
 
 - `<runtime>` is the resolved installed child helper's successful `runtime-dir` output, outside Git.
 - `<spec-stem>` is the spec's stem by the Spec stem rule of [stages-section.md](stages-section.md#parsing-rules), with every character outside `[A-Za-z0-9_-]` replaced by `-` (as `splitting-spec-into-stages` Preflight 5 names its window).
-- A nested call's brief is `<runtime>/stages-<spec-stem>-<NN>-<phase>-brief.md` and its status `<runtime>/stages-<spec-stem>-<NN>-<phase>-status.md`, `<NN>` the stage and `<phase>` `plan`, `refine` or `deliver`. A call status is renamed `<file>-waiting-<n>` before acting on its Waiting block and `<file>-blocked-<n>` before an answer, with the smallest unused `n`, by run contract Nested calls.
+- A nested call's brief is `<runtime>/stages-<spec-stem>-<NN>-<phase>-brief.md` and its status `<runtime>/stages-<spec-stem>-<NN>-<phase>-status.md`, `<NN>` the stage and `<phase>` `plan`, `refine` or `deliver`. A call status is renamed `<file>-waiting-<n>` before acting on its Waiting block and `<file>-blocked-<n>` before an answer, with the smallest unused `n`, by the [nested call cycle](../../child-sessions/references/nested-calls.md#cycle).
 
 ## State file
 
