@@ -59,7 +59,7 @@ When a whole skill moves outside `inline`, the child does the work. The parent f
 Before archiving old files, check whether another run still uses them. Treat these as possibly live:
 
 - A `subagent` or `background` brief with a missing status or a first line other than `STATUS: done` or `STATUS: failed`.
-- A run directory with `launch.time` or `wrapper.identity` and no valid [completed recording](#background-recording).
+- A run directory with `launch.time` or `wrapper.identity` and no valid [completed recording](background.md#background-recording).
 - A legacy directory with neither field and no `producer.exit`.
 
 Show the paths and ask the user whether the earlier run ended, including under `--auto`. Rename only on confirmation. Otherwise stop and name the files.
@@ -76,9 +76,9 @@ Read the brief at <absolute brief> completely and carry it out.
 
 - **`window`:** [SKILL.md](../SKILL.md) as today: `open`, Startup, [Wait](../SKILL.md#wait), Dialogs and the single reopen after a silent exit.
 - **`subagent`:** start a fresh agent with the host's agent tool ([Host mechanisms](#host-mechanisms)): the prompt above, no parent history, the host's normal tool set, and the pair of [Settings](#settings). For an orchestrator's phase agent, use its whole phase brief from [Nested calls](nested-calls.md#briefs) instead of that prompt, with the pair launch-settings' [Nested agents](../../independent-review/references/launch-settings.md#nested-agents) gives phase agents. It starts in the parent's working directory; the brief's `Checkout:` is where it works. Wait with the host's wait tools until it ends; it writes the status file before it ends.
-- **`background`.** Use the installed [background commands](#background-recording). On Claude, start the producer once with Bash `run_in_background: true` and retain the host task ID. On Codex use `exec_command` and continue the same yielded `session_id` with `write_stdin` at intervals of at most 60 seconds. A host task handle and a CLI conversation ID serve different purposes.
+- **`background`:** follow [Background recording](background.md#background-recording) for launch, wait selection and completion.
 
-Keep the [quiet wait](../SKILL.md#wait). Use rung 1 for a background child only when [Host mechanisms](#host-mechanisms) verifies notifications for the waiting host and session kind. Print the usual waiting notice with the host handle and end the turn. Background children have no rung 2. In the foreground, use the host wait when available (Claude `TaskOutput` with `block: true`, up to 60000 ms), otherwise the [completion check](#completion-marker-fallback). Report the applicable `Wait:` line. If neither a host execution/wait pair nor the shell/liveness fallback is usable, refuse before launch.
+Keep the [quiet wait](../SKILL.md#wait).
 
 After completion, dispatch the exact [status](../SKILL.md#exits-and-statuses). For a block, follow [Questions and continuation](#questions-and-continuation). A child ending without valid status gets one restart via that same section, with this message:
 
@@ -88,23 +88,11 @@ On a second silent exit, report the producer exit, stderr and run directory and 
 
 ### Background recording
 
-Use the installed [Bash helper](../scripts/background) or native [PowerShell 7 helper](../scripts/background.ps1) with literal arguments. Start the PowerShell producer in its own process with `pwsh -NoProfile -File <absolute background.ps1>`. Windows PowerShell 5.1 does not support this background path.
-
-1. Write the prompt outside the checkout. Before scheduling a producer, run `prepare --run-dir <fresh absolute directory> --prompt <absolute prompt file>`. This copies the prompt, verifies process inspection and records the launch time. Use a fresh directory for every start or resume.
-2. Launch `run --run-dir <directory> --checkout <absolute checkout> --agent <system[:command]> [--model M] [--effort E] [--resume ID] [--cli-arg WORD]...` once through the host. Apply [Permissions](#permissions) and [lean launch](#launch-and-wait). Each extra word is a literal argument. Keep the run directory and host handle.
-3. Run `wait --run-dir <directory> [--seconds N]` to verify publication before reading the child status. On success the helper prints `producer_exit:` and `session_id:` from the completed recording. Keep the wrapper result, actual CLI exit and child status distinct. A missing ID is a launch failure. Retain logs on error.
+Follow [Background recording](background.md#background-recording) for a background start or resume.
 
 ### Completion-marker fallback
 
-On each rung 1 wake, including user input, run the background helper's `wait --run-dir <directory> --seconds 1`. On the foreground fallback use 60 seconds with a host timeout that allows the command to finish (Claude Bash `timeout: 75000` ms).
-
-| Exit | Action |
-|---|---|
-| 0 | Record the printed producer exit and conversation ID, then dispatch status. |
-| 124 | Still pending. On rung 1, answer any input, repeat the notice with the original handle and end the turn. In the foreground, wait again on the same directory. |
-| 2 or 3 | Process or timestamp evidence is unavailable (2) or recording is incomplete (3). Preserve diagnostics and stop. |
-
-If the host unexpectedly backgrounds the foreground wait, settle its retained handle and report the failure. Start no competing waiter or producer. When relying on the marker, report that the outer host exit notification was not independently awaited. The marker grants no process cleanup authority.
+For a marker-based wait, use [Completion-marker fallback](background.md#completion-marker-fallback).
 
 ## Child environment
 
@@ -118,7 +106,7 @@ Window and background helpers remove only their fourteen named parent-session me
 - Before continuing, archive the status: rename it to `<file>-blocked-<n>` with an unused number, as for a window ([status-file.md](status-file.md)); the child writes a fresh status at the original path.
 - Continue **the same child conversation** by the host mechanism of [Host mechanisms](#host-mechanisms), the answer as one message (multiline content in a file, the message naming its absolute path), then wait as at launch:
   - `subagent`: the host's message tool to the same agent;
-  - `background`: use [Background recording](#background-recording) with a fresh directory, the answer as the prompt, `--resume <recorded session ID>`, and the same permissions, launch words and settings;
+  - `background`: use [Background recording](background.md#background-recording) with a fresh directory, the answer as the prompt, `--resume <recorded session ID>`, and the same permissions, launch words and settings;
   - `window`: child-sessions' `blocked` row.
 - Otherwise start a **fresh child**: the original brief, followed by every question and answer so far and the line "Continue from the current state of the checkout: read git log and git status first.". Otherwise means no mechanism for the host, no recorded session ID, or a continuation the host refuses (its message tool returns an error, or the resume exits nonzero without a status); that fallback belongs to the same answer or restart.
 

@@ -644,26 +644,33 @@ function Get-ChildSessionStartupScreenState {
     if ($working) { return 'WORKING' }
     return 'INSPECT'
 }
-function Invoke-ChildSessionStartup {
+function Get-ChildSessionWindowEvent {
     param($Set)
-    $name=$Set.Names[0];$start=Get-ChildSessionClock
-    while ($true) {
+    $name=$Set.Names[0]
+    $status=Get-ChildSessionTerminalStatus $Set.Files[0]
+    if ($status -cne '-') { [Console]::WriteLine('STATUS: '+$status);return 0 }
+    $r=Read-ChildSessionRecord $name
+    if (-not $r) { throw ('No owned launch record for '+$name+'.') }
+    $alive=Test-ChildSessionAlive $r
+    if (-not $alive -and ($r.phase -cne 'starting' -or $r.closed)) {
         $status=Get-ChildSessionTerminalStatus $Set.Files[0]
         if ($status -cne '-') { [Console]::WriteLine('STATUS: '+$status);return 0 }
-        $r=Read-ChildSessionRecord $name
-        if (-not $r) { throw ('No owned launch record for '+$name+'.') }
-        $alive=Test-ChildSessionAlive $r
-        if (-not $alive -and ($r.phase -cne 'starting' -or $r.closed)) {
-            $status=Get-ChildSessionTerminalStatus $Set.Files[0]
-            if ($status -cne '-') { [Console]::WriteLine('STATUS: '+$status);return 0 }
-            [Console]::WriteLine('EXITED: agent in window '+$name+' is gone, no status');return 3
-        }
-        if ($r.backend -ceq 'terminal') { [Console]::WriteLine('UNOBSERVABLE');return 0 }
-        Assert-ChildSessionPane $r
-        $screen=Get-ChildSessionScreen $r
+        [Console]::WriteLine('EXITED: agent in window '+$name+' is gone, no status');return 3
+    }
+    if ($r.backend -ceq 'terminal') { [Console]::WriteLine('UNOBSERVABLE');return 0 }
+    return [pscustomobject]@{Record=$r;Alive=$alive}
+}
+function Invoke-ChildSessionStartup {
+    param($Set)
+    $start=Get-ChildSessionClock
+    while ($true) {
+        $event=Get-ChildSessionWindowEvent $Set
+        if ($event -is [int]) { return $event }
+        Assert-ChildSessionPane $event.Record
+        $screen=Get-ChildSessionScreen $event.Record
         $state=Get-ChildSessionStartupScreenState $screen
         if ($state -ceq 'WORKING') {
-            if ($alive) { [Console]::WriteLine($state);return 0 }
+            if ($event.Alive) { [Console]::WriteLine($state);return 0 }
             $state='INSPECT'
         }
         $remaining=60-((Get-ChildSessionClock)-$start)
@@ -674,6 +681,43 @@ function Invoke-ChildSessionStartup {
             return 0
         }
         Start-Sleep -Milliseconds ([int][Math]::Ceiling(1000*[Math]::Min(5,$remaining)))
+    }
+}
+function Invoke-ChildSessionDialogScreen {
+    param($Set,[string]$Token)
+    $left=3
+    $prior=''
+    if ($Token) {
+        if ($Token -cnotmatch '\A([1-3])-([a-f0-9]{64})\z') { throw 'Expected a screen token with rechecks left.' }
+        $left=[int]$Matches[1]
+        $prior=$Matches[2]
+    }
+    $event=Get-ChildSessionWindowEvent $Set
+    if ($event -is [int]) { return $event }
+    while ($true) {
+        if ($prior) {
+            Start-Sleep -Seconds 5
+            $left--
+            $event=Get-ChildSessionWindowEvent $Set
+            if ($event -is [int]) { return $event }
+        }
+        try {
+            Assert-ChildSessionPane $event.Record
+            $screen=Get-ChildSessionScreen $event.Record
+        } catch {
+            $event=Get-ChildSessionWindowEvent $Set
+            if ($event -is [int]) { return $event }
+            throw
+        }
+        $hash=[Security.Cryptography.SHA256]::Create()
+        try { $digest=[BitConverter]::ToString($hash.ComputeHash($script:Utf8.GetBytes($screen))).Replace('-','').ToLowerInvariant() }
+        finally { $hash.Dispose() }
+        if ($digest -cne $prior) { [Console]::WriteLine('SCREEN '+$left+'-'+$digest) }
+        elseif ($left -eq 0) { [Console]::WriteLine('UNCHANGED') }
+        else { continue }
+        [Console]::Write($screen)
+        if ($screen -and -not $screen.EndsWith("`n")) { [Console]::WriteLine() }
+        return 0
     }
 }
 function Invoke-ChildSessionEvent {
@@ -1130,7 +1174,7 @@ function Invoke-ChildSessionDispatch {
     param([AllowEmptyCollection()][string[]]$Vector)
     if ($Vector.Count -eq 0) { throw 'A lifecycle command is required.' }
     $command=$Vector[0];$rest=@();if ($Vector.Count -gt 1) { $rest=@($Vector[1..($Vector.Count-1)]) }
-    $null=Get-ChildSessionRuntime -ReadOnly:($command -cin @('startup','event'))
+    $null=Get-ChildSessionRuntime -ReadOnly:($command -cin @('startup','event','dialog-screen'))
     if ($command -ceq 'open') { Start-ChildSession $rest;return 0 }
     if ($command -cin @('runtime-dir','list')) {
         if ($rest.Count -ne 0) { throw 'Command takes no arguments.' }
@@ -1141,6 +1185,13 @@ function Invoke-ChildSessionDispatch {
     if ($command -ceq 'wait' -and $rest.Count -gt 0 -and $rest[0] -ceq '--watch') {
         $set=@();if ($rest.Count -gt 1) { $set=@($rest[1..($rest.Count-1)]) }
         return (Invoke-ChildSessionWatch (Read-ChildSessionWatchArguments $set 'wait --watch'))
+    }
+    if ($command -ceq 'dialog-screen') {
+        if ($rest.Count -notin @(2,3) -or $rest[0].StartsWith('-')) { throw 'dialog-screen requires NAME STATUS [SCREEN-TOKEN].' }
+        $set=Read-ChildSessionWatchArguments $rest[0..1] $command
+        $token=''
+        if ($rest.Count -eq 3) { $token=$rest[2];if (-not $token) { throw 'Expected a screen token.' } }
+        return (Invoke-ChildSessionDialogScreen $set $token)
     }
     if ($command -cin @('startup','event')) {
         if (-not $rest.Count -or $rest.Count % 2 -or $rest[0].StartsWith('-') -or ($command -ceq 'startup' -and $rest.Count -ne 2)) { throw ($command+' requires launch and status-file pairs.') }
