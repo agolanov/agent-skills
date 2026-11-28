@@ -2,6 +2,10 @@
 
 An orchestrator (`delivering-spec-stages`, `delivering-task-follow-ups`) is the only session that lasts through a **call**, one run of a nested task skill. Short agents perform Prepare and Accept; the orchestrator holds every wait itself.
 
+## Setup
+
+Resolve the installed platform entrypoint and take `<runtime>` from successful `runtime-dir`. Use the [status contract](status-file.md) for phase results, [platform runtime](platform-runtime.md) for native invocation, and [Wait and events](#wait-and-events) for the wait and terminal controls. Consult [brief writing](brief-writing.md) when preparing call briefs, [auto](auto.md) under `--auto`, and launch-settings' [Places](../../independent-review/references/launch-settings.md#places) and [Child settings check](../../independent-review/references/launch-settings.md#child-settings-check) for a deferred start or continuation.
+
 ## Briefs
 
 The **call brief** is the file the orchestrator names: write it once per call with today's identity lines and the Phase instructions below. It records the call for [Earlier runs](run-contract.md#earlier-runs); no phase agent is told to read it. The **phase brief** is the whole prompt the orchestrator builds from its own arguments and state, never from re-reading a file under `runtime-dir`. A task skill's “its brief or prompt”, “ends as that brief says” and “its starting brief's Arguments and Authority” mean this prompt. Neither a call brief nor a handoff record grants authority: merge authorization, disputed acceptance, settings acceptance and every answer reach a phase agent only here.
@@ -55,10 +59,10 @@ The last message is the status's first line, then `Handoff record: <absolute pat
 
 1. Write the call brief, with its status path absent. Check Earlier runs before renaming earlier files as today's orchestrator does.
 2. Start a fresh native subagent with the phase brief as its prompt: Prepare, `Handoff record: None`, `Event: start`; no parent history, model and effort set as [Nested agents](../../independent-review/references/launch-settings.md#nested-agents) says for phase agents. Join it in the foreground. Workers take their roles whoever starts them.
-3. Branch on the **last message's first line**. For `done`, `blocked` or `failed`, read the status file; a different first line is a missing status by Restart below. For `waiting`, act on the last message alone: never read back the status file's copy.
+3. Branch on the **last message's first line**. For `waiting`, act on that message alone. For `done`, `blocked` or `failed`, read the status once: check its exact first line, then extract the requested Report fields, Decisions or Questions together from that same read. Retain the source path. A different first line is a missing status by Restart below.
 4. For `waiting`, apply Check before acting below; rename the call status to `<file>-waiting-<n>`, the smallest unused `n`, then perform Actions and Wait and events below.
 5. A phase's `blocked`: first validate its returned Handoff record against Check before acting 1–2's runtime and expected record path. Keep the first checked non-`None` record path returned by any phase of this call in your own context; every later phase must return that path. Until then, `None` is allowed, including an Earlier runs question about leftover files. A mismatch fails the call naming what was found, before starting another agent. Show its Questions verbatim with options and recommendation, obtain the answer (under `--auto`, route by [Deciding](auto.md#deciding)), and rename the status to `<file>-blocked-<n>`. Start a **fresh** agent of the phase that asked, with the same Event, the checked Handoff record and every question and answer of this call in Answers. Never continue the agent that asked and never write an answer into a call brief or record as authority. No answer ends the call as today's unanswered `blocked`.
-6. `done`: read from `## Report` the items the orchestrator's step names; retain `## Decisions`. `failed`: apply that step's existing failure rule.
+6. `done`: use the Report and Decisions obtained in step 3. `failed`: apply the caller's failure rule with the same status evidence.
 
 Rename the call status before every further phase agent, so each finds its path absent. Keep Prepare/Accept agent counts per call for the orchestrator's report.
 

@@ -1,22 +1,18 @@
-Display copy of `delivering-task/SKILL.md` Preflight 2 (the branch and window naming), Worktree 1 (the worktree path) and Worktree 3 (the removed-skill brief stop), and of `delivering-task/references/queue.md` Input 3 (the merged-subject search and the leftovers list) and Input 5–6; keep equal, except that the queue records Input 6's discard answers and its archives and performs them later (in its Preflight 4's Documents bullet), while staged delivery performs a discard or an archive at once, when Stage loop step 1 has the answer.
-
 # Stage derivation
 
 ## Branch and window
 
-Default branch to the task document's stem (the plan's stem for a plan or a spec resolved to its plan); validate with `git check-ref-format --branch`, asking for a valid override if invalid (under `--auto`, routed by [auto.md](../../child-sessions/references/auto.md#deciding)). Use window `<name> = impl-<branch>` for `[A-Za-z0-9_-]+` branches; otherwise replace disallowed branch characters with `-` and use `impl-<slug>-<hash8>` (first eight SHA-256 hex characters of the full branch name). Record the unique name; never alias slash/dot branches by slug alone.
+Use delivery's [branch and window names](../../delivering-task/references/task-names.md#branch-and-window).
 
 ## Worktree
 
-Use the project worktree convention, otherwise `<main-checkout>/.worktrees/<branch>`.
-
-For `--resume`, require the prior runtime brief whose identity block carries `Written by: delivering-task`. Any other brief stops before reopening, naming it: “brief written by a removed skill; finish that run with the catalog that started it, or remove its branch, worktree and runtime files by hand”.
+Use delivery's [worktree path](../../delivering-task/references/task-names.md#worktree-path). For an older brief without the delivery writer identity use the [resume refusal](../../delivering-task/references/resume.md).
 
 ## Merged
 
-Already merged: after Preflight 1–3 and before step 4's question, for each candidate take `<branch>` as step 1 says and search the first-parent history of the project main checkout's main branch (`git log --first-parent --merges --format='%H%x09%cs%x09%s' <main>`, merge commits only) for a subject equal, as a whole fixed string, to `Merge branch '<branch>'` or `Merge branch '<branch>' into <main>`; the most recent match counts.
+Use [delivery merge history](../../delivering-task/references/merge-history.md). Scan once for all candidate branches in a listing, then derive again from current main when acting on a stage or checking delivered stages after refinement.
 
-List its leftovers without acting on them: a worktree or branch under its name (Cleanup not done), a live window with its name (`child-session list`); finishing them is the user's call.
+Report a merged stage's leftover branch, worktree or live window. Leave those artifacts for the user.
 
 ## Leftovers
 

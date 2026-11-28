@@ -1,0 +1,11 @@
+# Run elsewhere
+
+Under `--run background` or `window` this session is a thin launcher (run contract [Places](../../child-sessions/references/run-contract.md#places)) and performs none of the sections below: a child of this session's system performs this skill `inline`, its chain included, and this session writes its brief, launches it, waits, relays its questions and reports its result.
+
+Follow child-sessions' [Thin launchers](../../child-sessions/references/run-contract.md#thin-launchers) with these local parameters.
+
+- **Inputs.** Find the project checkout as [Input](../SKILL.md#input) 3 says and resolve each argument to an absolute path. When the user's words set the implementer's place, announce the mapping now and add `Implementer place: <place> (the user's words)` to the brief. Apply the Keys list's reviewer refusals before launching, and map the user's words choosing a reviewer to the keys, announced, so that `Arguments:` carries the keys.
+- **Worker and arguments.** Role `follow-ups fixer`; consume `--run`, `--model` and `--effort`. `Arguments:` holds the absolute arguments and every other key as given. `Checkout:` is the project checkout.
+- **Name.** `follow-ups-<slug>`, where `<slug>` is the first argument's file stem or directory name, with every character outside `[A-Za-z0-9_-]` replaced by `-`.
+- **Authority.** The batch's fixes, briefs and follow-ups file updates, respecting the outcomes the user selected (under `--auto`, those [auto.md](../../child-sessions/references/auto.md#deciding) routes); the batch commit on the main branch; `review-fix-loop`'s commits and its follow-ups writing; the chain's windows, documents, commits, merges into main and cleanup; nothing more.
+- **Questions and result.** The Select question and every question the chain relays follow the shared window/blocked routing; a blocked Select question includes the table with its groups. The child writes `STATUS: done` once it has reported, or `STATUS: failed` with the reason when it stopped, and its Report under `## Report` after the status contract's sections. Report that `## Report` as this skill's Report (after `failed`, the failure and what the status lists), with the shared launch evidence.
